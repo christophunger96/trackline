@@ -16,6 +16,25 @@ const colors = {
   warning: "#78350f",
 };
 
+const cardTheme = {
+  table: "radial-gradient(circle at top left, rgba(126, 87, 255, 0.25), transparent 32%), linear-gradient(135deg, #080b15 0%, #141827 52%, #20162c 100%)",
+  ivory: "linear-gradient(160deg, #fffaf0 0%, #f1eadb 100%)",
+  back: "radial-gradient(circle at 50% 38%, rgba(196, 160, 255, 0.22), transparent 30%), repeating-radial-gradient(circle at 50% 38%, rgba(255,255,255,0.08) 0 1px, transparent 1px 9px), linear-gradient(160deg, #351371 0%, #1b0e3d 100%)",
+};
+
+function getGenreColor(genre = "") {
+  const key = genre.toLowerCase();
+
+  if (key.includes("rock") || key.includes("grunge") || key.includes("metal")) return "#ef476f";
+  if (key.includes("pop")) return "#8b5cf6";
+  if (key.includes("dance") || key.includes("disco") || key.includes("funk")) return "#22c55e";
+  if (key.includes("r&b") || key.includes("soul")) return "#f59e0b";
+  if (key.includes("hip")) return "#06b6d4";
+
+  return "#64748b";
+}
+
+
 const CUSTOM_TRACKS_STORAGE_KEY = "trackline.customTracks.v1";
 const GAME_STATE_STORAGE_KEY = "trackline.gameState.v1";
 const DISCORD_CLIENT_ID_STORAGE_KEY = "trackline.discord.clientId";
@@ -2619,7 +2638,7 @@ function LobbyCard({
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12, alignItems: "end" }}>
           <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: colors.muted, fontSize: 14 }}>Ziel: Songs in der Timeline</span>
+            <span style={{ color: colors.muted, fontSize: 14 }}>Ziel: Karten in der Timeline</span>
             <Input type="number" min="3" max="20" value={targetScore} onChange={(event) => setTargetScore(Number(event.target.value))} />
           </label>
 
@@ -2927,151 +2946,274 @@ function CurrentTrackPanel({
   onDrawTrack,
   onSkipTrack,
 }) {
-  if (!currentTrack && phase === "ready") {
-    return (
-      <div
-        style={{
-          border: `1px dashed ${colors.border}`,
-          borderRadius: 18,
-          padding: 18,
-          background: colors.bg,
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 12,
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <h3 style={{ margin: "0 0 6px" }}>Bereit fuer den naechsten Song</h3>
-          <p style={{ margin: 0, color: colors.muted }}>Jetzt wird eine verdeckte Karte gezogen.</p>
-        </div>
-
-        <Button onClick={onDrawTrack} disabled={!canDrawTrack}>
-          Song ziehen
-        </Button>
-      </div>
-    );
-  }
-
-  if (!currentTrack) return null;
-
-  const revealed = phase === "reveal" || showDebugSong;
+  const revealed = currentTrack && (phase === "reveal" || showDebugSong);
 
   return (
-    <div style={{ border: `1px dashed ${colors.border}`, borderRadius: 18, padding: 18, background: colors.bg, display: "grid", gap: 14 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+    <div
+      style={{
+        borderRadius: 24,
+        border: `1px solid ${colors.border}`,
+        background: cardTheme.table,
+        padding: 20,
+        display: "grid",
+        gridTemplateColumns: "max-content minmax(0, 1fr)",
+        gap: 22,
+        alignItems: "center",
+        overflow: "hidden",
+      }}
+    >
+      <div>{currentTrack && revealed ? <TimelineTrackCard track={currentTrack} /> : <HiddenTrackCard />}</div>
+
+      <div style={{ display: "grid", gap: 14 }}>
         <div>
-          <h3 style={{ margin: "0 0 6px" }}>{revealed ? currentTrack.title : "Verdeckter Song"}</h3>
+          <Badge variant="secondary">{currentTrack ? "Aktueller Song" : "Bereit"}</Badge>
+          <h2 style={{ margin: "10px 0 6px", fontSize: 28 }}>
+            {currentTrack && revealed ? currentTrack.title : currentTrack ? "Verdeckter Song" : "Noch kein Song gezogen"}
+          </h2>
           <p style={{ margin: 0, color: colors.muted }}>
-            {revealed ? `${currentTrack.artist} - ${currentTrack.year}` : "Spotify kann den Song verdeckt abspielen. Titel bleibt bis zum Reveal verborgen."}
+            {currentTrack && revealed
+              ? `${currentTrack.artist} • ${currentTrack.year} • ${currentTrack.genre}`
+              : currentTrack
+                ? "Starte den Song und platziere ihn in der Timeline."
+                : "Ziehe den naechsten Song, sobald der aktive Spieler bereit ist."}
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <Button variant="secondary" onClick={onToggleDebug} disabled={phase === "reveal" || !canHostControl}>
-            {showDebugSong ? "Debug verbergen" : "Debug anzeigen"}
-          </Button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {!currentTrack && phase === "ready" && (
+            <Button onClick={onDrawTrack} disabled={!canDrawTrack}>
+              Song ziehen
+            </Button>
+          )}
 
-          {phase === "placing" && (
-            <Button variant="secondary" onClick={onSkipTrack} disabled={!canHostControl}>
-              Ueberspringen
+          {currentTrack && phase === "placing" && (
+            <>
+              <Button onClick={onPlayTrack} disabled={!canPlayTrack}>
+                Song starten
+              </Button>
+
+              {canHostControl && (
+                <Button variant="secondary" onClick={onSkipTrack}>
+                  Song ueberspringen
+                </Button>
+              )}
+            </>
+          )}
+
+          {currentTrack && canHostControl && (
+            <Button variant="secondary" onClick={onToggleDebug} disabled={phase === "reveal"}>
+              {showDebugSong ? "Song wieder verdecken" : "Debug: Song anzeigen"}
             </Button>
           )}
         </div>
-      </div>
-
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 14, background: colors.panelSoft, display: "grid", gap: 10 }}>
-        <p style={{ margin: 0, color: colors.muted }}>
-          Dieser Button startet den verdeckten Song direkt ueber Spotify und erzeugt gleichzeitig das Playback-Event.
-        </p>
-
-        {phase === "placing" && (
-          <Button
-            variant="secondary"
-            disabled={!canPlayTrack}
-            onClick={() => {
-              onPlayTrack?.();
-              window.dispatchEvent(new Event(SPOTIFY_PLAY_EVENT_NAME));
-            }}
-          >
-            Song ueber Spotify starten / erneut abspielen
-          </Button>
-        )}
       </div>
     </div>
   );
 }
 
 function TimelineChooser({ playerName, timeline, phase, selectedInsertIndex, setSelectedInsertIndex, canPlace }) {
-  const compact = timeline.length >= 6;
+  const orderedTimeline = sortTimeline(timeline);
+  const disabled = phase !== "placing" || !canPlace;
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
+    <div style={{ display: "grid", gap: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <div>
           <h3 style={{ margin: 0 }}>Timeline von {playerName}</h3>
-          <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>
-            Chronologisch von links nach rechts. Die schmalen Plus-Felder sind moegliche Einfuegepositionen.
+          <p style={{ margin: "6px 0 0", color: colors.muted, fontSize: 13 }}>
+            Chronologisch von links nach rechts. Freie Kartenplaetze markieren moegliche Positionen.
           </p>
         </div>
 
-        <Badge variant="secondary">{timeline.length} Songs</Badge>
+        <Badge variant="secondary">{orderedTimeline.length} Karten</Badge>
       </div>
 
-      <div style={{ overflowX: "auto", border: `1px solid ${colors.border}`, borderRadius: 18, padding: 14, background: colors.bg }}>
-        <div style={{ display: "flex", alignItems: "stretch", gap: 8, minWidth: "max-content" }}>
-          <PlacementButton selected={selectedInsertIndex === 0} disabled={phase !== "placing" || !canPlace} onClick={() => setSelectedInsertIndex(0)} label="+" helper="vor" compact />
+      <div
+        style={{
+          padding: "24px 18px 18px",
+          borderRadius: 24,
+          background: cardTheme.table,
+          border: `1px solid ${colors.border}`,
+          overflowX: "auto",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+        }}
+      >
+        <div
+          style={{
+            display: "grid",
+            gridAutoFlow: "column",
+            gridAutoColumns: "max-content",
+            alignItems: "end",
+            gap: 10,
+            minWidth: "max-content",
+            paddingBottom: 14,
+          }}
+        >
+          <PlacementButton selected={selectedInsertIndex === 0} disabled={disabled} onClick={() => setSelectedInsertIndex(0)} label="Davor" compact />
 
-          {timeline.map((track, index) => (
+          {orderedTimeline.map((track, index) => (
             <React.Fragment key={track.id}>
-              <TimelineTrackCard track={track} compact={compact} />
-
+              <TimelineTrackCard track={track} compact />
               <PlacementButton
                 selected={selectedInsertIndex === index + 1}
-                disabled={phase !== "placing" || !canPlace}
+                disabled={disabled}
                 onClick={() => setSelectedInsertIndex(index + 1)}
-                label="+"
-                helper={index + 1 === timeline.length ? "nach" : "hier"}
+                label={index + 1 === orderedTimeline.length ? "Danach" : "Hier"}
                 compact
               />
             </React.Fragment>
           ))}
         </div>
+
+        <div
+          style={{
+            height: 2,
+            minWidth: "100%",
+            background: "linear-gradient(90deg, transparent, rgba(226,232,240,0.45), transparent)",
+          }}
+        />
       </div>
 
-      <MiniTimeline timeline={timeline} />
+      <MiniTimeline timeline={orderedTimeline} />
     </div>
   );
 }
 
 function TimelineTrackCard({ track, compact }) {
+  const genreColor = getGenreColor(track.genre);
+  const width = compact ? 116 : 138;
+
   return (
     <div
       style={{
-        minWidth: compact ? 132 : 170,
-        maxWidth: compact ? 132 : 190,
-        border: `1px solid ${colors.border}`,
-        borderRadius: 18,
-        padding: compact ? 10 : 14,
-        background: colors.panel,
+        width,
+        minHeight: compact ? 154 : 184,
+        borderRadius: 16,
+        padding: compact ? 10 : 12,
+        background: cardTheme.ivory,
+        color: "#111827",
+        boxShadow: "0 16px 32px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.7)",
+        border: "1px solid rgba(20, 24, 36, 0.18)",
+        position: "relative",
+        display: "grid",
+        gridTemplateRows: "auto 1fr auto",
+        gap: 8,
+        overflow: "hidden",
       }}
       title={`${track.year} - ${track.title} - ${track.artist}`}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 8 }}>
-        <Badge variant="secondary">{track.year}</Badge>
-        <span style={{ color: "#64748b", fontSize: 11 }}>{track.genre}</span>
+      <div
+        style={{
+          position: "absolute",
+          inset: 7,
+          border: "1px solid rgba(17, 24, 39, 0.08)",
+          borderRadius: 12,
+          pointerEvents: "none",
+        }}
+      />
+
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <div
+          style={{
+            fontSize: compact ? 24 : 30,
+            lineHeight: 1,
+            letterSpacing: 2,
+            fontWeight: 950,
+            color: genreColor,
+            textShadow: "0 1px 0 rgba(255,255,255,0.75)",
+          }}
+        >
+          {track.year}
+        </div>
       </div>
 
-      <p style={{ margin: "0 0 4px", fontWeight: 900, fontSize: compact ? 13 : 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-        {track.title}
-      </p>
-
-      {!compact && (
-        <p style={{ margin: 0, color: colors.muted, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {track.artist}
+      <div style={{ alignSelf: "end" }}>
+        <p
+          style={{
+            margin: "0 0 4px",
+            fontSize: compact ? 12 : 13,
+            fontWeight: 950,
+            lineHeight: 1.05,
+            color: "#111827",
+          }}
+        >
+          {track.title}
         </p>
-      )}
+        <p style={{ margin: 0, fontSize: compact ? 11 : 12, color: "#475569", lineHeight: 1.15 }}>{track.artist}</p>
+      </div>
+
+      <div>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            borderRadius: 999,
+            padding: "4px 7px",
+            background: genreColor,
+            color: "white",
+            fontSize: 9,
+            fontWeight: 900,
+            textTransform: "uppercase",
+            maxWidth: "100%",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {track.genre}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function HiddenTrackCard({ compact = false }) {
+  return (
+    <div
+      style={{
+        width: compact ? 116 : 138,
+        minHeight: compact ? 154 : 184,
+        borderRadius: 16,
+        padding: compact ? 10 : 12,
+        background: cardTheme.back,
+        color: "#f8fafc",
+        boxShadow: "0 16px 32px rgba(0,0,0,0.42), 0 0 0 1px rgba(196,160,255,0.45)",
+        border: "1px solid rgba(216, 180, 254, 0.55)",
+        display: "grid",
+        placeItems: "center",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          inset: 9,
+          borderRadius: 12,
+          border: "1px solid rgba(255,255,255,0.16)",
+        }}
+      />
+
+      <div style={{ display: "grid", justifyItems: "center", gap: 10 }}>
+        <div
+          style={{
+            width: compact ? 46 : 56,
+            height: compact ? 46 : 56,
+            borderRadius: "50%",
+            border: "1px solid rgba(255,255,255,0.22)",
+            display: "grid",
+            placeItems: "center",
+            background: "rgba(255,255,255,0.06)",
+          }}
+        >
+          <span style={{ fontSize: compact ? 20 : 24 }}>♫</span>
+        </div>
+
+        <div style={{ textAlign: "center" }}>
+          <p style={{ margin: 0, fontWeight: 950, letterSpacing: 2, fontSize: compact ? 11 : 12 }}>TRACKLINE</p>
+          <p style={{ margin: "5px 0 0", color: "#c4b5fd", fontSize: 10, letterSpacing: 1 }}>MUSIC TIMELINE</p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -3094,26 +3236,32 @@ function MiniTimeline({ timeline }) {
 function PlacementButton({ selected, disabled, onClick, label, helper, compact = false }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
       style={{
-        minWidth: compact ? 54 : 88,
-        border: `1px dashed ${selected ? colors.primary : colors.border}`,
+        width: compact ? 104 : 120,
+        minHeight: compact ? 154 : 170,
         borderRadius: 16,
-        padding: compact ? "8px 6px" : "10px 12px",
-        background: selected ? colors.primary : colors.panelSoft,
-        color: selected ? colors.primaryText : disabled ? "#475569" : colors.text,
-        cursor: disabled ? "not-allowed" : "pointer",
-        fontWeight: 900,
+        border: selected ? `2px solid ${colors.success}` : `1.5px dashed rgba(226,232,240,0.35)`,
+        background: selected ? "rgba(34,197,94,0.18)" : "rgba(15,23,42,0.52)",
+        color: selected ? "#bbf7d0" : colors.muted,
         display: "grid",
         placeItems: "center",
-        alignContent: "center",
-        gap: 2,
+        cursor: disabled ? "not-allowed" : "pointer",
+        boxShadow: selected ? "0 0 0 4px rgba(34,197,94,0.14), 0 18px 36px rgba(0,0,0,0.25)" : "inset 0 0 0 1px rgba(255,255,255,0.03)",
+        opacity: disabled ? 0.45 : 1,
+        padding: 10,
+        transition: "160ms ease",
       }}
       title={helper || label}
     >
-      <span style={{ fontSize: compact ? 20 : 14, lineHeight: 1 }}>{label}</span>
-      {helper && <span style={{ fontSize: 10, color: selected ? colors.primaryText : colors.muted }}>{helper}</span>}
+      <span style={{ display: "grid", justifyItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 30, lineHeight: 1 }}>{selected ? "✓" : "+"}</span>
+        <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 0.8, fontWeight: 900 }}>
+          {selected ? "Gewählt" : label}
+        </span>
+      </span>
     </button>
   );
 }
@@ -3143,7 +3291,7 @@ function FinishedPanel({ leaderboard }) {
     <div style={{ border: "1px solid #f59e0b", background: colors.warning, borderRadius: 18, padding: 18 }}>
       <h3 style={{ margin: "0 0 6px" }}>Spiel beendet</h3>
       <p style={{ margin: 0, color: "#fde68a" }}>
-        Gewinner: {leaderboard[0]?.name} mit {leaderboard[0]?.score} Songs in der Timeline.
+        Gewinner: {leaderboard[0]?.name} mit {leaderboard[0]?.score} Karten in der Timeline.
       </p>
     </div>
   );
