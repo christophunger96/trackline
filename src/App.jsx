@@ -41,6 +41,8 @@ const DISCORD_CLIENT_ID_STORAGE_KEY = "trackline.discord.clientId";
 const DISCORD_CLIENT_ID_DEFAULT = import.meta.env?.VITE_DISCORD_CLIENT_ID || "";
 const SYNC_SOCKET_URL_STORAGE_KEY = "trackline.sync.socketUrl";
 const SYNC_ENABLED_STORAGE_KEY = "trackline.sync.enabled";
+const CLIENT_INSTANCE_ID_STORAGE_KEY = "trackline.clientInstanceId.v1";
+const VIEWER_PLAYER_STORAGE_PREFIX = "trackline.viewerPlayer.v1.";
 const DEFAULT_SYNC_SOCKET_URL = import.meta.env?.VITE_SOCKET_URL || "http://127.0.0.1:3001";
 
 const SPOTIFY_CLIENT_ID_STORAGE_KEY = "trackline.spotify.clientId";
@@ -57,6 +59,12 @@ const SPOTIFY_SCOPES = [
 
 const SPOTIFY_PLAY_EVENT_NAME = "trackline.spotify.playCurrent";
 const DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS = 20;
+const PLAY_LIMIT_OPTIONS = [10, 20, 30];
+const DIFFICULTY_OPTIONS = [
+  { id: "easy", label: "Leicht", description: "bekannte Hits und große Klassiker" },
+  { id: "normal", label: "Normal", description: "ausgewogener Mix" },
+  { id: "hard", label: "Schwer", description: "mehr Randtreffer und weniger offensichtliche Songs" },
+];
 
 const NEW_LINE = String.fromCharCode(10);
 
@@ -67,12 +75,19 @@ const CSV_EXAMPLE_PLACEHOLDER = [
 ].join(NEW_LINE);
 
 const DECK_PRESETS = [
-  { id: "all", label: "Alles", description: "Alle Songs im Deck" },
-  { id: "classic", label: "Klassiker bis 1999", description: "Songs bis Ende der 90er" },
-  { id: "modern", label: "2000er+", description: "Songs ab 2000" },
-  { id: "party", label: "Party/Pop", description: "Pop, Dance, Disco, Funk Pop" },
-  { id: "rock", label: "Rock/Alternative", description: "Rock, Indie, Alternative, Grunge" },
-  { id: "custom", label: "Nur eigene Songs", description: "Nur importierte oder manuell erstellte Songs" },
+  { id: "party", label: "Party", description: "breiter Party-Mix aus Pop, Dance, Disco, Mitsing-Hits und Club-Songs" },
+  { id: "pop", label: "Pop", description: "großer Pop-Mix aus Mainstream, Synthpop, Pop Rock und Indie Pop" },
+  { id: "rock", label: "Rock/Alternative", description: "Rock, Alternative, Grunge, Pop Rock und Indie Rock" },
+  { id: "hiphop", label: "Hip-Hop/Rap", description: "Hip-Hop, Rap, R&B-Rap und Crossover" },
+  { id: "dance", label: "Dance/Electronic", description: "Dance, EDM, Trance, Eurodance, House und elektronische Hits" },
+  { id: "schlager", label: "Schlager", description: "Schlager, Partyhits und Mitsing-Songs" },
+  { id: "metalpunk", label: "Metal/Punk", description: "Metal, Punk, Nu Metal, härtere Rock-Songs und Crossover" },
+  { id: "indie", label: "Indie", description: "Indie Pop, Indie Rock, Alternative und moderne Gitarrenmusik" },
+  { id: "ballads", label: "Balladen", description: "Powerballaden, große Stimmen, ruhige Pop- und Rock-Hits" },
+  { id: "eurovision", label: "Eurovision", description: "Eurovision-Sound, ESC-Klassiker und große europäische Popmomente" },
+  { id: "movie", label: "Film/Soundtrack", description: "Movie-, Musical-, Disney- und Soundtrack-Hits" },
+  { id: "mix", label: "Bunter Mix", description: "alles, was nicht eindeutig in die Spezialthemen fällt" },
+  { id: "all", label: "Alle Songs", description: "kompletter Songpool inklusive eigener/importierter Songs" },
 ];
 
 const STARTING_TRACKS = [
@@ -387,6 +402,334 @@ const BASE_TRACK_DECK = [
   { id: "t300", title: "La Bachata", artist: "Manuel Turizo", year: 2022, genre: "Bachata" },
 ];
 
+
+const THEME_TRACK_DECK = [
+  { id: "x301", title: "Johnny B. Goode", artist: "Chuck Berry", year: 1958, genre: "Rock and Roll" },
+  { id: "x302", title: "Stand by Me", artist: "Ben E. King", year: 1961, genre: "Soul" },
+  { id: "x303", title: "Be My Baby", artist: "The Ronettes", year: 1963, genre: "Pop" },
+  { id: "x304", title: "House of the Rising Sun", artist: "The Animals", year: 1964, genre: "Rock" },
+  { id: "x305", title: "My Generation", artist: "The Who", year: 1965, genre: "Rock" },
+  { id: "x306", title: "California Dreamin'", artist: "The Mamas & The Papas", year: 1965, genre: "Folk Pop" },
+  { id: "x307", title: "Good Vibrations", artist: "The Beach Boys", year: 1966, genre: "Pop Rock" },
+  { id: "x308", title: "Respect", artist: "Aretha Franklin", year: 1967, genre: "Soul" },
+  { id: "x309", title: "All Along the Watchtower", artist: "Jimi Hendrix", year: 1968, genre: "Rock" },
+  { id: "x310", title: "Proud Mary", artist: "Creedence Clearwater Revival", year: 1969, genre: "Rock" },
+  { id: "x311", title: "Paranoid", artist: "Black Sabbath", year: 1970, genre: "Metal" },
+  { id: "x312", title: "Imagine", artist: "John Lennon", year: 1971, genre: "Pop" },
+  { id: "x313", title: "Superstition", artist: "Stevie Wonder", year: 1972, genre: "Funk" },
+  { id: "x314", title: "Smoke on the Water", artist: "Deep Purple", year: 1972, genre: "Rock" },
+  { id: "x315", title: "Dream On", artist: "Aerosmith", year: 1973, genre: "Rock" },
+  { id: "x316", title: "Waterloo", artist: "ABBA", year: 1974, genre: "Eurovision Pop" },
+  { id: "x317", title: "No Woman No Cry", artist: "Bob Marley & The Wailers", year: 1974, genre: "Reggae" },
+  { id: "x318", title: "Born to Run", artist: "Bruce Springsteen", year: 1975, genre: "Rock" },
+  { id: "x319", title: "Hotel California", artist: "Eagles", year: 1976, genre: "Rock" },
+  { id: "x320", title: "Stayin' Alive", artist: "Bee Gees", year: 1977, genre: "Disco" },
+  { id: "x321", title: "We Will Rock You", artist: "Queen", year: 1977, genre: "Rock" },
+  { id: "x322", title: "Le Freak", artist: "Chic", year: 1978, genre: "Disco" },
+  { id: "x323", title: "I Will Survive", artist: "Gloria Gaynor", year: 1978, genre: "Disco" },
+  { id: "x324", title: "Another Brick in the Wall", artist: "Pink Floyd", year: 1979, genre: "Rock" },
+  { id: "x325", title: "Another One Bites the Dust", artist: "Queen", year: 1980, genre: "Rock" },
+  { id: "x326", title: "Don't Stop Believin'", artist: "Journey", year: 1981, genre: "Rock" },
+  { id: "x327", title: "Tainted Love", artist: "Soft Cell", year: 1981, genre: "Synthpop" },
+  { id: "x328", title: "Eye of the Tiger", artist: "Survivor", year: 1982, genre: "Movie Rock" },
+  { id: "x329", title: "Africa", artist: "Toto", year: 1982, genre: "Pop Rock" },
+  { id: "x330", title: "Sweet Child O' Mine", artist: "Guns N' Roses", year: 1987, genre: "Rock" },
+  { id: "x331", title: "With or Without You", artist: "U2", year: 1987, genre: "Rock" },
+  { id: "x332", title: "Never Gonna Give You Up", artist: "Rick Astley", year: 1987, genre: "Pop" },
+  { id: "x333", title: "Fast Car", artist: "Tracy Chapman", year: 1988, genre: "Folk Pop" },
+  { id: "x334", title: "Like a Prayer", artist: "Madonna", year: 1989, genre: "Pop" },
+  { id: "x335", title: "Nothing Compares 2 U", artist: "Sinead O'Connor", year: 1990, genre: "Pop" },
+  { id: "x336", title: "Enter Sandman", artist: "Metallica", year: 1991, genre: "Metal" },
+  { id: "x337", title: "Under the Bridge", artist: "Red Hot Chili Peppers", year: 1991, genre: "Alternative Rock" },
+  { id: "x338", title: "Creep", artist: "Radiohead", year: 1992, genre: "Alternative Rock" },
+  { id: "x339", title: "What's Up?", artist: "4 Non Blondes", year: 1993, genre: "Rock" },
+  { id: "x340", title: "Zombie", artist: "The Cranberries", year: 1994, genre: "Alternative Rock" },
+  { id: "x341", title: "Basket Case", artist: "Green Day", year: 1994, genre: "Punk Rock" },
+  { id: "x342", title: "Gangsta's Paradise", artist: "Coolio", year: 1995, genre: "Hip Hop" },
+  { id: "x343", title: "Killing Me Softly", artist: "Fugees", year: 1996, genre: "Hip Hop Soul" },
+  { id: "x344", title: "Wannabe", artist: "Spice Girls", year: 1996, genre: "Pop" },
+  { id: "x345", title: "Song 2", artist: "Blur", year: 1997, genre: "Alternative Rock" },
+  { id: "x346", title: "Barbie Girl", artist: "Aqua", year: 1997, genre: "Eurodance" },
+  { id: "x347", title: "My Heart Will Go On", artist: "Celine Dion", year: 1997, genre: "Movie Pop" },
+  { id: "x348", title: "I Don't Want to Miss a Thing", artist: "Aerosmith", year: 1998, genre: "Movie Rock" },
+  { id: "x349", title: "...Baby One More Time", artist: "Britney Spears", year: 1998, genre: "Pop" },
+  { id: "x350", title: "Blue (Da Ba Dee)", artist: "Eiffel 65", year: 1998, genre: "Eurodance" },
+  { id: "x351", title: "Californication", artist: "Red Hot Chili Peppers", year: 1999, genre: "Alternative Rock" },
+  { id: "x352", title: "Smooth", artist: "Santana feat. Rob Thomas", year: 1999, genre: "Latin Rock" },
+  { id: "x353", title: "Stan", artist: "Eminem feat. Dido", year: 2000, genre: "Hip Hop" },
+  { id: "x354", title: "One More Time", artist: "Daft Punk", year: 2000, genre: "Electronic" },
+  { id: "x355", title: "Can't Get You Out of My Head", artist: "Kylie Minogue", year: 2001, genre: "Dance Pop" },
+  { id: "x356", title: "Whenever, Wherever", artist: "Shakira", year: 2001, genre: "Latin Pop" },
+  { id: "x357", title: "Lose Yourself", artist: "Eminem", year: 2002, genre: "Hip Hop" },
+  { id: "x358", title: "Seven Nation Army", artist: "The White Stripes", year: 2003, genre: "Rock" },
+  { id: "x359", title: "Toxic", artist: "Britney Spears", year: 2003, genre: "Pop" },
+  { id: "x360", title: "Yeah!", artist: "Usher feat. Lil Jon & Ludacris", year: 2004, genre: "R&B" },
+  { id: "x361", title: "Dragostea Din Tei", artist: "O-Zone", year: 2004, genre: "Eurodance" },
+  { id: "x362", title: "Boulevard of Broken Dreams", artist: "Green Day", year: 2004, genre: "Rock" },
+  { id: "x363", title: "Hips Don't Lie", artist: "Shakira feat. Wyclef Jean", year: 2005, genre: "Latin Pop" },
+  { id: "x364", title: "Gold Digger", artist: "Kanye West feat. Jamie Foxx", year: 2005, genre: "Hip Hop" },
+  { id: "x365", title: "Crazy", artist: "Gnarls Barkley", year: 2006, genre: "Soul Pop" },
+  { id: "x366", title: "Rehab", artist: "Amy Winehouse", year: 2006, genre: "Soul" },
+  { id: "x367", title: "Stronger", artist: "Kanye West", year: 2007, genre: "Hip Hop" },
+  { id: "x368", title: "I Gotta Feeling", artist: "The Black Eyed Peas", year: 2009, genre: "Dance Pop" },
+  { id: "x369", title: "Empire State of Mind", artist: "Jay-Z feat. Alicia Keys", year: 2009, genre: "Hip Hop" },
+  { id: "x370", title: "Tik Tok", artist: "Kesha", year: 2009, genre: "Dance Pop" },
+  { id: "x371", title: "Waka Waka", artist: "Shakira", year: 2010, genre: "Latin Pop" },
+  { id: "x372", title: "Somebody That I Used to Know", artist: "Gotye feat. Kimbra", year: 2011, genre: "Indie Pop" },
+  { id: "x373", title: "We Found Love", artist: "Rihanna feat. Calvin Harris", year: 2011, genre: "Dance Pop" },
+  { id: "x374", title: "Call Me Maybe", artist: "Carly Rae Jepsen", year: 2011, genre: "Pop" },
+  { id: "x375", title: "Thrift Shop", artist: "Macklemore & Ryan Lewis", year: 2012, genre: "Hip Hop" },
+  { id: "x376", title: "Radioactive", artist: "Imagine Dragons", year: 2012, genre: "Alternative Rock" },
+  { id: "x377", title: "Royals", artist: "Lorde", year: 2013, genre: "Pop" },
+  { id: "x378", title: "Happy", artist: "Pharrell Williams", year: 2013, genre: "Soul Pop" },
+  { id: "x379", title: "Rather Be", artist: "Clean Bandit feat. Jess Glynne", year: 2014, genre: "Dance Pop" },
+  { id: "x380", title: "Shake It Off", artist: "Taylor Swift", year: 2014, genre: "Pop" },
+  { id: "x381", title: "See You Again", artist: "Wiz Khalifa feat. Charlie Puth", year: 2015, genre: "Movie Hip Hop" },
+  { id: "x382", title: "Can't Feel My Face", artist: "The Weeknd", year: 2015, genre: "R&B Pop" },
+  { id: "x383", title: "One Dance", artist: "Drake feat. Wizkid & Kyla", year: 2016, genre: "Hip Hop" },
+  { id: "x384", title: "Cheap Thrills", artist: "Sia feat. Sean Paul", year: 2016, genre: "Pop" },
+  { id: "x385", title: "Human", artist: "Rag'n'Bone Man", year: 2016, genre: "Soul" },
+  { id: "x386", title: "Havana", artist: "Camila Cabello feat. Young Thug", year: 2017, genre: "Latin Pop" },
+  { id: "x387", title: "God's Plan", artist: "Drake", year: 2018, genre: "Hip Hop" },
+  { id: "x388", title: "Shallow", artist: "Lady Gaga & Bradley Cooper", year: 2018, genre: "Movie Pop" },
+  { id: "x389", title: "Old Town Road", artist: "Lil Nas X feat. Billy Ray Cyrus", year: 2019, genre: "Country Rap" },
+  { id: "x390", title: "Dance Monkey", artist: "Tones and I", year: 2019, genre: "Pop" },
+  { id: "x391", title: "Watermelon Sugar", artist: "Harry Styles", year: 2019, genre: "Pop" },
+  { id: "x392", title: "WAP", artist: "Cardi B feat. Megan Thee Stallion", year: 2020, genre: "Hip Hop" },
+  { id: "x393", title: "Drivers License", artist: "Olivia Rodrigo", year: 2021, genre: "Pop" },
+  { id: "x394", title: "Good 4 U", artist: "Olivia Rodrigo", year: 2021, genre: "Pop Rock" },
+  { id: "x395", title: "Heat Waves", artist: "Glass Animals", year: 2020, genre: "Indie Pop" },
+  { id: "x396", title: "Anti-Hero", artist: "Taylor Swift", year: 2022, genre: "Pop" },
+  { id: "x397", title: "Unholy", artist: "Sam Smith & Kim Petras", year: 2022, genre: "Pop" },
+  { id: "x398", title: "Vampire", artist: "Olivia Rodrigo", year: 2023, genre: "Pop Rock" },
+  { id: "x399", title: "Flowers", artist: "Miley Cyrus", year: 2023, genre: "Pop" },
+  { id: "x400", title: "Espresso", artist: "Sabrina Carpenter", year: 2024, genre: "Pop" },
+  { id: "x401", title: "99 Luftballons", artist: "Nena", year: 1983, genre: "Deutsch Pop" },
+  { id: "x402", title: "Major Tom", artist: "Peter Schilling", year: 1983, genre: "Neue Deutsche Welle" },
+  { id: "x403", title: "Skandal im Sperrbezirk", artist: "Spider Murphy Gang", year: 1981, genre: "Deutsch Rock" },
+  { id: "x404", title: "Mensch", artist: "Herbert Grönemeyer", year: 2002, genre: "Deutsch Pop" },
+  { id: "x405", title: "Perfekte Welle", artist: "Juli", year: 2004, genre: "Deutsch Pop Rock" },
+  { id: "x406", title: "Durch den Monsun", artist: "Tokio Hotel", year: 2005, genre: "Deutsch Rock" },
+  { id: "x407", title: "Dieser Weg", artist: "Xavier Naidoo", year: 2005, genre: "Deutsch Soul" },
+  { id: "x408", title: "Haus am See", artist: "Peter Fox", year: 2008, genre: "Deutsch Pop" },
+  { id: "x409", title: "Tage wie diese", artist: "Die Toten Hosen", year: 2012, genre: "Deutsch Rock" },
+  { id: "x410", title: "Atemlos durch die Nacht", artist: "Helene Fischer", year: 2013, genre: "Schlager" },
+  { id: "x411", title: "Auf uns", artist: "Andreas Bourani", year: 2014, genre: "Deutsch Pop" },
+  { id: "x412", title: "80 Millionen", artist: "Max Giesinger", year: 2016, genre: "Deutsch Pop" },
+  { id: "x413", title: "Roller", artist: "Apache 207", year: 2019, genre: "Deutschrap" },
+  { id: "x414", title: "Ohne mein Team", artist: "Bonez MC & RAF Camora", year: 2016, genre: "Deutschrap" },
+  { id: "x415", title: "Komet", artist: "Udo Lindenberg & Apache 207", year: 2023, genre: "Deutsch Pop" },
+  { id: "x416", title: "Nel Blu Dipinto Di Blu", artist: "Domenico Modugno", year: 1958, genre: "Eurovision Pop" },
+  { id: "x417", title: "Puppet on a String", artist: "Sandie Shaw", year: 1967, genre: "Eurovision Pop" },
+  { id: "x418", title: "Save Your Kisses for Me", artist: "Brotherhood of Man", year: 1976, genre: "Eurovision Pop" },
+  { id: "x419", title: "Ein bisschen Frieden", artist: "Nicole", year: 1982, genre: "Eurovision Schlager" },
+  { id: "x420", title: "Hold Me Now", artist: "Johnny Logan", year: 1987, genre: "Eurovision Pop" },
+  { id: "x421", title: "Euphoria", artist: "Loreen", year: 2012, genre: "Eurovision Dance" },
+  { id: "x422", title: "Rise Like a Phoenix", artist: "Conchita Wurst", year: 2014, genre: "Eurovision Pop" },
+  { id: "x423", title: "Arcade", artist: "Duncan Laurence", year: 2019, genre: "Eurovision Pop" },
+  { id: "x424", title: "Zitti e buoni", artist: "Måneskin", year: 2021, genre: "Eurovision Rock" },
+  { id: "x425", title: "Tattoo", artist: "Loreen", year: 2023, genre: "Eurovision Pop" },
+  { id: "x426", title: "Stayin' Alive", artist: "Bee Gees", year: 1977, genre: "Movie Disco" },
+  { id: "x427", title: "Don't You (Forget About Me)", artist: "Simple Minds", year: 1985, genre: "Movie Pop" },
+  { id: "x428", title: "The Power of Love", artist: "Huey Lewis and the News", year: 1985, genre: "Movie Rock" },
+  { id: "x429", title: "Take My Breath Away", artist: "Berlin", year: 1986, genre: "Movie Pop" },
+  { id: "x430", title: "Ghostbusters", artist: "Ray Parker Jr.", year: 1984, genre: "Movie Pop" },
+  { id: "x431", title: "Kiss from a Rose", artist: "Seal", year: 1994, genre: "Movie Soul" },
+  { id: "x432", title: "Men in Black", artist: "Will Smith", year: 1997, genre: "Movie Hip Hop" },
+  { id: "x433", title: "Let It Go", artist: "Idina Menzel", year: 2013, genre: "Movie Pop" },
+  { id: "x434", title: "This Is Me", artist: "Keala Settle", year: 2017, genre: "Movie Pop" },
+  { id: "x435", title: "Skyfall", artist: "Adele", year: 2012, genre: "Movie Pop" },
+  { id: "x436", title: "Livin' la Vida Loca", artist: "Ricky Martin", year: 1999, genre: "Latin Pop" },
+  { id: "x437", title: "Whenever, Wherever", artist: "Shakira", year: 2001, genre: "Latin Pop" },
+  { id: "x438", title: "Gasolina", artist: "Daddy Yankee", year: 2004, genre: "Reggaeton" },
+  { id: "x439", title: "Danza Kuduro", artist: "Don Omar feat. Lucenzo", year: 2010, genre: "Reggaeton" },
+  { id: "x440", title: "Bailando", artist: "Enrique Iglesias", year: 2014, genre: "Latin Pop" },
+  { id: "x441", title: "Despacito", artist: "Luis Fonsi feat. Daddy Yankee", year: 2017, genre: "Reggaeton" },
+  { id: "x442", title: "Mi Gente", artist: "J Balvin & Willy William", year: 2017, genre: "Reggaeton" },
+  { id: "x443", title: "Taki Taki", artist: "DJ Snake feat. Selena Gomez, Ozuna & Cardi B", year: 2018, genre: "Reggaeton" },
+  { id: "x444", title: "Con Calma", artist: "Daddy Yankee feat. Snow", year: 2019, genre: "Reggaeton" },
+  { id: "x445", title: "La Bachata", artist: "Manuel Turizo", year: 2022, genre: "Bachata" },
+  { id: "x446", title: "Rhythm Is a Dancer", artist: "Snap!", year: 1992, genre: "Eurodance" },
+  { id: "x447", title: "Insomnia", artist: "Faithless", year: 1995, genre: "Electronic" },
+  { id: "x448", title: "Around the World", artist: "Daft Punk", year: 1997, genre: "Electronic" },
+  { id: "x449", title: "Sandstorm", artist: "Darude", year: 1999, genre: "Trance" },
+  { id: "x450", title: "Satisfaction", artist: "Benny Benassi", year: 2002, genre: "Electronic" },
+  { id: "x451", title: "Call on Me", artist: "Eric Prydz", year: 2004, genre: "Dance" },
+  { id: "x452", title: "Levels", artist: "Avicii", year: 2011, genre: "EDM" },
+  { id: "x453", title: "Wake Me Up", artist: "Avicii", year: 2013, genre: "EDM" },
+  { id: "x454", title: "Summer", artist: "Calvin Harris", year: 2014, genre: "EDM" },
+  { id: "x455", title: "Lean On", artist: "Major Lazer & DJ Snake", year: 2015, genre: "Dancehall" },
+];
+
+
+const CATEGORY_EXPANSION_TRACKS = [
+  { id: "c456", title: "Celebration", artist: "Kool & The Gang", year: 1980, genre: "Party Funk" },
+  { id: "c457", title: "Girls Just Want to Have Fun", artist: "Cyndi Lauper", year: 1983, genre: "Party Pop" },
+  { id: "c458", title: "Wake Me Up Before You Go-Go", artist: "Wham!", year: 1984, genre: "Party Pop" },
+  { id: "c459", title: "Footloose", artist: "Kenny Loggins", year: 1984, genre: "Movie Party Pop" },
+  { id: "c460", title: "Walking on Sunshine", artist: "Katrina and the Waves", year: 1985, genre: "Party Pop" },
+  { id: "c461", title: "You Spin Me Round", artist: "Dead or Alive", year: 1984, genre: "Dance Pop" },
+  { id: "c462", title: "The Final Countdown", artist: "Europe", year: 1986, genre: "Party Rock" },
+  { id: "c463", title: "Livin' on a Prayer", artist: "Bon Jovi", year: 1986, genre: "Party Rock" },
+  { id: "c464", title: "I'm Gonna Be (500 Miles)", artist: "The Proclaimers", year: 1988, genre: "Party Pop Rock" },
+  { id: "c465", title: "Pump Up the Jam", artist: "Technotronic", year: 1989, genre: "Dance" },
+  { id: "c466", title: "Vogue", artist: "Madonna", year: 1990, genre: "Dance Pop" },
+  { id: "c467", title: "Gonna Make You Sweat", artist: "C+C Music Factory", year: 1990, genre: "Dance" },
+  { id: "c468", title: "Finally", artist: "CeCe Peniston", year: 1991, genre: "Dance" },
+  { id: "c469", title: "The Rhythm of the Night", artist: "Corona", year: 1993, genre: "Eurodance" },
+  { id: "c470", title: "What Is Love", artist: "Haddaway", year: 1993, genre: "Eurodance" },
+  { id: "c471", title: "Mr. Vain", artist: "Culture Beat", year: 1993, genre: "Eurodance" },
+  { id: "c472", title: "Freed from Desire", artist: "Gala", year: 1996, genre: "Dance" },
+  { id: "c473", title: "Boom, Boom, Boom, Boom!!", artist: "Vengaboys", year: 1998, genre: "Eurodance" },
+  { id: "c474", title: "We Like to Party", artist: "Vengaboys", year: 1998, genre: "Eurodance" },
+  { id: "c475", title: "Mambo No. 5", artist: "Lou Bega", year: 1999, genre: "Party Pop" },
+  { id: "c476", title: "All Star", artist: "Smash Mouth", year: 1999, genre: "Party Pop Rock" },
+  { id: "c477", title: "Who Let the Dogs Out", artist: "Baha Men", year: 2000, genre: "Party Pop" },
+  { id: "c478", title: "Can't Stop the Feeling!", artist: "Justin Timberlake", year: 2016, genre: "Party Pop" },
+  { id: "c479", title: "Shut Up and Dance", artist: "Walk the Moon", year: 2014, genre: "Party Pop Rock" },
+  { id: "c480", title: "Cake by the Ocean", artist: "DNCE", year: 2015, genre: "Party Pop" },
+  { id: "c481", title: "Levitating", artist: "Dua Lipa", year: 2020, genre: "Dance Pop" },
+  { id: "c482", title: "Don't Start Now", artist: "Dua Lipa", year: 2019, genre: "Dance Pop" },
+  { id: "c483", title: "About Damn Time", artist: "Lizzo", year: 2022, genre: "Party Pop" },
+  { id: "c484", title: "Houdini", artist: "Dua Lipa", year: 2023, genre: "Dance Pop" },
+  { id: "c485", title: "Paint the Town Red", artist: "Doja Cat", year: 2023, genre: "Pop Rap" },
+  { id: "c486", title: "Greedy", artist: "Tate McRae", year: 2023, genre: "Pop" },
+  { id: "c487", title: "True Colors", artist: "Cyndi Lauper", year: 1986, genre: "Pop Ballad" },
+  { id: "c488", title: "Careless Whisper", artist: "George Michael", year: 1984, genre: "Pop Ballad" },
+  { id: "c489", title: "Every Breath You Take", artist: "The Police", year: 1983, genre: "Pop Rock" },
+  { id: "c490", title: "Time After Time", artist: "Cyndi Lauper", year: 1983, genre: "Pop Ballad" },
+  { id: "c491", title: "I Want to Know What Love Is", artist: "Foreigner", year: 1984, genre: "Rock Ballad" },
+  { id: "c492", title: "Nothing's Gonna Stop Us Now", artist: "Starship", year: 1987, genre: "Movie Pop Ballad" },
+  { id: "c493", title: "Total Eclipse of the Heart", artist: "Bonnie Tyler", year: 1983, genre: "Power Ballad" },
+  { id: "c494", title: "Alone", artist: "Heart", year: 1987, genre: "Rock Ballad" },
+  { id: "c495", title: "Eternal Flame", artist: "The Bangles", year: 1988, genre: "Pop Ballad" },
+  { id: "c496", title: "Wind of Change", artist: "Scorpions", year: 1990, genre: "Rock Ballad" },
+  { id: "c497", title: "I Will Always Love You", artist: "Whitney Houston", year: 1992, genre: "Movie Pop Ballad" },
+  { id: "c498", title: "Everybody Hurts", artist: "R.E.M.", year: 1992, genre: "Alternative Ballad" },
+  { id: "c499", title: "Angels", artist: "Robbie Williams", year: 1997, genre: "Pop Ballad" },
+  { id: "c500", title: "Torn", artist: "Natalie Imbruglia", year: 1997, genre: "Pop Rock" },
+  { id: "c501", title: "Iris", artist: "Goo Goo Dolls", year: 1998, genre: "Movie Rock Ballad" },
+  { id: "c502", title: "If I Ain't Got You", artist: "Alicia Keys", year: 2003, genre: "R&B Soul Ballad" },
+  { id: "c503", title: "The Scientist", artist: "Coldplay", year: 2002, genre: "Alternative Ballad" },
+  { id: "c504", title: "Chasing Cars", artist: "Snow Patrol", year: 2006, genre: "Indie Ballad" },
+  { id: "c505", title: "Apologize", artist: "Timbaland feat. OneRepublic", year: 2007, genre: "Pop Ballad" },
+  { id: "c506", title: "Someone Like You", artist: "Adele", year: 2011, genre: "Pop Ballad" },
+  { id: "c507", title: "Stay", artist: "Rihanna feat. Mikky Ekko", year: 2012, genre: "Pop Ballad" },
+  { id: "c508", title: "All of Me", artist: "John Legend", year: 2013, genre: "Soul Ballad" },
+  { id: "c509", title: "Say Something", artist: "A Great Big World & Christina Aguilera", year: 2013, genre: "Pop Ballad" },
+  { id: "c510", title: "Let Her Go", artist: "Passenger", year: 2012, genre: "Folk Pop Ballad" },
+  { id: "c511", title: "When I Was Your Man", artist: "Bruno Mars", year: 2012, genre: "Pop Ballad" },
+  { id: "c512", title: "Stay With Me", artist: "Sam Smith", year: 2014, genre: "Soul Ballad" },
+  { id: "c513", title: "Love Yourself", artist: "Justin Bieber", year: 2015, genre: "Pop Ballad" },
+  { id: "c514", title: "Someone You Loved", artist: "Lewis Capaldi", year: 2018, genre: "Pop Ballad" },
+  { id: "c515", title: "Easy on Me", artist: "Adele", year: 2021, genre: "Pop Ballad" },
+  { id: "c516", title: "Lose Control", artist: "Teddy Swims", year: 2023, genre: "Soul Pop" },
+  { id: "c517", title: "Should I Stay or Should I Go", artist: "The Clash", year: 1982, genre: "Punk Rock" },
+  { id: "c518", title: "Rock You Like a Hurricane", artist: "Scorpions", year: 1984, genre: "Hard Rock" },
+  { id: "c519", title: "The Boys of Summer", artist: "Don Henley", year: 1984, genre: "Rock" },
+  { id: "c520", title: "Here I Go Again", artist: "Whitesnake", year: 1987, genre: "Rock" },
+  { id: "c521", title: "Welcome to the Jungle", artist: "Guns N' Roses", year: 1987, genre: "Hard Rock" },
+  { id: "c522", title: "Personal Jesus", artist: "Depeche Mode", year: 1989, genre: "Alternative" },
+  { id: "c523", title: "Alive", artist: "Pearl Jam", year: 1991, genre: "Grunge" },
+  { id: "c524", title: "Black Hole Sun", artist: "Soundgarden", year: 1994, genre: "Grunge" },
+  { id: "c525", title: "Come As You Are", artist: "Nirvana", year: 1991, genre: "Grunge" },
+  { id: "c526", title: "Everlong", artist: "Foo Fighters", year: 1997, genre: "Alternative Rock" },
+  { id: "c527", title: "The Kids Aren't Alright", artist: "The Offspring", year: 1998, genre: "Punk Rock" },
+  { id: "c528", title: "All the Small Things", artist: "Blink-182", year: 1999, genre: "Punk Pop" },
+  { id: "c529", title: "Last Resort", artist: "Papa Roach", year: 2000, genre: "Nu Metal" },
+  { id: "c530", title: "Chop Suey!", artist: "System of a Down", year: 2001, genre: "Metal" },
+  { id: "c531", title: "The Middle", artist: "Jimmy Eat World", year: 2001, genre: "Pop Punk" },
+  { id: "c532", title: "Numb", artist: "Linkin Park", year: 2003, genre: "Nu Metal" },
+  { id: "c533", title: "American Idiot", artist: "Green Day", year: 2004, genre: "Punk Rock" },
+  { id: "c534", title: "I Believe in a Thing Called Love", artist: "The Darkness", year: 2003, genre: "Rock" },
+  { id: "c535", title: "Take Me Out", artist: "Franz Ferdinand", year: 2004, genre: "Indie Rock" },
+  { id: "c536", title: "Somebody Told Me", artist: "The Killers", year: 2004, genre: "Indie Rock" },
+  { id: "c537", title: "Dani California", artist: "Red Hot Chili Peppers", year: 2006, genre: "Alternative Rock" },
+  { id: "c538", title: "Use Somebody", artist: "Kings of Leon", year: 2008, genre: "Alternative Rock" },
+  { id: "c539", title: "Sex on Fire", artist: "Kings of Leon", year: 2008, genre: "Alternative Rock" },
+  { id: "c540", title: "Dog Days Are Over", artist: "Florence + The Machine", year: 2008, genre: "Indie Pop" },
+  { id: "c541", title: "Little Lion Man", artist: "Mumford & Sons", year: 2009, genre: "Folk Rock" },
+  { id: "c542", title: "Pumped Up Kicks", artist: "Foster the People", year: 2010, genre: "Indie Pop" },
+  { id: "c543", title: "Ho Hey", artist: "The Lumineers", year: 2012, genre: "Indie Folk" },
+  { id: "c544", title: "Do I Wanna Know?", artist: "Arctic Monkeys", year: 2013, genre: "Indie Rock" },
+  { id: "c545", title: "Stressed Out", artist: "Twenty One Pilots", year: 2015, genre: "Alternative" },
+  { id: "c546", title: "Believer", artist: "Imagine Dragons", year: 2017, genre: "Alternative Rock" },
+  { id: "c547", title: "Rapper's Delight", artist: "The Sugarhill Gang", year: 1979, genre: "Hip Hop" },
+  { id: "c548", title: "The Message", artist: "Grandmaster Flash & The Furious Five", year: 1982, genre: "Hip Hop" },
+  { id: "c549", title: "Walk This Way", artist: "Run-DMC feat. Aerosmith", year: 1986, genre: "Rap Rock" },
+  { id: "c550", title: "Fight the Power", artist: "Public Enemy", year: 1989, genre: "Hip Hop" },
+  { id: "c551", title: "U Can't Touch This", artist: "MC Hammer", year: 1990, genre: "Hip Hop" },
+  { id: "c552", title: "Jump Around", artist: "House of Pain", year: 1992, genre: "Hip Hop" },
+  { id: "c553", title: "California Love", artist: "2Pac feat. Dr. Dre", year: 1995, genre: "Hip Hop" },
+  { id: "c554", title: "Hypnotize", artist: "The Notorious B.I.G.", year: 1997, genre: "Hip Hop" },
+  { id: "c555", title: "Get Ur Freak On", artist: "Missy Elliott", year: 2001, genre: "Hip Hop" },
+  { id: "c556", title: "Without Me", artist: "Eminem", year: 2002, genre: "Hip Hop" },
+  { id: "c557", title: "In Da Club", artist: "50 Cent", year: 2003, genre: "Hip Hop" },
+  { id: "c558", title: "Hey Ya!", artist: "OutKast", year: 2003, genre: "Hip Hop Pop" },
+  { id: "c559", title: "Drop It Like It's Hot", artist: "Snoop Dogg feat. Pharrell", year: 2004, genre: "Hip Hop" },
+  { id: "c560", title: "Run This Town", artist: "Jay-Z feat. Rihanna & Kanye West", year: 2009, genre: "Hip Hop" },
+  { id: "c561", title: "Love the Way You Lie", artist: "Eminem feat. Rihanna", year: 2010, genre: "Hip Hop Ballad" },
+  { id: "c562", title: "Black and Yellow", artist: "Wiz Khalifa", year: 2010, genre: "Hip Hop" },
+  { id: "c563", title: "Can't Hold Us", artist: "Macklemore & Ryan Lewis", year: 2011, genre: "Hip Hop" },
+  { id: "c564", title: "Hotline Bling", artist: "Drake", year: 2015, genre: "Hip Hop" },
+  { id: "c565", title: "HUMBLE.", artist: "Kendrick Lamar", year: 2017, genre: "Hip Hop" },
+  { id: "c566", title: "SICKO MODE", artist: "Travis Scott", year: 2018, genre: "Hip Hop" },
+  { id: "c567", title: "Savage", artist: "Megan Thee Stallion", year: 2020, genre: "Hip Hop" },
+  { id: "c568", title: "Lose Yourself", artist: "Eminem", year: 2002, genre: "Hip Hop" },
+  { id: "c569", title: "Astronaut in the Ocean", artist: "Masked Wolf", year: 2019, genre: "Hip Hop" },
+  { id: "c570", title: "Industry Baby", artist: "Lil Nas X & Jack Harlow", year: 2021, genre: "Hip Hop" },
+  { id: "c571", title: "Griechischer Wein", artist: "Udo Jürgens", year: 1974, genre: "Schlager" },
+  { id: "c572", title: "Über den Wolken", artist: "Reinhard Mey", year: 1974, genre: "Deutsch Folk" },
+  { id: "c573", title: "Er gehört zu mir", artist: "Marianne Rosenberg", year: 1975, genre: "Schlager" },
+  { id: "c574", title: "Anita", artist: "Costa Cordalis", year: 1976, genre: "Schlager" },
+  { id: "c575", title: "Santa Maria", artist: "Roland Kaiser", year: 1980, genre: "Schlager" },
+  { id: "c576", title: "Joana", artist: "Roland Kaiser", year: 1984, genre: "Schlager" },
+  { id: "c577", title: "Verdammt, ich lieb' dich", artist: "Matthias Reim", year: 1990, genre: "Schlager" },
+  { id: "c578", title: "Wahnsinn", artist: "Wolfgang Petry", year: 1983, genre: "Schlager" },
+  { id: "c579", title: "Weiß der Geier", artist: "Wolfgang Petry", year: 1997, genre: "Schlager" },
+  { id: "c580", title: "Sie liebt den DJ", artist: "Michael Wendler", year: 2007, genre: "Schlager" },
+  { id: "c581", title: "Ich war noch niemals in New York", artist: "Udo Jürgens", year: 1982, genre: "Schlager" },
+  { id: "c582", title: "Cordula Grün", artist: "Josh.", year: 2018, genre: "Deutsch Pop" },
+  { id: "c583", title: "Hulapalu", artist: "Andreas Gabalier", year: 2015, genre: "Schlager" },
+  { id: "c584", title: "Warum hast du nicht nein gesagt", artist: "Roland Kaiser & Maite Kelly", year: 2014, genre: "Schlager" },
+  { id: "c585", title: "Herzbeben", artist: "Helene Fischer", year: 2017, genre: "Schlager" },
+  { id: "c586", title: "Regenbogenfarben", artist: "Kerstin Ott", year: 2018, genre: "Schlager" },
+  { id: "c587", title: "Delfin", artist: "Isi Glück", year: 2023, genre: "Schlager Party" },
+  { id: "c588", title: "Layla", artist: "DJ Robin & Schürze", year: 2022, genre: "Schlager Party" },
+  { id: "c589", title: "Johnny Däpp", artist: "Lorenz Büffel", year: 2016, genre: "Schlager Party" },
+  { id: "c590", title: "Mama Laudaaa", artist: "Almklausi & Specktakel", year: 2018, genre: "Schlager Party" },
+  { id: "c591", title: "Waterloo", artist: "ABBA", year: 1974, genre: "Eurovision Pop" },
+  { id: "c592", title: "Dschinghis Khan", artist: "Dschinghis Khan", year: 1979, genre: "Eurovision Pop" },
+  { id: "c593", title: "Making Your Mind Up", artist: "Bucks Fizz", year: 1981, genre: "Eurovision Pop" },
+  { id: "c594", title: "Hard Rock Hallelujah", artist: "Lordi", year: 2006, genre: "Eurovision Rock" },
+  { id: "c595", title: "Satellite", artist: "Lena", year: 2010, genre: "Eurovision Pop" },
+  { id: "c596", title: "Fairytale", artist: "Alexander Rybak", year: 2009, genre: "Eurovision Pop" },
+  { id: "c597", title: "Only Teardrops", artist: "Emmelie de Forest", year: 2013, genre: "Eurovision Pop" },
+  { id: "c598", title: "Heroes", artist: "Måns Zelmerlöw", year: 2015, genre: "Eurovision Pop" },
+  { id: "c599", title: "Soldi", artist: "Mahmood", year: 2019, genre: "Eurovision Pop" },
+  { id: "c600", title: "Stefania", artist: "Kalush Orchestra", year: 2022, genre: "Eurovision Folk Rap" },
+  { id: "c601", title: "Cha Cha Cha", artist: "Käärijä", year: 2023, genre: "Eurovision Electronic" },
+  { id: "c602", title: "The Code", artist: "Nemo", year: 2024, genre: "Eurovision Pop" },
+  { id: "c603", title: "Circle of Life", artist: "Elton John", year: 1994, genre: "Movie Pop" },
+  { id: "c604", title: "Hakuna Matata", artist: "Nathan Lane & Ernie Sabella", year: 1994, genre: "Movie Pop" },
+  { id: "c605", title: "A Whole New World", artist: "Peabo Bryson & Regina Belle", year: 1992, genre: "Movie Pop" },
+  { id: "c606", title: "You're the One That I Want", artist: "John Travolta & Olivia Newton-John", year: 1978, genre: "Movie Pop" },
+  { id: "c607", title: "Summer Nights", artist: "John Travolta & Olivia Newton-John", year: 1978, genre: "Movie Pop" },
+  { id: "c608", title: "Eye of the Tiger", artist: "Survivor", year: 1982, genre: "Movie Rock" },
+  { id: "c609", title: "Flashdance... What a Feeling", artist: "Irene Cara", year: 1983, genre: "Movie Pop" },
+  { id: "c610", title: "Footloose", artist: "Kenny Loggins", year: 1984, genre: "Movie Pop" },
+  { id: "c611", title: "Danger Zone", artist: "Kenny Loggins", year: 1986, genre: "Movie Rock" },
+  { id: "c612", title: "Unchained Melody", artist: "The Righteous Brothers", year: 1965, genre: "Movie Ballad" },
+  { id: "c613", title: "(I've Had) The Time of My Life", artist: "Bill Medley & Jennifer Warnes", year: 1987, genre: "Movie Pop" },
+  { id: "c614", title: "Can You Feel the Love Tonight", artist: "Elton John", year: 1994, genre: "Movie Ballad" },
+  { id: "c615", title: "Lose Yourself", artist: "Eminem", year: 2002, genre: "Movie Hip Hop" },
+  { id: "c616", title: "Lady Marmalade", artist: "Christina Aguilera, Lil' Kim, Mya & Pink", year: 2001, genre: "Movie Pop" },
+  { id: "c617", title: "City of Stars", artist: "Ryan Gosling & Emma Stone", year: 2016, genre: "Movie Ballad" },
+  { id: "c618", title: "A Million Dreams", artist: "Ziv Zaifman, Hugh Jackman & Michelle Williams", year: 2017, genre: "Movie Pop" },
+  { id: "c619", title: "Remember Me", artist: "Miguel feat. Natalia Lafourcade", year: 2017, genre: "Movie Pop" },
+  { id: "c620", title: "No Time to Die", artist: "Billie Eilish", year: 2020, genre: "Movie Ballad" },
+];
+
 const initialGameState = {
   phase: "lobby",
   room: null,
@@ -398,6 +741,8 @@ const initialGameState = {
   lastResult: null,
   targetScore: 10,
   maxTurns: 0,
+  playLimitSeconds: DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS,
+  difficulty: "normal",
   turnNumber: 1,
   showDebugSong: false,
   discardedTracks: [],
@@ -537,6 +882,19 @@ function createInitialPlayers(names) {
   }));
 }
 
+function resetPlayersForNewRound(players) {
+  const starters = shuffle(STARTING_TRACKS);
+
+  return players.map((player, index) => ({
+    ...player,
+    role: index === 0 ? "host" : "player",
+    timeline: [starters[index % starters.length]],
+    score: 1,
+    correct: 0,
+    wrong: 0,
+  }));
+}
+
 function isCorrectPlacement(timeline, track, insertIndex) {
   const orderedTimeline = sortTimeline(timeline);
   const left = orderedTimeline[insertIndex - 1];
@@ -556,6 +914,17 @@ function getPlacementLabel(timeline, insertIndex) {
   if (insertIndex === orderedTimeline.length) return `nach ${orderedTimeline[orderedTimeline.length - 1]?.title || "Ende"}`;
 
   return `zwischen ${orderedTimeline[insertIndex - 1]?.title} und ${orderedTimeline[insertIndex]?.title}`;
+}
+
+function getCorrectPlacementLabel(timeline, track) {
+  const orderedTimeline = sortTimeline(timeline || []);
+
+  if (!track || orderedTimeline.length === 0) return "als erste Karte";
+
+  const insertIndex = orderedTimeline.findIndex((item) => track.year < item.year || (track.year === item.year && track.title.localeCompare(item.title) <= 0));
+  const safeIndex = insertIndex === -1 ? orderedTimeline.length : insertIndex;
+
+  return getPlacementLabel(orderedTimeline, safeIndex);
 }
 
 function getWinner(players, targetScore) {
@@ -584,6 +953,37 @@ function gameReducer(state, action) {
     case "SERVER_STATE_RECEIVED":
       return action.gameState || state;
 
+    case "NEW_ROUND": {
+      if (!state.players.length || !state.room) return state;
+
+      const deck = Array.isArray(action.deck) ? action.deck : [];
+      const players = resetPlayersForNewRound(state.players);
+
+      const nextState = {
+        ...initialGameState,
+        phase: "ready",
+        room: {
+          ...state.room,
+          hostPlayerId: players[0]?.id || state.room.hostPlayerId,
+          hostName: players[0]?.name || state.room.hostName || "Host",
+        },
+        players,
+        deck: shuffle(deck),
+        targetScore: Number(action.targetScore || state.targetScore || 10),
+        maxTurns: Number(action.maxTurns ?? state.maxTurns ?? 0),
+        playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || state.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS))),
+        difficulty: action.difficulty || state.difficulty || "normal",
+        gameLog: [
+          {
+            id: createId("log"),
+            text: `Neue Runde gestartet mit ${players.length} Spielern und ${deck.length} Songs im Deck.`,
+          },
+        ],
+      };
+
+      return addEvent(nextState, "NEW_ROUND", `${players.length} Spieler, ${deck.length} Songs`);
+    }
+
     case "START_GAME": {
       const players = createInitialPlayers(action.playerNames);
 
@@ -598,8 +998,10 @@ function gameReducer(state, action) {
         },
         players,
         deck: shuffle(action.deck),
-        targetScore: action.targetScore,
-        maxTurns: action.maxTurns,
+        targetScore: Number(action.targetScore || 10),
+        maxTurns: Number(action.maxTurns || 0),
+        playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS))),
+        difficulty: action.difficulty || "normal",
         gameLog: [
           {
             id: createId("log"),
@@ -655,6 +1057,7 @@ function gameReducer(state, action) {
         requester,
         trackId: state.currentTrack.id,
         hiddenLabel: "Verdeckter Song",
+        playLimitSeconds: Number(action.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS),
         createdAt: new Date().toLocaleTimeString(),
       };
 
@@ -1277,19 +1680,134 @@ function isCustomTrack(track) {
 }
 
 function trackMatchesPreset(track, presetId) {
-  const genre = String(track.genre || "").toLowerCase();
+  const searchable = `${track.title || ""} ${track.artist || ""} ${track.genre || ""}`.toLowerCase();
+  const hasAny = (...terms) => terms.some((term) => searchable.includes(term));
+  const isSpecialThemeTrack = () =>
+    hasAny(
+      "party", "pop", "dance", "disco", "funk", "synthpop", "eurodance", "edm", "electronic", "trance",
+      "rock", "alternative", "grunge", "metal", "punk", "indie",
+      "hip hop", "hip-hop", "rap", "deutschrap",
+      "schlager", "eurovision", "movie", "soundtrack", "film", "ballad", "power ballad"
+    );
 
-  if (presetId === "classic") return track.year <= 1999;
-  if (presetId === "modern") return track.year >= 2000;
-  if (presetId === "party") return ["pop", "dance", "disco", "funk pop", "synthpop"].includes(genre);
-  if (presetId === "rock") return ["rock", "indie", "indie rock", "alternative", "grunge", "pop rock", "nu metal"].includes(genre);
-  if (presetId === "custom") return isCustomTrack(track);
+  if (presetId === "party") return hasAny("party", "pop", "dance", "disco", "funk", "synthpop", "eurodance", "edm", "latin", "reggaeton", "schlager", "movie pop", "club");
+  if (presetId === "pop") return hasAny("pop", "synthpop", "indie pop", "pop rock", "dance pop", "latin pop", "soul pop", "movie pop", "eurovision pop");
+  if (presetId === "rock") return hasAny("rock", "alternative", "grunge", "indie rock", "pop rock", "rock and roll", "hard rock");
+  if (presetId === "hiphop") return hasAny("hip hop", "hip-hop", "rap", "deutschrap", "country rap", "pop rap", "rap rock");
+  if (presetId === "dance") return hasAny("dance", "electronic", "edm", "trance", "eurodance", "techno", "synthpop", "house", "club");
+  if (presetId === "schlager") return hasAny("schlager", "helene", "nicole", "atemlos", "roland kaiser", "wolfgang petry", "mallorca", "party schlager");
+  if (presetId === "metalpunk") return hasAny("metal", "punk", "nu metal", "hard rock", "black sabbath", "metallica", "green day", "linkin park", "blink-182", "offspring");
+  if (presetId === "indie") return hasAny("indie", "alternative", "folk rock", "indie folk", "lorde", "blur", "radiohead", "killers", "glass animals", "arctic monkeys", "lumineers");
+  if (presetId === "ballads") return hasAny("ballad", "power ballad", "powerballad", "adele", "celine", "sinead", "aerosmith", "shallow", "skyfall", "nothing compares", "easy on me", "stay with me", "all of me");
+  if (presetId === "eurovision") return hasAny("eurovision", "esc", "loreen", "abba", "måneskin", "nicole", "conchita", "duncan laurence", "lena", "lordi", "käärijä", "nemo");
+  if (presetId === "movie") return hasAny("movie", "soundtrack", "film", "skyfall", "titanic", "ghostbusters", "frozen", "men in black", "lion king", "disney", "musical", "bond");
+  if (presetId === "mix") return !isSpecialThemeTrack() && !isCustomTrack(track);
+  if (presetId === "all") return true;
 
   return true;
 }
 
+function normalizeTrackText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function getTrackDedupeKey(track) {
+  return `${normalizeTrackText(track.title)}::${normalizeTrackText(track.artist)}`;
+}
+
+function dedupeTrackDeck(tracks) {
+  const seen = new Set();
+  const result = [];
+
+  for (const track of tracks) {
+    const key = getTrackDedupeKey(track);
+
+    if (!key || seen.has(key)) continue;
+
+    seen.add(key);
+    result.push(track);
+  }
+
+  return result;
+}
+
+function getTrackDifficultyScore(track) {
+  const searchable = `${track.title || ""} ${track.artist || ""} ${track.genre || ""}`.toLowerCase();
+  let score = 0;
+
+  if (track.spotifyUri) score += 2;
+  if (hasAnyText(searchable, "pop", "party", "dance", "disco", "rock", "movie", "eurovision", "schlager")) score += 2;
+  if (hasAnyText(searchable, "beatles", "queen", "michael jackson", "abba", "madonna", "rihanna", "lady gaga", "adele", "eminem", "nirvana", "coldplay", "taylor swift", "bruno mars", "britney", "elvis", "helene", "loreen")) score += 3;
+  if (track.year >= 1980 && track.year <= 2024) score += 1;
+  if (hasAnyText(searchable, "indie", "alternative", "metal", "punk", "eurovision", "soundtrack", "country", "folk")) score -= 1;
+  if (isCustomTrack(track)) score += 1;
+
+  return score;
+}
+
+function hasAnyText(text, ...terms) {
+  return terms.some((term) => text.includes(term));
+}
+
+function filterDeckByDifficulty(tracks, difficulty) {
+  if (difficulty === "normal") return tracks;
+
+  const scored = tracks.map((track) => ({
+    track,
+    score: getTrackDifficultyScore(track),
+  }));
+
+  if (difficulty === "easy") {
+    const easyTracks = scored.filter((item) => item.score >= 3).map((item) => item.track);
+    return easyTracks.length >= 40 ? easyTracks : tracks;
+  }
+
+  if (difficulty === "hard") {
+    const hardTracks = scored.filter((item) => item.score <= 3).map((item) => item.track);
+    return hardTracks.length >= 40 ? hardTracks : tracks;
+  }
+
+  return tracks;
+}
+
 function filterDeckByPreset(tracks, presetId) {
-  return tracks.filter((track) => trackMatchesPreset(track, presetId));
+  const directMatches = tracks.filter((track) => trackMatchesPreset(track, presetId));
+
+  if (presetId === "mix" || presetId === "all") return directMatches;
+
+  const MIN_THEME_DECK_SIZE = 150;
+
+  if (directMatches.length >= MIN_THEME_DECK_SIZE) return directMatches;
+
+  const matchedIds = new Set(directMatches.map((track) => track.id));
+  const broadFallback = tracks.filter((track) => {
+    if (matchedIds.has(track.id) || isCustomTrack(track)) return false;
+
+    const searchable = `${track.title || ""} ${track.artist || ""} ${track.genre || ""}`.toLowerCase();
+
+    if (presetId === "schlager") return searchable.includes("deutsch") || searchable.includes("party") || searchable.includes("pop");
+    if (presetId === "eurovision") return searchable.includes("pop") || searchable.includes("dance") || searchable.includes("rock") || searchable.includes("movie");
+    if (presetId === "movie") return searchable.includes("pop") || searchable.includes("rock") || searchable.includes("ballad") || searchable.includes("hip hop");
+    if (presetId === "ballads") return searchable.includes("pop") || searchable.includes("rock") || searchable.includes("soul");
+    if (presetId === "metalpunk") return searchable.includes("rock") || searchable.includes("alternative") || searchable.includes("grunge");
+    if (presetId === "indie") return searchable.includes("rock") || searchable.includes("pop") || searchable.includes("alternative");
+
+    return false;
+  });
+
+  const padded = [...directMatches, ...broadFallback.filter((track) => !matchedIds.has(track.id))];
+
+  if (padded.length >= MIN_THEME_DECK_SIZE) return padded.slice(0, Math.max(MIN_THEME_DECK_SIZE, directMatches.length));
+
+  const paddedIds = new Set(padded.map((track) => track.id));
+  const finalFallback = tracks.filter((track) => !paddedIds.has(track.id) && !isCustomTrack(track));
+
+  return [...padded, ...finalFallback].slice(0, Math.min(tracks.length, MIN_THEME_DECK_SIZE));
 }
 
 function getViewerRoleFromPlayer(viewerPlayerId, gameState) {
@@ -1377,6 +1895,39 @@ function getInitialViewerPlayerId() {
   return "auto-host";
 }
 
+function getClientInstanceId() {
+  try {
+    const existingId = localStorage.getItem(CLIENT_INSTANCE_ID_STORAGE_KEY);
+
+    if (existingId) return existingId;
+
+    const nextId = createId("client");
+    localStorage.setItem(CLIENT_INSTANCE_ID_STORAGE_KEY, nextId);
+
+    return nextId;
+  } catch {
+    return createId("client");
+  }
+}
+
+function getStoredViewerPlayerId(roomCode) {
+  try {
+    return localStorage.getItem(`${VIEWER_PLAYER_STORAGE_PREFIX}${String(roomCode || "DEFAULT").toUpperCase()}`) || "";
+  } catch {
+    return "";
+  }
+}
+
+function storeViewerPlayerId(roomCode, playerId) {
+  try {
+    if (!playerId || playerId === "spectator" || playerId.startsWith("auto-")) return;
+
+    localStorage.setItem(`${VIEWER_PLAYER_STORAGE_PREFIX}${String(roomCode || "DEFAULT").toUpperCase()}`, playerId);
+  } catch {
+    // ignore
+  }
+}
+
 
 function getInitialSocketUrl() {
   try {
@@ -1403,6 +1954,7 @@ export default function App() {
   const [playerNames, setPlayerNames] = useState(["Christoph", "Alex"]);
   const [customTracks, setCustomTracks] = useState(() => loadStoredCustomTracks());
   const [selectedPreset, setSelectedPreset] = useState("all");
+  const [selectedDifficulty, setSelectedDifficulty] = useState("normal");
   const [roomCode, setRoomCode] = useState(() => getInitialRoomCode());
   const [discordClientId, setDiscordClientId] = useState(() => localStorage.getItem(DISCORD_CLIENT_ID_STORAGE_KEY) || DISCORD_CLIENT_ID_DEFAULT);
   const [discordStatus, setDiscordStatus] = useState(() =>
@@ -1413,24 +1965,54 @@ export default function App() {
   const [syncEnabled, setSyncEnabled] = useState(() => localStorage.getItem(SYNC_ENABLED_STORAGE_KEY) === "true");
   const [syncStatus, setSyncStatus] = useState("Sync nicht verbunden.");
   const [syncClientCount, setSyncClientCount] = useState(1);
+  const [roomClients, setRoomClients] = useState([]);
+  const [clientInstanceId] = useState(() => getClientInstanceId());
+  const [roomPlaybackTimer, setRoomPlaybackTimer] = useState({
+    requestId: null,
+    trackId: null,
+    requester: "",
+    remainingSeconds: 0,
+    endsAt: 0,
+  });
 
   const socketRef = useRef(null);
   const lastRemoteStateRef = useRef("");
   const lastEmittedStateRef = useRef("");
 
-  const fullDeck = useMemo(() => [...BASE_TRACK_DECK, ...customTracks], [customTracks]);
-  const availableDeck = useMemo(() => filterDeckByPreset(fullDeck, selectedPreset), [fullDeck, selectedPreset]);
+  const fullDeck = useMemo(() => dedupeTrackDeck([...BASE_TRACK_DECK, ...THEME_TRACK_DECK, ...CATEGORY_EXPANSION_TRACKS, ...customTracks]), [customTracks]);
+  const presetDeck = useMemo(() => filterDeckByPreset(fullDeck, selectedPreset), [fullDeck, selectedPreset]);
+  const availableDeck = useMemo(() => filterDeckByDifficulty(presetDeck, selectedDifficulty), [presetDeck, selectedDifficulty]);
 
   const activePlayer = gameState.players[gameState.activePlayerIndex];
   const activeTimeline = activePlayer ? sortTimeline(activePlayer.timeline) : [];
   const winner = getWinner(gameState.players, gameState.targetScore);
+  const activeRoomCode = gameState.room?.code || roomCode;
 
-  const resolvedViewerPlayerId =
-    viewerPlayerId === "auto-host"
-      ? gameState.room?.hostPlayerId
-      : viewerPlayerId === "auto-player"
-        ? gameState.players.find((player) => player.id !== gameState.room?.hostPlayerId)?.id || "spectator"
-        : viewerPlayerId;
+  const resolvedViewerPlayerId = (() => {
+    if (viewerPlayerId === "auto-host") return gameState.room?.hostPlayerId || "spectator";
+
+    if (viewerPlayerId === "auto-player") {
+      const storedPlayerId = getStoredViewerPlayerId(activeRoomCode);
+      const storedPlayer = gameState.players.find((player) => player.id === storedPlayerId);
+
+      if (storedPlayer && storedPlayer.id !== gameState.room?.hostPlayerId) return storedPlayer.id;
+
+      const claimedByOther = new Set(
+        roomClients
+          .filter((client) => client.clientInstanceId && client.clientInstanceId !== clientInstanceId)
+          .map((client) => client.playerId)
+          .filter(Boolean)
+      );
+
+      return (
+        gameState.players.find((player) => player.id !== gameState.room?.hostPlayerId && !claimedByOther.has(player.id))?.id ||
+        gameState.players.find((player) => player.id !== gameState.room?.hostPlayerId)?.id ||
+        "spectator"
+      );
+    }
+
+    return viewerPlayerId;
+  })();
   const viewerRole = getViewerRoleFromPlayer(resolvedViewerPlayerId, gameState);
   const viewerPermissions = getViewerPermissions(viewerRole);
   const showAdminPanels = gameState.phase === "lobby" || viewerRole === "host";
@@ -1481,6 +2063,7 @@ export default function App() {
       socket.emit("room:join", {
         roomCode: activeRoomCode,
         playerName: playerNames[0] || "Spieler",
+        clientInstanceId,
       });
     });
 
@@ -1493,9 +2076,10 @@ export default function App() {
       setSyncClientCount(1);
     });
 
-    socket.on("room:joined", ({ roomCode: joinedRoomCode, gameState: remoteGameState, clientCount }) => {
+    socket.on("room:joined", ({ roomCode: joinedRoomCode, gameState: remoteGameState, clientCount, clients }) => {
       setSyncStatus(`Raum ${joinedRoomCode} verbunden.`);
       setSyncClientCount(clientCount || 1);
+      setRoomClients(Array.isArray(clients) ? clients : []);
 
       if (remoteGameState && remoteGameState.phase !== "lobby") {
         const serializedRemoteState = JSON.stringify(remoteGameState);
@@ -1505,8 +2089,9 @@ export default function App() {
       }
     });
 
-    socket.on("room:state", ({ gameState: remoteGameState, clientCount }) => {
+    socket.on("room:state", ({ gameState: remoteGameState, clientCount, clients }) => {
       setSyncClientCount(clientCount || 1);
+      if (Array.isArray(clients)) setRoomClients(clients);
 
       if (!remoteGameState) return;
 
@@ -1518,8 +2103,18 @@ export default function App() {
       dispatch({ type: "SERVER_STATE_RECEIVED", gameState: remoteGameState });
     });
 
-    socket.on("room:presence", ({ clientCount }) => {
+    socket.on("room:presence", ({ clientCount, clients }) => {
       setSyncClientCount(clientCount || 1);
+      setRoomClients(Array.isArray(clients) ? clients : []);
+    });
+
+    socket.on("room:claimResult", ({ ok, playerId, playerName, message }) => {
+      if (ok) {
+        setSyncStatus(`${playerName || "Spieler"} verbunden.`);
+        storeViewerPlayerId(activeRoomCode, playerId);
+      } else {
+        setSyncStatus(`Namensauswahl abgelehnt: ${message}`);
+      }
     });
 
     socket.on("room:error", ({ message }) => {
@@ -1532,7 +2127,7 @@ export default function App() {
         socketRef.current = null;
       }
     };
-  }, [syncEnabled, socketUrl, roomCode, gameState.room?.code, playerNames[0]]);
+  }, [syncEnabled, socketUrl, roomCode, gameState.room?.code, playerNames[0], clientInstanceId]);
 
   useEffect(() => {
     const socket = socketRef.current;
@@ -1547,8 +2142,16 @@ export default function App() {
       roomCode: activeRoomCode,
       playerId: resolvedViewerPlayerId,
       playerName: claimedPlayer?.name || playerNames[0] || "Spieler",
+      clientInstanceId,
     });
-  }, [syncEnabled, viewerPlayerId, resolvedViewerPlayerId, gameState.room?.code, roomCode, gameState.players, playerNames]);
+  }, [syncEnabled, viewerPlayerId, resolvedViewerPlayerId, gameState.room?.code, roomCode, gameState.players, playerNames, clientInstanceId]);
+
+  useEffect(() => {
+    if (!resolvedViewerPlayerId || resolvedViewerPlayerId === "spectator" || resolvedViewerPlayerId.startsWith("auto-")) return;
+
+    storeViewerPlayerId(activeRoomCode, resolvedViewerPlayerId);
+  }, [activeRoomCode, resolvedViewerPlayerId]);
+
 
   useEffect(() => {
     if (gameState.phase === "lobby") {
@@ -1559,9 +2162,117 @@ export default function App() {
     localStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify(gameState));
   }, [gameState]);
 
+  useEffect(() => {
+    const latestRequest = gameState.playbackRequests?.[0];
+
+    if (!latestRequest || !gameState.currentTrack || gameState.phase !== "placing") return;
+    if (latestRequest.trackId !== gameState.currentTrack.id) return;
+    if (latestRequest.id === roomPlaybackTimer.requestId) return;
+
+    const seconds = Math.max(1, Math.min(120, Number(latestRequest.playLimitSeconds || gameState.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS)));
+
+    setRoomPlaybackTimer({
+      requestId: latestRequest.id,
+      trackId: latestRequest.trackId,
+      requester: latestRequest.requester || "",
+      remainingSeconds: seconds,
+      endsAt: Date.now() + seconds * 1000,
+    });
+  }, [gameState.playbackRequests, gameState.currentTrack?.id, gameState.phase, gameState.playLimitSeconds, roomPlaybackTimer.requestId]);
+
+  useEffect(() => {
+    if (!roomPlaybackTimer.endsAt) return;
+
+    const intervalId = window.setInterval(() => {
+      const remainingSeconds = Math.max(0, Math.ceil((roomPlaybackTimer.endsAt - Date.now()) / 1000));
+
+      setRoomPlaybackTimer((current) => ({
+        ...current,
+        remainingSeconds,
+      }));
+
+      if (remainingSeconds <= 0) {
+        window.clearInterval(intervalId);
+      }
+    }, 250);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [roomPlaybackTimer.endsAt]);
+
+  useEffect(() => {
+    if (gameState.phase !== "placing" || !gameState.currentTrack) {
+      setRoomPlaybackTimer({
+        requestId: null,
+        trackId: null,
+        requester: "",
+        remainingSeconds: 0,
+        endsAt: 0,
+      });
+    }
+  }, [gameState.phase, gameState.currentTrack?.id]);
+
+  async function handleSongStart() {
+    const playLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS;
+    const didStart = await requestRoomSpotifyPlayback(playLimitSeconds);
+
+    if (!didStart) return;
+
+    sendGameAction({
+      type: "TRACK_PLAY_REQUESTED",
+      requesterName: activePlayer?.name,
+      playLimitSeconds,
+    });
+
+  }
+
+  function handleRevealTrack() {
+    sendGameAction({ type: "TRACK_REVEALED" });
+  }
+
+  function handleNextPlayer() {
+    sendGameAction({ type: "NEXT_PLAYER" });
+  }
+
+  async function requestRoomSpotifyPlayback(playLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS) {
+    const activeRoomCode = gameState.room?.code || roomCode;
+    const serverBaseUrl = String(socketUrl || "").trim().replace(/\/+$/, "");
+
+    if (!serverBaseUrl) {
+      window.alert("Socket Server URL fehlt. Der Host muss die Server-URL setzen.");
+      return;
+    }
+
+    if (!gameState.currentTrack) {
+      window.alert("Kein Song gezogen.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${serverBaseUrl}/room/${encodeURIComponent(activeRoomCode)}/spotify/play`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          playLimitSeconds,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return true;
+    } catch (error) {
+      window.alert(error.message || "Spotify Wiedergabe konnte nicht gestartet werden.");
+      return false;
+    }
+  }
+
   function sendGameAction(action) {
     const socket = socketRef.current;
-    const activeRoomCode = gameState.room?.code || roomCode;
     const actorPlayerId = resolvedViewerPlayerId || null;
     const actorPlayer = gameState.players.find((player) => player.id === actorPlayerId);
     const actionWithActor = {
@@ -1569,6 +2280,7 @@ export default function App() {
       actorPlayerId,
       actorName: actorPlayer?.name || playerNames[0] || "Spieler",
     };
+
 
     if (syncEnabled && socket?.connected) {
       socket.emit("room:event", {
@@ -1662,6 +2374,19 @@ export default function App() {
       roomCode,
       targetScore: settings.targetScore,
       maxTurns: settings.maxTurns,
+      playLimitSeconds: settings.playLimitSeconds,
+      difficulty: selectedDifficulty,
+    });
+  }
+
+  function startNewRound() {
+    sendGameAction({
+      type: "NEW_ROUND",
+      deck: availableDeck,
+      targetScore: gameState.targetScore,
+      maxTurns: gameState.maxTurns,
+      playLimitSeconds: gameState.playLimitSeconds,
+      difficulty: gameState.difficulty,
     });
   }
 
@@ -1672,8 +2397,10 @@ export default function App() {
 
   const twoColumnLayout = {
     display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) 340px",
+    gridTemplateColumns: "minmax(0, calc(100% - 364px)) 340px",
     gap: 24,
+    alignItems: "start",
+    width: "100%",
   };
 
   return (
@@ -1687,6 +2414,7 @@ export default function App() {
             roomCode={roomCode}
             playerNames={playerNames}
             socketUrl={socketUrl}
+            syncClientCount={syncClientCount}
           />
         )}
 
@@ -1710,10 +2438,12 @@ export default function App() {
             canManageSpotify={showAdminPanels}
             roomCode={gameState.room?.code || roomCode}
             spotifyAuthServerUrl={socketUrl}
+            roundPlayLimitSeconds={gameState.playLimitSeconds}
             onPlaybackRequested={() =>
               sendGameAction({
                 type: "TRACK_PLAY_REQUESTED",
                 requesterName: activePlayer?.name,
+                playLimitSeconds: gameState.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS,
               })
             }
           />
@@ -1721,7 +2451,7 @@ export default function App() {
 
         {gameState.phase === "lobby" && (
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.35fr) minmax(280px, 0.65fr)", gap: 24 }}>
-            <main style={{ display: "grid", gap: 24 }}>
+            <main style={{ display: "grid", gap: 24, minWidth: 0 }}>
               <LobbyCard
                 playerName={playerName}
                 setPlayerName={setPlayerName}
@@ -1733,13 +2463,16 @@ export default function App() {
                 fullDeck={fullDeck}
                 selectedPreset={selectedPreset}
                 setSelectedPreset={setSelectedPreset}
+                selectedDifficulty={selectedDifficulty}
+                setSelectedDifficulty={setSelectedDifficulty}
+                presetDeckCount={presetDeck.length}
                 roomCode={roomCode}
                 setRoomCode={setRoomCode}
               />
 
             </main>
 
-            <aside style={{ display: "grid", gap: 24, alignContent: "start" }}>
+            <aside style={{ display: "grid", gap: 24, alignContent: "start", minWidth: 0 }}>
               <RulesCard />
             </aside>
           </div>
@@ -1747,9 +2480,9 @@ export default function App() {
 
         {gameState.phase !== "lobby" && gameState.players.length > 0 && (
           <div style={twoColumnLayout}>
-            <main style={{ display: "grid", gap: 24 }}>
-              <Card>
-                <CardContent style={{ display: "grid", gap: 20 }}>
+            <main style={{ display: "grid", gap: 24, minWidth: 0 }}>
+              <Card style={{ minWidth: 0, overflow: "hidden" }}>
+                <CardContent style={{ display: "grid", gap: 20, minWidth: 0 }}>
                   <RoleStatusBanner
                     viewerRole={viewerRole}
                     activePlayer={activePlayer}
@@ -1763,6 +2496,9 @@ export default function App() {
                     deck={gameState.deck}
                     turnNumber={gameState.turnNumber}
                     maxTurns={gameState.maxTurns}
+                    targetScore={gameState.targetScore}
+                    playLimitSeconds={gameState.playLimitSeconds}
+                    difficulty={gameState.difficulty}
                   />
 
                   <CurrentTrackPanel
@@ -1772,27 +2508,43 @@ export default function App() {
                     canHostControl={viewerPermissions.canHostControl}
                     canDrawTrack={viewerPermissions.canDrawTrack}
                     canPlayTrack={viewerPermissions.canPlayTrack}
-                    onPlayTrack={() =>
-                      sendGameAction({
-                        type: "TRACK_PLAY_REQUESTED",
-                        requesterName: activePlayer?.name,
-                      })
+                    playbackRemainingSeconds={
+                      roomPlaybackTimer.trackId === gameState.currentTrack?.id ? roomPlaybackTimer.remainingSeconds : 0
                     }
+                    playbackTotalSeconds={gameState.playLimitSeconds}
+                    playbackRequester={roomPlaybackTimer.requester}
+                    onPlayTrack={handleSongStart}
                     onToggleDebug={() => sendGameAction({ type: "TOGGLE_DEBUG_SONG" })}
                     onDrawTrack={() => sendGameAction({ type: "TRACK_DRAWN" })}
                     onSkipTrack={() => sendGameAction({ type: "TRACK_SKIPPED" })}
                   />
 
                   {gameState.phase === "placing" && gameState.currentTrack && (
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                      <p style={{ color: colors.muted, margin: 0 }}>Waehle eine Position in der Timeline.</p>
+                    <div
+                      style={{
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: 22,
+                        padding: 14,
+                        background: colors.bg,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <div>
+                        <strong>Position gewählt?</strong>
+                        <p style={{ color: colors.muted, margin: "4px 0 0", fontSize: 13 }}>Dann decke die Karte auf und prüfe das Jahr.</p>
+                      </div>
 
-                      <Button
-                        onClick={() => sendGameAction({ type: "TRACK_REVEALED" })}
+                      <ActionPill
+                        onClick={handleRevealTrack}
                         disabled={gameState.selectedInsertIndex === null || !viewerPermissions.canReveal}
+                        hint="Karte drehen"
                       >
                         Aufdecken
-                      </Button>
+                      </ActionPill>
                     </div>
                   )}
 
@@ -1813,45 +2565,56 @@ export default function App() {
                   {gameState.lastResult && (
                     <ResultPanel
                       result={gameState.lastResult}
-                      onNext={() => sendGameAction({ type: "NEXT_PLAYER" })}
+                      timeline={activeTimeline}
+                      onNext={handleNextPlayer}
                       canAdvance={viewerPermissions.canAdvance}
                     />
                   )}
 
-                  {(winner || gameState.phase === "finished") && <FinishedPanel leaderboard={leaderboard} />}
+                  {(winner || gameState.phase === "finished") && (
+                    <FinishedPanel
+                      leaderboard={leaderboard}
+                      onNewRound={startNewRound}
+                      canNewRound={viewerPermissions.canHostControl}
+                    />
+                  )}
                 </CardContent>
               </Card>
 
               <AllTimelines players={gameState.players} activePlayerIndex={gameState.activePlayerIndex} />
             </main>
 
-            <aside style={{ display: "grid", gap: 24, alignContent: "start" }}>
+            <aside style={{ display: "grid", gap: 24, alignContent: "start", minWidth: 0 }}>
               <LocalRoleCard
                 viewerPlayerId={viewerPlayerId}
                 setViewerPlayerId={setViewerPlayerId}
                 viewerRole={viewerRole}
                 permissions={viewerPermissions}
                 players={gameState.players}
+                roomClients={roomClients}
+                clientInstanceId={clientInstanceId}
+                roomCode={activeRoomCode}
               />
 
-              <RoomCard room={gameState.room} players={gameState.players} activePlayerIndex={gameState.activePlayerIndex} />
+              {showAdminPanels && <RoomCard room={gameState.room} players={gameState.players} activePlayerIndex={gameState.activePlayerIndex} />}
               <Leaderboard players={leaderboard} />
               <TurnOrder players={gameState.players} activePlayerIndex={gameState.activePlayerIndex} />
 
               {showAdminPanels ? (
-                <>
-                  <PlaybackQueue playbackRequests={gameState.playbackRequests} />
-                  <DiscordCommandMap />
-                  <GameLog gameLog={gameState.gameLog} discardedTracks={gameState.discardedTracks} />
-                  <EventHistory eventHistory={gameState.eventHistory} />
-                  <SyncPreview gameState={gameState} />
-                </>
+                <HostAdminDetails
+                  playbackRequests={gameState.playbackRequests}
+                  gameLog={gameState.gameLog}
+                  discardedTracks={gameState.discardedTracks}
+                  eventHistory={gameState.eventHistory}
+                  gameState={gameState}
+                />
               ) : (
                 <PlayerFocusedCard viewerRole={viewerRole} activePlayer={activePlayer} permissions={viewerPermissions} />
               )}
             </aside>
           </div>
         )}
+
       </div>
     </div>
   );
@@ -1872,7 +2635,7 @@ function Header({ onReset, isInGame }) {
   );
 }
 
-function WebsiteShareCard({ room, roomCode, playerNames, socketUrl }) {
+function WebsiteShareCard({ room, roomCode, playerNames, socketUrl, syncClientCount = 1 }) {
   const activeRoomCode = room?.code || roomCode;
   const hostName = room?.hostName || playerNames[0] || "Host";
   const [copied, setCopied] = useState(false);
@@ -1894,39 +2657,42 @@ function WebsiteShareCard({ room, roomCode, playerNames, socketUrl }) {
 
   return (
     <Card>
-      <CardContent style={{ display: "grid", gap: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <CardContent style={{ display: "grid", gap: 14 }}>
+        <div
+          style={{
+            borderRadius: 24,
+            padding: 18,
+            background: cardTheme.table,
+            border: `1px solid ${colors.border}`,
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) auto",
+            gap: 16,
+            alignItems: "center",
+          }}
+        >
           <div>
-            <Badge variant="secondary">Web-Spiel</Badge>
-            <h2 style={{ margin: "10px 0 6px" }}>Raum teilen</h2>
+            <Badge variant="secondary">Host-Dashboard</Badge>
+            <h2 style={{ margin: "10px 0 6px", letterSpacing: -0.6 }}>Runde bereitstellen</h2>
             <p style={{ margin: 0, color: colors.muted }}>
-              Teile den Raumcode oder den Link mit deinen Freunden. Discord kann parallel als Voice-Chat laufen.
+              {syncClientCount} verbunden · Host: {hostName} · Raum {activeRoomCode}
             </p>
           </div>
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Badge variant="secondary">Raum {activeRoomCode}</Badge>
-            <Badge variant="secondary">Host: {hostName}</Badge>
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
-          <InfoTile label="Raumcode" value={activeRoomCode} />
-          <InfoTile label="Host" value={hostName} />
-          <InfoTile label="Modus" value="private Website" />
-          <InfoTile label="Socket Server" value={normalizedSocketUrl || "-"} />
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, alignItems: "center" }}>
-          <div style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 14, background: colors.bg }}>
-            <p style={{ margin: "0 0 6px", fontWeight: 800 }}>Einladungslink</p>
-            <p style={{ margin: 0, color: colors.muted, wordBreak: "break-all", fontSize: 13 }}>{joinUrl}</p>
-          </div>
-
-          <Button variant="secondary" onClick={copyJoinUrl}>
-            {copied ? "Kopiert" : "Link kopieren"}
+          <Button onClick={copyJoinUrl} style={{ padding: "14px 18px" }}>
+            {copied ? "Link kopiert" : "Einladungslink kopieren"}
           </Button>
         </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+          <InfoTile label="Verbunden" value={`${syncClientCount}`} />
+          <InfoTile label="Host" value={hostName} />
+          <InfoTile label="Raum" value={activeRoomCode} />
+        </div>
+
+        <details style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 14, background: colors.bg }}>
+          <summary style={{ cursor: "pointer", fontWeight: 900 }}>Einladungslink anzeigen</summary>
+          <p style={{ margin: "10px 0 0", color: colors.muted, wordBreak: "break-all", fontSize: 13 }}>{joinUrl}</p>
+        </details>
       </CardContent>
     </Card>
   );
@@ -1983,7 +2749,7 @@ function MultiplayerSyncCard({ roomCode, socketUrl, setSocketUrl, syncEnabled, s
   );
 }
 
-function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify, roomCode, spotifyAuthServerUrl, onPlaybackRequested }) {
+function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify, roomCode, spotifyAuthServerUrl, roundPlayLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS, onPlaybackRequested }) {
   const [clientId] = useState(() => {
     const storedClientId = localStorage.getItem(SPOTIFY_CLIENT_ID_STORAGE_KEY);
     return storedClientId?.trim() || DEFAULT_SPOTIFY_CLIENT_ID;
@@ -2000,6 +2766,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
   const [spotifyDevices, setSpotifyDevices] = useState([]);
   const [selectedSpotifyDeviceId, setSelectedSpotifyDeviceId] = useState("");
   const [savedDeviceName, setSavedDeviceName] = useState("");
+  const [spotifyDetailsOpen, setSpotifyDetailsOpen] = useState(false);
 
   const countdownIntervalRef = useRef(null);
 
@@ -2065,6 +2832,10 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
       window.removeEventListener(SPOTIFY_PLAY_EVENT_NAME, handleExternalPlayRequest);
     };
   }, [currentTrack, phase, canPlayTrack, isBusy, roomCode, spotifyAuthServerUrl, playLimitSeconds, selectedSpotifyDeviceId]);
+
+  useEffect(() => {
+    setPlayLimitSeconds(Math.max(1, Math.min(120, Number(roundPlayLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS))));
+  }, [roundPlayLimitSeconds]);
 
   useEffect(() => {
     return () => {
@@ -2363,6 +3134,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
 
   const canStartSpotify = Boolean(currentTrack && phase === "placing" && canPlayTrack && !isBusy);
   const selectedDevice = spotifyDevices.find((device) => device.id === selectedSpotifyDeviceId);
+  const showSpotifyDetails = !spotifyConnected || !savedDeviceName || spotifyDetailsOpen || Boolean(externalLoginUrl);
 
   return (
     <Card>
@@ -2382,7 +3154,32 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
           </div>
         </div>
 
-        {canManageSpotify && (
+        {canManageSpotify && spotifyConnected && savedDeviceName && (
+          <div
+            style={{
+              border: `1px solid ${colors.border}`,
+              borderRadius: 18,
+              padding: 14,
+              background: colors.bg,
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <strong>Spotify bereit</strong>
+              <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>Zielgeraet: {savedDeviceName}</p>
+            </div>
+
+            <Button variant="secondary" onClick={() => setSpotifyDetailsOpen((value) => !value)}>
+              {spotifyDetailsOpen ? "Spotify-Details ausblenden" : "Gerät / Login ändern"}
+            </Button>
+          </div>
+        )}
+
+        {canManageSpotify && showSpotifyDetails && (
           <div style={{ display: "grid", gap: 12 }}>
             <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", gap: 10, alignItems: "center" }}>
               <div style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 14, background: colors.bg }}>
@@ -2558,20 +3355,34 @@ function LobbyCard({
   fullDeck,
   selectedPreset,
   setSelectedPreset,
+  selectedDifficulty,
+  setSelectedDifficulty,
+  presetDeckCount,
   roomCode,
   setRoomCode,
 }) {
   const [targetScore, setTargetScore] = useState(10);
   const [maxTurns, setMaxTurns] = useState(0);
+  const [playLimitSeconds, setPlayLimitSeconds] = useState(DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS);
+  const targetScoreOptions = [5, 7, 10, 15];
 
   return (
     <Card>
-      <CardContent style={{ display: "grid", gap: 20 }}>
-        <div>
-          <Badge variant="secondary">Version lokal</Badge>
-          <h2 style={{ fontSize: 26, margin: "12px 0 8px" }}>Lobby einrichten</h2>
+      <CardContent style={{ display: "grid", gap: 18 }}>
+        <div
+          style={{
+            borderRadius: 24,
+            padding: 18,
+            background: cardTheme.table,
+            border: `1px solid ${colors.border}`,
+            display: "grid",
+            gap: 8,
+          }}
+        >
+          <Badge variant="secondary">Lobby</Badge>
+          <h2 style={{ fontSize: 30, margin: "4px 0 0", letterSpacing: -0.8 }}>Runde vorbereiten</h2>
           <p style={{ color: colors.muted, margin: 0 }}>
-            Spielt reihum mit einem gemeinsamen Deck. Der erste Spieler ist Host, alle weiteren sind Spieler.
+            Spieler hinzufügen, Ziel festlegen und dann die erste verdeckte Karte ziehen.
           </p>
         </div>
 
@@ -2585,40 +3396,48 @@ function LobbyCard({
           <Button onClick={addPlayer}>Hinzufuegen</Button>
         </div>
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {playerNames.map((name) => (
-            <button
-              key={name}
-              onClick={() => removePlayer(name)}
-              style={{
-                border: `1px solid ${colors.border}`,
-                borderRadius: 999,
-                background: colors.chip,
-                color: colors.text,
-                padding: "8px 12px",
-                cursor: "pointer",
-              }}
-              title="Klicken zum Entfernen"
-            >
-              {name}
-            </button>
-          ))}
-        </div>
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+            <strong>Spieler</strong>
+            <Badge variant="secondary">{playerNames.length}</Badge>
+          </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "end" }}>
-          <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: colors.muted, fontSize: 14 }}>Privater Raumcode</span>
-            <Input value={roomCode} onChange={(event) => setRoomCode(event.target.value.toUpperCase().slice(0, 8))} />
-          </label>
-
-          <Button variant="secondary" onClick={() => setRoomCode(createRoomCode())}>
-            Neu
-          </Button>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {playerNames.map((name, index) => (
+              <button
+                key={name}
+                onClick={() => removePlayer(name)}
+                style={{
+                  border: `1px solid ${index === 0 ? colors.primary : colors.border}`,
+                  borderRadius: 999,
+                  background: index === 0 ? "rgba(126,87,255,0.18)" : colors.chip,
+                  color: colors.text,
+                  padding: "8px 12px",
+                  cursor: "pointer",
+                  fontWeight: 850,
+                }}
+                title="Klicken zum Entfernen"
+              >
+                {index === 0 ? "Host · " : ""}
+                {name}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: colors.muted, fontSize: 14 }}>Deck-Preset</span>
+            <span style={{ color: colors.muted, fontSize: 14 }}>Raumcode</span>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
+              <Input value={roomCode} onChange={(event) => setRoomCode(event.target.value.toUpperCase().slice(0, 8))} />
+              <Button variant="secondary" onClick={() => setRoomCode(createRoomCode())}>
+                Neu
+              </Button>
+            </div>
+          </label>
+
+          <label style={{ display: "grid", gap: 8 }}>
+            <span style={{ color: colors.muted, fontSize: 14 }}>Deck</span>
             <Select value={selectedPreset} onChange={(event) => setSelectedPreset(event.target.value)}>
               {DECK_PRESETS.map((preset) => (
                 <option key={preset.id} value={preset.id}>
@@ -2627,30 +3446,104 @@ function LobbyCard({
               ))}
             </Select>
           </label>
+        </div>
 
-          <div style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: "10px 12px", background: colors.bg }}>
-            <span style={{ display: "block", color: colors.muted, fontSize: 13 }}>Aktives Deck</span>
-            <strong>
-              {availableDeck.length} von {fullDeck.length} Songs
-            </strong>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr 1fr", gap: 12 }}>
+          <div style={{ border: `1px solid ${colors.border}`, borderRadius: 18, padding: "12px 14px", background: colors.bg }}>
+            <span style={{ display: "block", color: colors.muted, fontSize: 12 }}>Aktives Deck</span>
+            <strong>{availableDeck.length} Songs</strong>
+            <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 11 }}>
+              {presetDeckCount} vor Schwierigkeit · Dubletten entfernt
+            </p>
+          </div>
+
+          <div style={{ display: "grid", gap: 8 }}>
+            <span style={{ color: colors.muted, fontSize: 14 }}>Ziel-Karten</span>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
+              {targetScoreOptions.map((score) => (
+                <button
+                  key={score}
+                  type="button"
+                  onClick={() => setTargetScore(score)}
+                  style={{
+                    border: `1px solid ${targetScore === score ? colors.primary : colors.border}`,
+                    borderRadius: 16,
+                    padding: "11px 10px",
+                    background: targetScore === score ? "rgba(126,87,255,0.22)" : colors.bg,
+                    color: colors.text,
+                    cursor: "pointer",
+                    fontWeight: 950,
+                    boxShadow: targetScore === score ? "0 0 0 4px rgba(126,87,255,0.12)" : "none",
+                  }}
+                >
+                  {score}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <label style={{ display: "grid", gap: 8 }}>
+            <span style={{ color: colors.muted, fontSize: 14 }}>Max. Zuege</span>
+            <Input type="number" min="0" max="99" value={maxTurns} onChange={(event) => setMaxTurns(Number(event.target.value))} />
+          </label>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gap: 8 }}>
+            <span style={{ color: colors.muted, fontSize: 14 }}>Songzeit</span>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+              {PLAY_LIMIT_OPTIONS.map((seconds) => (
+                <button
+                  key={seconds}
+                  type="button"
+                  onClick={() => setPlayLimitSeconds(seconds)}
+                  style={{
+                    border: `1px solid ${playLimitSeconds === seconds ? colors.primary : colors.border}`,
+                    borderRadius: 16,
+                    padding: "11px 10px",
+                    background: playLimitSeconds === seconds ? "rgba(126,87,255,0.22)" : colors.bg,
+                    color: colors.text,
+                    cursor: "pointer",
+                    fontWeight: 950,
+                    boxShadow: playLimitSeconds === seconds ? "0 0 0 4px rgba(126,87,255,0.12)" : "none",
+                  }}
+                >
+                  {seconds}s
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gap: 8 }}>
+            <span style={{ color: colors.muted, fontSize: 14 }}>Schwierigkeit</span>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+              {DIFFICULTY_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setSelectedDifficulty(option.id)}
+                  style={{
+                    border: `1px solid ${selectedDifficulty === option.id ? colors.primary : colors.border}`,
+                    borderRadius: 16,
+                    padding: "11px 10px",
+                    background: selectedDifficulty === option.id ? "rgba(126,87,255,0.22)" : colors.bg,
+                    color: colors.text,
+                    cursor: "pointer",
+                    fontWeight: 950,
+                    boxShadow: selectedDifficulty === option.id ? "0 0 0 4px rgba(126,87,255,0.12)" : "none",
+                  }}
+                  title={option.description}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12, alignItems: "end" }}>
-          <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: colors.muted, fontSize: 14 }}>Ziel: Karten in der Timeline</span>
-            <Input type="number" min="3" max="20" value={targetScore} onChange={(event) => setTargetScore(Number(event.target.value))} />
-          </label>
-
-          <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: colors.muted, fontSize: 14 }}>Max. Zuege, 0 = unbegrenzt</span>
-            <Input type="number" min="0" max="99" value={maxTurns} onChange={(event) => setMaxTurns(Number(event.target.value))} />
-          </label>
-
-          <Button onClick={() => startGame({ targetScore, maxTurns })} disabled={playerNames.length < 1 || availableDeck.length < 1} style={{ padding: "12px 22px" }}>
-            Spiel starten
-          </Button>
-        </div>
+        <Button onClick={() => startGame({ targetScore, maxTurns, playLimitSeconds })} disabled={playerNames.length < 1 || availableDeck.length < 1} style={{ padding: "14px 22px", fontSize: 16 }}>
+          Spiel starten
+        </Button>
       </CardContent>
     </Card>
   );
@@ -2870,49 +3763,69 @@ function DeckPreview({ tracks, selectedPreset }) {
   );
 }
 
-function GameHeader({ activePlayer, deck, turnNumber, maxTurns }) {
+function GameHeader({ activePlayer, deck, turnNumber, maxTurns, targetScore, playLimitSeconds, difficulty }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
-      <div>
-        <Badge variant="secondary">Am Zug</Badge>
-        <h2 style={{ fontSize: 30, margin: "10px 0 4px" }}>{activePlayer?.name}</h2>
-        <p style={{ color: colors.muted, margin: 0 }}>Ordne den neuen Song in diese Timeline ein.</p>
+    <div
+      style={{
+        border: `1px solid ${colors.border}`,
+        borderRadius: 22,
+        padding: 16,
+        background: "rgba(2,6,23,0.38)",
+        display: "grid",
+        gap: 12,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+        <div>
+          <Badge variant="secondary">Spielstatus</Badge>
+          <h2 style={{ fontSize: 30, margin: "10px 0 4px", letterSpacing: -0.8 }}>
+            {activePlayer?.name || "-"} ist dran
+          </h2>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Badge variant="secondary">
+            Runde {turnNumber}
+            {maxTurns > 0 ? ` / ${maxTurns}` : ""}
+          </Badge>
+          <Badge variant="secondary">{deck.length} im Deck</Badge>
+          <Badge variant="secondary">Ziel: {targetScore} Karten</Badge>
+          <Badge variant="secondary">{playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS}s Songzeit</Badge>
+          <Badge variant="secondary">{DIFFICULTY_OPTIONS.find((item) => item.id === difficulty)?.label || "Normal"}</Badge>
+        </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <Badge variant="secondary">
-          Zug {turnNumber}
-          {maxTurns > 0 ? ` / ${maxTurns}` : ""}
-        </Badge>
-        <Badge variant="secondary">Deck: {deck.length}</Badge>
+      <div style={{ color: colors.muted, fontSize: 13 }}>
+        Runde {turnNumber} · {activePlayer?.name || "-"} ist dran · {deck.length} Karten im Deck · Ziel: {targetScore} Karten · Songzeit: {playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS}s
       </div>
     </div>
   );
 }
 
-
 function RoleStatusBanner({ viewerRole, activePlayer, permissions, syncEnabled, player }) {
+  const isActive = viewerRole === "activePlayer";
   const roleLabel =
     {
       host: "Host/DJ",
-      activePlayer: "Aktiver Spieler",
+      activePlayer: "Du bist dran",
       player: "Wartender Spieler",
       spectator: "Zuschauer",
     }[viewerRole] || viewerRole;
 
-  const message = permissions.canReveal
-    ? "Du steuerst Reveal, Skip und den naechsten Spieler."
-    : permissions.canPlace
-      ? "Du bist am Zug: Song starten, hoeren und einsortieren."
+  const message = isActive
+    ? "Song starten, Karte platzieren und danach aufdecken."
+    : viewerRole === "host"
+      ? "Du steuerst die Runde und Spotify."
       : "Du wartest und siehst den gemeinsamen Spielstand.";
 
   return (
     <div
       style={{
-        border: `1px solid ${permissions.canPlace || permissions.canReveal ? colors.primary : colors.border}`,
-        borderRadius: 18,
-        padding: 14,
-        background: colors.bg,
+        border: `1px solid ${isActive || viewerRole === "host" ? colors.primary : colors.border}`,
+        borderRadius: 24,
+        padding: 16,
+        background: isActive ? "rgba(126,87,255,0.20)" : colors.bg,
+        boxShadow: isActive ? "0 18px 44px rgba(126,87,255,0.22)" : "none",
         display: "flex",
         justifyContent: "space-between",
         gap: 12,
@@ -2921,8 +3834,11 @@ function RoleStatusBanner({ viewerRole, activePlayer, permissions, syncEnabled, 
       }}
     >
       <div>
-        <Badge variant={permissions.canPlace || permissions.canReveal ? "default" : "secondary"}>{roleLabel}</Badge>
-        <p style={{ margin: "8px 0 0", color: colors.muted }}>{message}</p>
+        <Badge variant={isActive || viewerRole === "host" ? "default" : "secondary"}>{roleLabel}</Badge>
+        <h3 style={{ margin: "10px 0 4px", fontSize: isActive ? 24 : 18 }}>
+          {isActive ? "Jetzt bist du am Zug" : player?.name || "Deine Ansicht"}
+        </h3>
+        <p style={{ margin: 0, color: colors.muted }}>{message}</p>
       </div>
 
       <div style={{ display: "grid", gap: 4, textAlign: "right" }}>
@@ -2934,6 +3850,109 @@ function RoleStatusBanner({ viewerRole, activePlayer, permissions, syncEnabled, 
   );
 }
 
+
+function SongTimerPill({ remainingSeconds, requester, totalSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS }) {
+  const total = Math.max(1, Math.min(120, Number(totalSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS)));
+  const safeRemaining = Math.max(0, Math.min(total, Number(remainingSeconds || 0)));
+  const progress = total > 0 ? safeRemaining / total : 0;
+  const circumference = 2 * Math.PI * 23;
+
+  if (safeRemaining <= 0) return null;
+
+  return (
+    <div
+      style={{
+        display: "inline-grid",
+        gridTemplateColumns: "58px minmax(0, 1fr)",
+        gap: 12,
+        alignItems: "center",
+        border: `1px solid ${colors.primary}`,
+        borderRadius: 20,
+        padding: "10px 12px",
+        background: "rgba(126,87,255,0.16)",
+        boxShadow: "0 16px 34px rgba(126,87,255,0.14)",
+        maxWidth: 320,
+      }}
+    >
+      <div style={{ position: "relative", width: 54, height: 54 }}>
+        <svg width="54" height="54" viewBox="0 0 54 54" style={{ transform: "rotate(-90deg)" }}>
+          <circle cx="27" cy="27" r="23" fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="6" />
+          <circle
+            cx="27"
+            cy="27"
+            r="23"
+            fill="none"
+            stroke={colors.primary}
+            strokeWidth="6"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference * (1 - progress)}
+          />
+        </svg>
+        <strong
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "grid",
+            placeItems: "center",
+            fontSize: 18,
+          }}
+        >
+          {safeRemaining}
+        </strong>
+      </div>
+
+      <div style={{ minWidth: 0 }}>
+        <span style={{ display: "block", color: colors.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.8, fontWeight: 900 }}>
+          Song läuft noch
+        </span>
+        <strong>{safeRemaining} Sekunden</strong>
+        {requester && <p style={{ margin: "3px 0 0", color: colors.muted, fontSize: 12 }}>gestartet von {requester}</p>}
+      </div>
+    </div>
+  );
+}
+
+
+function ActionPill({ children, onClick, disabled, variant = "primary", hint }) {
+  const isSecondary = variant === "secondary";
+  const isDanger = variant === "danger";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        border: `1px solid ${isDanger ? "#ef4444" : isSecondary ? colors.border : colors.primary}`,
+        borderRadius: 18,
+        padding: "14px 18px",
+        background: disabled
+          ? "rgba(15,23,42,0.55)"
+          : isDanger
+            ? "rgba(239,68,68,0.16)"
+            : isSecondary
+              ? "rgba(15,23,42,0.78)"
+              : colors.primary,
+        color: disabled ? "#64748b" : isSecondary || isDanger ? colors.text : colors.primaryText,
+        fontWeight: 950,
+        cursor: disabled ? "not-allowed" : "pointer",
+        boxShadow: disabled || isSecondary ? "none" : "0 16px 34px rgba(126,87,255,0.22)",
+        display: "grid",
+        gap: 3,
+        textAlign: "left",
+        minWidth: 150,
+        transition: "160ms ease",
+      }}
+    >
+      <span>{children}</span>
+      {hint && <span style={{ fontSize: 11, color: disabled ? "#475569" : isSecondary || isDanger ? colors.muted : "rgba(255,255,255,0.76)", fontWeight: 800 }}>{hint}</span>}
+    </button>
+  );
+}
+
+
+
 function CurrentTrackPanel({
   phase,
   currentTrack,
@@ -2941,6 +3960,9 @@ function CurrentTrackPanel({
   canHostControl,
   canDrawTrack,
   canPlayTrack,
+  playbackRemainingSeconds = 0,
+  playbackTotalSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS,
+  playbackRequester = "",
   onPlayTrack,
   onToggleDebug,
   onDrawTrack,
@@ -2951,59 +3973,76 @@ function CurrentTrackPanel({
   return (
     <div
       style={{
-        borderRadius: 24,
+        borderRadius: 28,
         border: `1px solid ${colors.border}`,
         background: cardTheme.table,
-        padding: 20,
+        padding: 22,
         display: "grid",
         gridTemplateColumns: "max-content minmax(0, 1fr)",
-        gap: 22,
+        gap: 24,
         alignItems: "center",
         overflow: "hidden",
+        minWidth: 0,
+        maxWidth: "100%",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 22px 60px rgba(0,0,0,0.22)",
       }}
     >
       <div>{currentTrack && revealed ? <TimelineTrackCard track={currentTrack} /> : <HiddenTrackCard />}</div>
 
-      <div style={{ display: "grid", gap: 14 }}>
+      <div style={{ display: "grid", gap: 16, minWidth: 0 }}>
         <div>
-          <Badge variant="secondary">{currentTrack ? "Aktueller Song" : "Bereit"}</Badge>
-          <h2 style={{ margin: "10px 0 6px", fontSize: 28 }}>
+          <Badge variant={currentTrack ? "default" : "secondary"}>{currentTrack ? "Aktuelle Karte" : "Bereit"}</Badge>
+          <h2 style={{ margin: "12px 0 6px", fontSize: 30, letterSpacing: -0.6 }}>
             {currentTrack && revealed ? currentTrack.title : currentTrack ? "Verdeckter Song" : "Noch kein Song gezogen"}
           </h2>
           <p style={{ margin: 0, color: colors.muted }}>
             {currentTrack && revealed
               ? `${currentTrack.artist} • ${currentTrack.year} • ${currentTrack.genre}`
               : currentTrack
-                ? "Starte den Song und platziere ihn in der Timeline."
-                : "Ziehe den naechsten Song, sobald der aktive Spieler bereit ist."}
+                ? "Song starten, hoeren und die passende Stelle in der Timeline waehlen."
+                : "Ziehe eine neue verdeckte Karte fuer den aktiven Spieler."}
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {currentTrack && phase === "placing" && (
+          <SongTimerPill remainingSeconds={playbackRemainingSeconds} totalSeconds={playbackTotalSeconds} requester={playbackRequester} />
+        )}
+
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            flexWrap: "wrap",
+            padding: 10,
+            borderRadius: 22,
+            border: `1px solid ${colors.border}`,
+            background: "rgba(2,6,23,0.32)",
+          }}
+        >
           {!currentTrack && phase === "ready" && (
-            <Button onClick={onDrawTrack} disabled={!canDrawTrack}>
+            <ActionPill onClick={onDrawTrack} disabled={!canDrawTrack} hint="neue Karte">
               Song ziehen
-            </Button>
+            </ActionPill>
           )}
 
           {currentTrack && phase === "placing" && (
             <>
-              <Button onClick={onPlayTrack} disabled={!canPlayTrack}>
+              <ActionPill onClick={onPlayTrack} disabled={!canPlayTrack} hint="20s TimeLimit">
                 Song starten
-              </Button>
+              </ActionPill>
 
               {canHostControl && (
-                <Button variant="secondary" onClick={onSkipTrack}>
-                  Song ueberspringen
-                </Button>
+                <ActionPill variant="secondary" onClick={onSkipTrack} hint="Host-only">
+                  Ueberspringen
+                </ActionPill>
               )}
             </>
           )}
 
           {currentTrack && canHostControl && (
-            <Button variant="secondary" onClick={onToggleDebug} disabled={phase === "reveal"}>
-              {showDebugSong ? "Song wieder verdecken" : "Debug: Song anzeigen"}
-            </Button>
+            <ActionPill variant="secondary" onClick={onToggleDebug} disabled={phase === "reveal"} hint="Host-only">
+              {showDebugSong ? "Wieder verdecken" : "Debug anzeigen"}
+            </ActionPill>
           )}
         </div>
       </div>
@@ -3016,7 +4055,7 @@ function TimelineChooser({ playerName, timeline, phase, selectedInsertIndex, set
   const disabled = phase !== "placing" || !canPlace;
 
   return (
-    <div style={{ display: "grid", gap: 14 }}>
+    <div style={{ display: "grid", gap: 14, minWidth: 0, maxWidth: "100%" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <div>
           <h3 style={{ margin: 0 }}>Timeline von {playerName}</h3>
@@ -3035,6 +4074,9 @@ function TimelineChooser({ playerName, timeline, phase, selectedInsertIndex, set
           background: cardTheme.table,
           border: `1px solid ${colors.border}`,
           overflowX: "auto",
+          overflowY: "hidden",
+          maxWidth: "100%",
+          minWidth: 0,
           boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
         }}
       >
@@ -3074,12 +4116,11 @@ function TimelineChooser({ playerName, timeline, phase, selectedInsertIndex, set
         />
       </div>
 
-      <MiniTimeline timeline={orderedTimeline} />
     </div>
   );
 }
 
-function TimelineTrackCard({ track, compact }) {
+function TimelineTrackCard({ track, compact, index = 0 }) {
   const genreColor = getGenreColor(track.genre);
   const width = compact ? 116 : 138;
 
@@ -3099,6 +4140,7 @@ function TimelineTrackCard({ track, compact }) {
         gridTemplateRows: "auto 1fr auto",
         gap: 8,
         overflow: "hidden",
+        transition: "box-shadow 160ms ease",
       }}
       title={`${track.year} - ${track.title} - ${track.artist}`}
     >
@@ -3167,7 +4209,100 @@ function TimelineTrackCard({ track, compact }) {
   );
 }
 
+
+function MiniTimelineTrackCard({ track }) {
+  const genreColor = getGenreColor(track.genre);
+
+  return (
+    <div
+      title={`${track.year} - ${track.title} - ${track.artist}`}
+      style={{
+        width: 62,
+        minHeight: 82,
+        borderRadius: 10,
+        padding: 7,
+        background: cardTheme.ivory,
+        color: "#111827",
+        boxShadow: "0 8px 18px rgba(0,0,0,0.28), inset 0 0 0 1px rgba(255,255,255,0.65)",
+        border: "1px solid rgba(20, 24, 36, 0.15)",
+        position: "relative",
+        display: "grid",
+        gridTemplateRows: "auto 1fr auto",
+        gap: 4,
+        overflow: "hidden",
+        flex: "0 0 auto",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          inset: 4,
+          border: "1px solid rgba(17, 24, 39, 0.07)",
+          borderRadius: 7,
+          pointerEvents: "none",
+        }}
+      />
+
+      <div
+        style={{
+          fontSize: 14,
+          lineHeight: 1,
+          letterSpacing: 1,
+          fontWeight: 950,
+          color: genreColor,
+          textAlign: "center",
+        }}
+      >
+        {track.year}
+      </div>
+
+      <div style={{ alignSelf: "end", minWidth: 0 }}>
+        <p
+          style={{
+            margin: "0 0 2px",
+            fontSize: 8,
+            fontWeight: 950,
+            lineHeight: 1.05,
+            color: "#111827",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {track.title}
+        </p>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 7,
+            color: "#475569",
+            lineHeight: 1.05,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {track.artist}
+        </p>
+      </div>
+
+      <span
+        style={{
+          width: 22,
+          height: 4,
+          borderRadius: 999,
+          background: genreColor,
+          display: "inline-block",
+        }}
+      />
+    </div>
+  );
+}
+
 function HiddenTrackCard({ compact = false }) {
+  const ringSize = compact ? 88 : 110;
+  const innerSize = compact ? 34 : 42;
+
   return (
     <div
       style={{
@@ -3194,22 +4329,50 @@ function HiddenTrackCard({ compact = false }) {
         }}
       />
 
-      <div style={{ display: "grid", justifyItems: "center", gap: 10 }}>
-        <div
-          style={{
-            width: compact ? 46 : 56,
-            height: compact ? 46 : 56,
-            borderRadius: "50%",
-            border: "1px solid rgba(255,255,255,0.22)",
-            display: "grid",
-            placeItems: "center",
-            background: "rgba(255,255,255,0.06)",
-          }}
-        >
-          <span style={{ fontSize: compact ? 20 : 24 }}>♫</span>
-        </div>
+      <div
+        style={{
+          position: "absolute",
+          width: ringSize,
+          height: ringSize,
+          borderRadius: "50%",
+          background:
+            "repeating-radial-gradient(circle, rgba(216,180,254,0.22) 0 1px, transparent 1px 8px), radial-gradient(circle at center, rgba(126,87,255,0.34), rgba(59,27,120,0.18) 34%, rgba(12,8,32,0.16) 68%)",
+          border: "1px solid rgba(216,180,254,0.22)",
+          boxShadow: "0 0 32px rgba(126,87,255,0.24)",
+          opacity: 0.95,
+        }}
+      />
 
-        <div style={{ textAlign: "center" }}>
+      <div
+        style={{
+          position: "absolute",
+          width: innerSize,
+          height: innerSize,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, #8b5cf6 0%, #6d28d9 48%, #351371 100%)",
+          border: "1px solid rgba(216,180,254,0.55)",
+          boxShadow: "0 0 0 7px rgba(126,87,255,0.18), 0 0 22px rgba(196,160,255,0.30)",
+        }}
+      />
+
+      <div style={{ position: "absolute", bottom: 18, left: 16, right: 16, display: "flex", alignItems: "end", justifyContent: "center", gap: 4 }}>
+        {[14, 26, 18, 32, 22, 28, 16].map((height, index) => (
+          <span
+            key={index}
+            style={{
+              width: 4,
+              height: compact ? Math.max(8, height - 8) : height,
+              borderRadius: 999,
+              background: index % 2 ? "#c4b5fd" : "#8b5cf6",
+              opacity: 0.76,
+              boxShadow: "0 0 10px rgba(196,160,255,0.22)",
+            }}
+          />
+        ))}
+      </div>
+
+      <div style={{ position: "relative", zIndex: 1, textAlign: "center", display: "grid", gap: 52 }}>
+        <div>
           <p style={{ margin: 0, fontWeight: 950, letterSpacing: 2, fontSize: compact ? 11 : 12 }}>TRACKLINE</p>
           <p style={{ margin: "5px 0 0", color: "#c4b5fd", fontSize: 10, letterSpacing: 1 }}>MUSIC TIMELINE</p>
         </div>
@@ -3234,25 +4397,43 @@ function MiniTimeline({ timeline }) {
 }
 
 function PlacementButton({ selected, disabled, onClick, label, helper, compact = false }) {
+  const [hovered, setHovered] = useState(false);
+  const isHot = selected || hovered;
+
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
-        width: compact ? 104 : 120,
+        width: compact ? 96 : 118,
         minHeight: compact ? 154 : 170,
         borderRadius: 16,
-        border: selected ? `2px solid ${colors.success}` : `1.5px dashed rgba(226,232,240,0.35)`,
-        background: selected ? "rgba(34,197,94,0.18)" : "rgba(15,23,42,0.52)",
-        color: selected ? "#bbf7d0" : colors.muted,
+        border: selected
+          ? `2px solid ${colors.success}`
+          : hovered && !disabled
+            ? `2px solid ${colors.primary}`
+            : `1.5px dashed rgba(226,232,240,0.35)`,
+        background: selected
+          ? "rgba(34,197,94,0.22)"
+          : hovered && !disabled
+            ? "rgba(126,87,255,0.22)"
+            : "rgba(15,23,42,0.52)",
+        color: selected ? "#bbf7d0" : hovered && !disabled ? "#ddd6fe" : colors.muted,
         display: "grid",
         placeItems: "center",
         cursor: disabled ? "not-allowed" : "pointer",
-        boxShadow: selected ? "0 0 0 4px rgba(34,197,94,0.14), 0 18px 36px rgba(0,0,0,0.25)" : "inset 0 0 0 1px rgba(255,255,255,0.03)",
-        opacity: disabled ? 0.45 : 1,
+        boxShadow: selected
+          ? "0 0 0 5px rgba(34,197,94,0.18), 0 20px 42px rgba(34,197,94,0.18)"
+          : hovered && !disabled
+            ? "0 0 0 5px rgba(126,87,255,0.20), 0 18px 38px rgba(126,87,255,0.16)"
+            : "inset 0 0 0 1px rgba(255,255,255,0.03)",
+        opacity: disabled ? 0.42 : 1,
         padding: 10,
         transition: "160ms ease",
+        transform: isHot && !disabled ? "translateY(-3px)" : "translateY(0)",
       }}
       title={helper || label}
     >
@@ -3266,81 +4447,243 @@ function PlacementButton({ selected, disabled, onClick, label, helper, compact =
   );
 }
 
-function ResultPanel({ result, onNext, canAdvance }) {
+function ResultPanel({ result, timeline = [], onNext, canAdvance }) {
   const isSkipped = Boolean(result.skipped);
   const isCorrect = result.correct && !isSkipped;
+  const accent = isSkipped ? colors.warning : isCorrect ? colors.good : colors.bad;
+  const borderColor = isSkipped ? "#f59e0b" : isCorrect ? "#10b981" : "#ef4444";
+  const textColor = isSkipped ? "#fde68a" : isCorrect ? "#bbf7d0" : "#fecaca";
+  const headline = isSkipped ? "Song übersprungen" : isCorrect ? "Richtig gelegt!" : "Knapp daneben";
+  const icon = isSkipped ? "↷" : isCorrect ? "✓" : "×";
+  const correctPlacementLabel = getCorrectPlacementLabel(timeline, result.track);
 
   return (
-    <div style={{ border: `1px solid ${isCorrect ? "#10b981" : "#ef4444"}`, background: isCorrect ? colors.good : colors.bad, borderRadius: 18, padding: 18 }}>
-      <h3 style={{ margin: "0 0 6px" }}>{isSkipped ? "Song uebersprungen" : isCorrect ? "Richtig einsortiert" : "Leider falsch"}</h3>
-      <p style={{ margin: 0, color: isCorrect ? "#a7f3d0" : "#fecaca" }}>
-        {result.track.title} von {result.track.artist} erschien {result.track.year}. Gewaehlte Position: {result.placementLabel}.
-      </p>
+    <div
+      style={{
+        border: `1px solid ${borderColor}`,
+        background: accent,
+        borderRadius: 24,
+        padding: 20,
+        display: "grid",
+        gridTemplateColumns: "max-content minmax(0, 1fr)",
+        gap: 20,
+        alignItems: "center",
+        boxShadow: `0 18px 48px ${isCorrect ? "rgba(16,185,129,0.16)" : "rgba(239,68,68,0.14)"}`,
+        overflow: "hidden",
+        position: "relative",
+      }}
+    >
+      <style>
+        {`
+          @keyframes tracklineRevealPop {
+            0% { transform: rotateY(86deg) scale(0.92); opacity: 0; }
+            70% { transform: rotateY(-5deg) scale(1.04); opacity: 1; }
+            100% { transform: rotateY(0deg) scale(1); opacity: 1; }
+          }
 
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
-        <Button onClick={onNext} disabled={!canAdvance}>
-          Naechster Spieler
-        </Button>
+          @keyframes tracklineResultPulse {
+            0% { transform: scale(0.88); opacity: 0; }
+            70% { transform: scale(1.08); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+          }
+        `}
+      </style>
+
+      <div style={{ animation: "tracklineRevealPop 520ms ease-out both", transformStyle: "preserve-3d" }}>
+        <TimelineTrackCard track={result.track} />
+      </div>
+
+      <div style={{ display: "grid", gap: 14, minWidth: 0 }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: "50%",
+              display: "grid",
+              placeItems: "center",
+              background: isCorrect ? "#10b981" : isSkipped ? "#f59e0b" : "#ef4444",
+              color: "white",
+              fontSize: 30,
+              fontWeight: 950,
+              animation: "tracklineResultPulse 420ms ease-out both",
+              boxShadow: "0 12px 28px rgba(0,0,0,0.28)",
+            }}
+          >
+            {icon}
+          </div>
+
+          <div>
+            <h3 style={{ margin: 0, fontSize: 26 }}>{headline}</h3>
+            <p style={{ margin: "5px 0 0", color: textColor }}>
+              {result.track.title} von {result.track.artist} erschien {result.track.year}.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: isCorrect || isSkipped ? "1fr" : "1fr 1fr", gap: 10 }}>
+          <div
+            style={{
+              border: `1px solid ${borderColor}`,
+              borderRadius: 18,
+              padding: 14,
+              background: "rgba(0,0,0,0.16)",
+            }}
+          >
+            <span style={{ display: "block", color: textColor, fontSize: 12, textTransform: "uppercase", letterSpacing: 0.8, fontWeight: 900 }}>
+              Gewählte Position
+            </span>
+            <strong style={{ display: "block", marginTop: 4 }}>{result.placementLabel}</strong>
+          </div>
+
+          {!isCorrect && !isSkipped && (
+            <div
+              style={{
+                border: "1px solid rgba(187,247,208,0.35)",
+                borderRadius: 18,
+                padding: 14,
+                background: "rgba(16,185,129,0.10)",
+              }}
+            >
+              <span style={{ display: "block", color: "#bbf7d0", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.8, fontWeight: 900 }}>
+                Korrekte Position
+              </span>
+              <strong style={{ display: "block", marginTop: 4 }}>{correctPlacementLabel}</strong>
+            </div>
+          )}
+        </div>
+
+        {!isCorrect && !isSkipped && (
+          <p style={{ margin: 0, color: textColor, fontSize: 13 }}>
+            Die Karte wäre korrekt {correctPlacementLabel} gelandet.
+          </p>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
+          <Button onClick={onNext} disabled={!canAdvance}>
+            Nächster Spieler
+          </Button>
+        </div>
       </div>
     </div>
   );
 }
 
-function FinishedPanel({ leaderboard }) {
+function FinishedPanel({ leaderboard, onNewRound, canNewRound }) {
+  const winner = leaderboard[0];
+
   return (
-    <div style={{ border: "1px solid #f59e0b", background: colors.warning, borderRadius: 18, padding: 18 }}>
-      <h3 style={{ margin: "0 0 6px" }}>Spiel beendet</h3>
-      <p style={{ margin: 0, color: "#fde68a" }}>
-        Gewinner: {leaderboard[0]?.name} mit {leaderboard[0]?.score} Karten in der Timeline.
-      </p>
+    <div
+      style={{
+        border: "1px solid #f59e0b",
+        background: "radial-gradient(circle at top, rgba(245,158,11,0.22), transparent 34%), rgba(120,53,15,0.35)",
+        borderRadius: 26,
+        padding: 22,
+        display: "grid",
+        gap: 18,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+        <div>
+          <Badge variant="secondary">Finale</Badge>
+          <h2 style={{ margin: "10px 0 4px", fontSize: 30 }}>Spiel beendet</h2>
+          <p style={{ margin: 0, color: "#fde68a" }}>Gewinner: {winner?.name || "-"} mit {winner?.score || 0} Karten.</p>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div
+            style={{
+              minWidth: 120,
+              borderRadius: 20,
+              padding: 16,
+              background: cardTheme.ivory,
+              color: "#111827",
+              textAlign: "center",
+              boxShadow: "0 18px 38px rgba(0,0,0,0.24)",
+            }}
+          >
+            <div style={{ fontSize: 30 }}>★</div>
+            <strong style={{ display: "block", fontSize: 24 }}>{winner?.score || 0}</strong>
+            <span style={{ color: "#64748b", fontSize: 11, fontWeight: 900, textTransform: "uppercase" }}>Karten</span>
+          </div>
+
+          <Button onClick={onNewRound} disabled={!canNewRound} style={{ padding: "14px 18px" }}>
+            Neue Runde gleiche Spieler
+          </Button>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+        {leaderboard.slice(0, 3).map((player, index) => (
+          <div
+            key={player.id}
+            style={{
+              borderRadius: 18,
+              padding: 14,
+              background: index === 0 ? "rgba(245,158,11,0.18)" : colors.bg,
+              border: `1px solid ${index === 0 ? "#f59e0b" : colors.border}`,
+              textAlign: "center",
+            }}
+          >
+            <Badge variant={index === 0 ? "default" : "secondary"}>#{index + 1}</Badge>
+            <strong style={{ display: "block", marginTop: 8 }}>{player.name}</strong>
+            <span style={{ color: colors.muted, fontSize: 12 }}>{player.score} Karten</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
 function AllTimelines({ players, activePlayerIndex }) {
   return (
-    <Card>
-      <CardContent>
-        <h3 style={{ marginTop: 0 }}>Alle Timelines</h3>
+    <Card style={{ minWidth: 0, overflow: "hidden" }}>
+      <CardContent style={{ display: "grid", gap: 12, minWidth: 0, padding: 18 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Alle Timelines</h3>
+            <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 12 }}>Kompakte Übersicht aller Spieler.</p>
+          </div>
 
-        <div style={{ display: "grid", gap: 14 }}>
-          {players.map((player, index) => (
-            <div
-              key={player.id}
-              style={{
-                border: `1px solid ${index === activePlayerIndex ? colors.primary : colors.border}`,
-                borderRadius: 18,
-                padding: 14,
-                background: colors.bg,
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 10, alignItems: "center" }}>
-                <strong>{player.name}</strong>
-                <Badge variant="secondary">{player.score} Songs</Badge>
-              </div>
+          <Badge variant="secondary">{players.length} Spieler</Badge>
+        </div>
 
-              <div style={{ overflowX: "auto" }}>
-                <div style={{ display: "flex", gap: 8, minWidth: "max-content", paddingBottom: 2 }}>
-                  {sortTimeline(player.timeline).map((track) => (
-                    <span
-                      key={track.id}
-                      title={`${track.year} - ${track.title} - ${track.artist}`}
-                      style={{
-                        borderRadius: 999,
-                        background: colors.chip,
-                        color: colors.text,
-                        padding: "6px 10px",
-                        fontSize: 12,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {track.year} - {track.title}
-                    </span>
-                  ))}
+        <div style={{ display: "grid", gap: 10 }}>
+          {players.map((player, index) => {
+            const sortedTimeline = sortTimeline(player.timeline);
+            const isActive = index === activePlayerIndex;
+
+            return (
+              <div
+                key={player.id}
+                style={{
+                  border: `1px solid ${isActive ? colors.primary : colors.border}`,
+                  borderRadius: 16,
+                  padding: 10,
+                  background: isActive ? "rgba(126,87,255,0.12)" : colors.bg,
+                  boxShadow: isActive ? "0 12px 28px rgba(126,87,255,0.10)" : "none",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 8, alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <strong style={{ fontSize: 14 }}>{player.name}</strong>
+                    {isActive && <Badge>am Zug</Badge>}
+                  </div>
+                  <Badge variant="secondary">{player.score} Karten</Badge>
+                </div>
+
+                <div style={{ overflowX: "auto", overflowY: "hidden", maxWidth: "100%", minWidth: 0 }}>
+                  <div style={{ display: "flex", gap: 5, minWidth: "max-content", paddingBottom: 2, alignItems: "center" }}>
+                    {sortedTimeline.length === 0 ? (
+                      <span style={{ color: colors.muted, fontSize: 12 }}>Noch keine Karten</span>
+                    ) : (
+                      sortedTimeline.map((track) => <MiniTimelineTrackCard key={`${player.id}-${track.id}`} track={track} />)
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </CardContent>
     </Card>
@@ -3349,6 +4692,7 @@ function AllTimelines({ players, activePlayerIndex }) {
 
 
 function PlayerFocusedCard({ viewerRole, activePlayer, permissions }) {
+  const isActive = viewerRole === "activePlayer";
   const roleLabel =
     {
       activePlayer: "Du bist am Zug",
@@ -3357,101 +4701,107 @@ function PlayerFocusedCard({ viewerRole, activePlayer, permissions }) {
       host: "Host",
     }[viewerRole] || viewerRole;
 
-  const nextAction = permissions.canReveal
-    ? "Du kannst aufdecken oder zum naechsten Spieler wechseln."
-    : permissions.canPlace
-      ? "Du kannst den Song starten, einsortieren, aufdecken und danach zum naechsten Spieler gehen."
-      : "Du siehst den aktuellen Spielstand und wartest auf deinen Zug.";
-
   return (
     <Card>
       <CardContent style={{ display: "grid", gap: 12 }}>
-        <div>
-          <Badge variant={permissions.canPlace ? "default" : "secondary"}>{roleLabel}</Badge>
-          <h3 style={{ margin: "10px 0 6px" }}>Spieleransicht</h3>
-          <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>{nextAction}</p>
+        <div
+          style={{
+            borderRadius: 22,
+            border: `1px solid ${isActive ? colors.primary : colors.border}`,
+            background: isActive ? "rgba(126,87,255,0.16)" : cardTheme.table,
+            padding: 16,
+            display: "grid",
+            gap: 8,
+          }}
+        >
+          <Badge variant={isActive ? "default" : "secondary"}>{roleLabel}</Badge>
+          <h3 style={{ margin: 0 }}>{isActive ? "Jetzt spielen" : "Wartebereich"}</h3>
+          <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+            {isActive ? "Song starten, Karte platzieren und aufdecken." : "Aktueller Spieler ist unten angezeigt."}
+          </p>
         </div>
 
-        <div style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 12, background: colors.bg }}>
-          <span style={{ display: "block", color: colors.muted, fontSize: 12 }}>Aktiv am Zug</span>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", borderRadius: 16, background: colors.bg, padding: 12 }}>
+          <span style={{ color: colors.muted }}>Aktiv</span>
           <strong>{activePlayer?.name || "-"}</strong>
-        </div>
-
-        <div style={{ display: "grid", gap: 8 }}>
-          <PermissionRow label="Song ziehen" allowed={permissions.canDrawTrack} />
-          <PermissionRow label="Song starten" allowed={permissions.canPlayTrack} />
-          <PermissionRow label="Position waehlen" allowed={permissions.canPlace} />
-          <PermissionRow label="Reveal / naechster Spieler" allowed={permissions.canReveal && permissions.canAdvance} />
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function LocalRoleCard({ viewerPlayerId, setViewerPlayerId, viewerRole, permissions, players }) {
+function LocalRoleCard({ viewerPlayerId, setViewerPlayerId, viewerRole, permissions, players, roomClients = [], clientInstanceId, roomCode }) {
   const roleLabel =
     {
       host: "Host",
       activePlayer: "Aktiver Spieler",
-      player: "Spieler wartet",
+      player: "Spieler",
       spectator: "Zuschauer",
     }[viewerRole] || viewerRole;
 
+  const selectedPlayer = players.find((player) => player.id === viewerPlayerId);
+  const claimedByOther = new Set(
+    roomClients
+      .filter((client) => client.clientInstanceId && client.clientInstanceId !== clientInstanceId)
+      .map((client) => client.playerId)
+      .filter(Boolean)
+  );
+
+  function handleViewerChange(event) {
+    const nextPlayerId = event.target.value;
+
+    setViewerPlayerId(nextPlayerId);
+    storeViewerPlayerId(roomCode, nextPlayerId);
+  }
+
   return (
     <Card>
-      <CardContent style={{ display: "grid", gap: 12 }}>
+      <CardContent style={{ display: "grid", gap: 14 }}>
         <div>
           <h3 style={{ margin: "0 0 6px" }}>Deine Ansicht</h3>
-          <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>Zum Testen lokal auswaehlen. Bei aktivem Sync wird die Auswahl an den Server gesendet. Einladungslinks setzen neue Teilnehmer automatisch auf Spieleransicht.</p>
+          <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+            Waehle deinen Namen aus. Bereits belegte Namen sind gesperrt.
+          </p>
         </div>
 
-        <Select value={viewerPlayerId} onChange={(event) => setViewerPlayerId(event.target.value)}>
+        <Select value={viewerPlayerId} onChange={handleViewerChange}>
           <option value="auto-host">Host automatisch beim Spielstart</option>
           <option value="auto-player">Automatisch: Spieler per Einladungslink</option>
 
-          {players.map((player) => (
-            <option key={player.id} value={player.id}>
-              {player.name}
-            </option>
-          ))}
+          {players.map((player) => {
+            const isClaimedByOther = claimedByOther.has(player.id);
+
+            return (
+              <option key={player.id} value={player.id} disabled={isClaimedByOther}>
+                {player.name}{isClaimedByOther ? " (belegt)" : ""}
+              </option>
+            );
+          })}
 
           <option value="spectator">Zuschauer</option>
         </Select>
 
-        <div style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg }}>
-          <span style={{ display: "block", color: colors.muted, fontSize: 12 }}>Aktuelle Rolle</span>
-          <strong>{roleLabel}</strong>
-        </div>
+        <div
+          style={{
+            border: `1px solid ${colors.border}`,
+            borderRadius: 18,
+            padding: 14,
+            background: cardTheme.table,
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            alignItems: "center",
+          }}
+        >
+          <div>
+            <span style={{ display: "block", color: colors.muted, fontSize: 12 }}>Aktuelle Ansicht</span>
+            <strong>{selectedPlayer?.name || roleLabel}</strong>
+          </div>
 
-        <div style={{ display: "grid", gap: 8 }}>
-          <PermissionRow label="Song ziehen" allowed={permissions.canDrawTrack} />
-          <PermissionRow label="Song starten" allowed={permissions.canPlayTrack} />
-          <PermissionRow label="Position waehlen" allowed={permissions.canPlace} />
-          <PermissionRow label="Skip / Debug" allowed={permissions.canHostControl} />
-          <PermissionRow label="Reveal / naechster Spieler" allowed={permissions.canReveal && permissions.canAdvance} />
+          <Badge variant={viewerRole === "activePlayer" ? "default" : "secondary"}>{roleLabel}</Badge>
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-function PermissionRow({ label, allowed }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        gap: 10,
-        alignItems: "center",
-        border: `1px solid ${colors.border}`,
-        borderRadius: 12,
-        padding: "8px 10px",
-        background: colors.bg,
-      }}
-    >
-      <span style={{ color: colors.muted, fontSize: 13 }}>{label}</span>
-      <Badge variant={allowed ? "default" : "secondary"}>{allowed ? "ja" : "nein"}</Badge>
-    </div>
   );
 }
 
@@ -3463,7 +4813,7 @@ function RoomCard({ room, players, activePlayerIndex }) {
       <CardContent style={{ display: "grid", gap: 12 }}>
         <div>
           <h3 style={{ margin: "0 0 6px" }}>Privater Raum</h3>
-          <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>Vorbereitung fuer Discord Activity / Multiplayer.</p>
+          <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>Privater Online-Raum fuer deine Runde.</p>
         </div>
 
         <div style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 12, background: colors.bg }}>
@@ -3495,26 +4845,67 @@ function InfoLine({ label, value }) {
 }
 
 function Leaderboard({ players }) {
+  const topScore = players[0]?.score || 0;
+
   return (
     <Card>
-      <CardContent>
-        <h3 style={{ marginTop: 0 }}>Rangliste</h3>
+      <CardContent style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+          <h3 style={{ margin: 0 }}>Scoreboard</h3>
+          <Badge variant="secondary">Karten</Badge>
+        </div>
 
-        <div style={{ display: "grid", gap: 10 }}>
-          {players.map((player, index) => (
-            <div key={player.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", borderRadius: 16, background: colors.bg, padding: 12 }}>
-              <div>
-                <strong>
-                  {index + 1}. {player.name}
+        <div style={{ display: "grid", gap: 8 }}>
+          {players.map((player, index) => {
+            const isLeader = player.score === topScore && topScore > 0;
+
+            return (
+              <div
+                key={player.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "28px minmax(0, 1fr) 44px",
+                  gap: 10,
+                  alignItems: "center",
+                  borderRadius: 14,
+                  border: `1px solid ${isLeader ? colors.primary : colors.border}`,
+                  background: isLeader ? "rgba(126,87,255,0.14)" : colors.bg,
+                  padding: "8px 10px",
+                }}
+              >
+                <span
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: "50%",
+                    display: "grid",
+                    placeItems: "center",
+                    background: isLeader ? colors.primary : colors.panelSoft,
+                    color: isLeader ? colors.primaryText : colors.text,
+                    fontWeight: 950,
+                    fontSize: 12,
+                  }}
+                >
+                  {index + 1}
+                </span>
+
+                <div style={{ minWidth: 0 }}>
+                  <strong style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontSize: 14 }}>{player.name}</strong>
+                  <span style={{ color: colors.muted, fontSize: 11 }}>{player.correct}✓ · {player.wrong}×</span>
+                </div>
+
+                <strong
+                  style={{
+                    justifySelf: "end",
+                    fontSize: 22,
+                    color: isLeader ? "#c4b5fd" : colors.text,
+                  }}
+                >
+                  {player.score}
                 </strong>
-                <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 12 }}>
-                  {player.correct} richtig - {player.wrong} falsch
-                </p>
               </div>
-
-              <Badge>{player.score}</Badge>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </CardContent>
     </Card>
@@ -3525,7 +4916,7 @@ function TurnOrder({ players, activePlayerIndex }) {
   return (
     <Card>
       <CardContent>
-        <h3 style={{ marginTop: 0 }}>Reihenfolge</h3>
+        <h3 style={{ marginTop: 0 }}>Zugreihenfolge</h3>
 
         <div style={{ display: "grid", gap: 8 }}>
           {players.map((player, index) => (
@@ -3554,6 +4945,50 @@ function TurnOrder({ players, activePlayerIndex }) {
     </Card>
   );
 }
+
+
+function HostAdminDetails({ playbackRequests, gameLog, discardedTracks, eventHistory, gameState }) {
+  return (
+    <details
+      style={{
+        border: `1px solid ${colors.border}`,
+        borderRadius: 20,
+        background: colors.bg,
+        overflow: "hidden",
+      }}
+    >
+      <summary
+        style={{
+          cursor: "pointer",
+          padding: 16,
+          fontWeight: 900,
+          listStyle: "none",
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          alignItems: "center",
+        }}
+      >
+        <span>Admin / Debug</span>
+        <Badge variant="secondary">einklappbar</Badge>
+      </summary>
+
+      <div style={{ display: "grid", gap: 14, padding: "0 16px 16px" }}>
+        <PlaybackQueue playbackRequests={playbackRequests} />
+        <details style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 12, background: colors.panel }}>
+          <summary style={{ cursor: "pointer", fontWeight: 900 }}>Weitere technische Details</summary>
+          <div style={{ display: "grid", gap: 14, marginTop: 14 }}>
+            <DiscordCommandMap />
+            <GameLog gameLog={gameLog} discardedTracks={discardedTracks} />
+            <EventHistory eventHistory={eventHistory} />
+            <SyncPreview gameState={gameState} />
+          </div>
+        </details>
+      </div>
+    </details>
+  );
+}
+
 
 function PlaybackQueue({ playbackRequests }) {
   return (

@@ -5,6 +5,7 @@ import { Server } from "socket.io";
 const PORT = Number(process.env.PORT || 3001);
 const rooms = new Map();
 const spotifyLogins = new Map();
+const DEFAULT_PLAY_LIMIT_SECONDS = 20;
 
 const STARTING_TRACKS = [
   { id: "s1", title: "Billie Jean", artist: "Michael Jackson", year: 1982, genre: "Pop" },
@@ -26,6 +27,8 @@ const initialGameState = {
   lastResult: null,
   targetScore: 10,
   maxTurns: 0,
+  playLimitSeconds: DEFAULT_PLAY_LIMIT_SECONDS,
+  difficulty: "normal",
   turnNumber: 1,
   showDebugSong: false,
   discardedTracks: [],
@@ -56,6 +59,19 @@ function createInitialPlayers(names) {
   return names.map((name, index) => ({
     id: createId("player"),
     name,
+    role: index === 0 ? "host" : "player",
+    timeline: [starters[index % starters.length]],
+    score: 1,
+    correct: 0,
+    wrong: 0,
+  }));
+}
+
+function resetPlayersForNewRound(players) {
+  const starters = shuffle(STARTING_TRACKS);
+
+  return players.map((player, index) => ({
+    ...player,
     role: index === 0 ? "host" : "player",
     timeline: [starters[index % starters.length]],
     score: 1,
@@ -108,6 +124,37 @@ function gameReducer(state, action) {
     case "RESET_GAME":
       return initialGameState;
 
+    case "NEW_ROUND": {
+      if (!state.players.length || !state.room) return state;
+
+      const deck = Array.isArray(action.deck) ? action.deck : [];
+      const players = resetPlayersForNewRound(state.players);
+
+      const nextState = {
+        ...initialGameState,
+        phase: "ready",
+        room: {
+          ...state.room,
+          hostPlayerId: players[0]?.id || state.room.hostPlayerId,
+          hostName: players[0]?.name || state.room.hostName || "Host",
+        },
+        players,
+        deck: shuffle(deck),
+        targetScore: Number(action.targetScore || state.targetScore || 10),
+        maxTurns: Number(action.maxTurns ?? state.maxTurns ?? 0),
+        playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || state.playLimitSeconds || DEFAULT_PLAY_LIMIT_SECONDS))),
+        difficulty: action.difficulty || state.difficulty || "normal",
+        gameLog: [
+          {
+            id: createId("log"),
+            text: `Neue Runde gestartet mit ${players.length} Spielern und ${deck.length} Songs im Deck.`,
+          },
+        ],
+      };
+
+      return addEvent(nextState, "NEW_ROUND", `${players.length} Spieler, ${deck.length} Songs`);
+    }
+
     case "START_GAME": {
       const playerNames = Array.isArray(action.playerNames) && action.playerNames.length > 0 ? action.playerNames : ["Host"];
       const deck = Array.isArray(action.deck) ? action.deck : [];
@@ -126,6 +173,8 @@ function gameReducer(state, action) {
         deck: shuffle(deck),
         targetScore: Number(action.targetScore || 10),
         maxTurns: Number(action.maxTurns || 0),
+        playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || DEFAULT_PLAY_LIMIT_SECONDS))),
+        difficulty: action.difficulty || "normal",
         gameLog: [
           {
             id: createId("log"),
@@ -181,6 +230,7 @@ function gameReducer(state, action) {
         requester,
         trackId: state.currentTrack.id,
         hiddenLabel: "Verdeckter Song",
+        playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || state.playLimitSeconds || DEFAULT_PLAY_LIMIT_SECONDS))),
         createdAt: new Date().toLocaleTimeString(),
       };
 
@@ -568,6 +618,7 @@ function getRoom(roomCode) {
     rooms.set(normalizedRoomCode, {
       gameState: null,
       clients: new Map(),
+      playerClaims: new Map(),
       spotify: {
         token: null,
         refreshToken: null,
@@ -595,6 +646,7 @@ function getClientList(room) {
     socketId: client.socketId,
     playerName: client.playerName,
     playerId: client.playerId || null,
+    clientInstanceId: client.clientInstanceId || null,
     joinedAt: client.joinedAt,
   }));
 }
@@ -649,6 +701,10 @@ function authorizeAction(state, action) {
 
   if (type === "RESET_GAME") {
     return actor.isHost ? { ok: true } : { ok: false, message: "Nur der Host darf das Spiel beenden." };
+  }
+
+  if (type === "NEW_ROUND") {
+    return actor.isHost ? { ok: true } : { ok: false, message: "Nur der Host darf eine neue Runde starten." };
   }
 
   if (["TRACK_REVEALED", "NEXT_PLAYER"].includes(type)) {
@@ -861,7 +917,7 @@ async function handleRoomSpotifyPlay(req, res) {
     const { roomCode, room } = getRoomFromSpotifyPath(req);
     const state = room.gameState;
     const track = state?.currentTrack || body.track;
-    const playLimitSeconds = Math.max(1, Math.min(120, Math.round(Number(body.playLimitSeconds || 20))));
+    const playLimitSeconds = Math.max(1, Math.min(120, Math.round(Number(body.playLimitSeconds || state?.playLimitSeconds || DEFAULT_PLAY_LIMIT_SECONDS))));
 
     if (!track) {
       sendJson(res, 400, { error: "Kein aktueller Song im Raum." });
@@ -1015,16 +1071,24 @@ const io = new Server(httpServer, {
 io.on("connection", (socket) => {
   let currentRoomCode = null;
 
-  socket.on("room:join", ({ roomCode, playerName } = {}) => {
+  socket.on("room:join", ({ roomCode, playerName, clientInstanceId } = {}) => {
     const result = getRoom(roomCode);
     currentRoomCode = result.roomCode;
 
     socket.join(currentRoomCode);
 
+    const normalizedClientInstanceId = String(clientInstanceId || "").trim();
+    const existingClaim = normalizedClientInstanceId
+      ? Array.from(result.room.playerClaims.entries()).find(([, value]) => value.clientInstanceId === normalizedClientInstanceId)
+      : null;
+    const claimedPlayerId = existingClaim?.[0] || null;
+    const claimedPlayer = result.room.gameState?.players?.find((player) => player.id === claimedPlayerId) || null;
+
     result.room.clients.set(socket.id, {
       socketId: socket.id,
-      playerName: playerName || "Spieler",
-      playerId: null,
+      clientInstanceId: normalizedClientInstanceId || null,
+      playerName: claimedPlayer?.name || playerName || "Spieler",
+      playerId: claimedPlayer?.id || null,
       joinedAt: Date.now(),
     });
 
@@ -1042,29 +1106,57 @@ io.on("connection", (socket) => {
     console.log(`[join] ${socket.id} -> ${currentRoomCode} (${clientCount} clients)`);
   });
 
-  socket.on("room:claimPlayer", ({ roomCode, playerId, playerName } = {}) => {
+  socket.on("room:claimPlayer", ({ roomCode, playerId, playerName, clientInstanceId } = {}) => {
     const result = getRoom(roomCode || currentRoomCode);
     currentRoomCode = result.roomCode;
     socket.join(currentRoomCode);
 
+    const normalizedClientInstanceId = String(clientInstanceId || "").trim();
     const client = result.room.clients.get(socket.id) || {
       socketId: socket.id,
       joinedAt: Date.now(),
     };
 
+    client.clientInstanceId = normalizedClientInstanceId || client.clientInstanceId || null;
+
     const claimedPlayer = result.room.gameState?.players?.find((player) => player.id === playerId);
 
     if (!claimedPlayer) {
+      socket.emit("room:claimResult", { ok: false, playerId, message: "Dieser Spieler existiert im aktuellen Raum nicht." });
       socket.emit("room:error", { message: "Dieser Spieler existiert im aktuellen Raum nicht." });
       return;
     }
 
+    const persistentClaim = result.room.playerClaims.get(playerId);
+    const claimedByDifferentClient =
+      persistentClaim?.clientInstanceId &&
+      normalizedClientInstanceId &&
+      persistentClaim.clientInstanceId !== normalizedClientInstanceId &&
+      Array.from(result.room.clients.values()).some(
+        (item) => item.socketId !== socket.id && item.playerId === playerId && item.clientInstanceId === persistentClaim.clientInstanceId
+      );
+
+    if (claimedByDifferentClient) {
+      const message = `${claimedPlayer.name} ist bereits mit einem anderen Client verbunden.`;
+      socket.emit("room:claimResult", { ok: false, playerId, playerName: claimedPlayer.name, message });
+      socket.emit("room:error", { message });
+      broadcastPresence(currentRoomCode, result.room);
+      return;
+    }
+
     const alreadyClaimed = Array.from(result.room.clients.values()).find(
-      (item) => item.socketId !== socket.id && item.playerId === playerId
+      (item) =>
+        item.socketId !== socket.id &&
+        item.playerId === playerId &&
+        item.clientInstanceId &&
+        normalizedClientInstanceId &&
+        item.clientInstanceId !== normalizedClientInstanceId
     );
 
     if (alreadyClaimed) {
-      socket.emit("room:error", { message: `${claimedPlayer.name} ist bereits mit einem anderen Client verbunden.` });
+      const message = `${claimedPlayer.name} ist bereits mit einem anderen Client verbunden.`;
+      socket.emit("room:claimResult", { ok: false, playerId, playerName: claimedPlayer.name, message });
+      socket.emit("room:error", { message });
       broadcastPresence(currentRoomCode, result.room);
       return;
     }
@@ -1072,7 +1164,19 @@ io.on("connection", (socket) => {
     client.playerId = playerId;
     client.playerName = claimedPlayer.name || playerName || client.playerName || "Spieler";
 
+    result.room.playerClaims.set(playerId, {
+      clientInstanceId: normalizedClientInstanceId || client.clientInstanceId || socket.id,
+      playerName: client.playerName,
+      claimedAt: Date.now(),
+    });
+
     result.room.clients.set(socket.id, client);
+
+    socket.emit("room:claimResult", {
+      ok: true,
+      playerId,
+      playerName: client.playerName,
+    });
 
     broadcastPresence(currentRoomCode, result.room);
 
@@ -1107,6 +1211,10 @@ io.on("connection", (socket) => {
     const serverAction = enrichActionForServer(previousState, socketBoundAction);
     const nextState = gameReducer(previousState, serverAction);
 
+    if (action.type === "RESET_GAME") {
+      result.room.playerClaims = new Map();
+    }
+
     result.room.gameState = nextState;
     result.room.updatedAt = Date.now();
 
@@ -1120,6 +1228,17 @@ io.on("connection", (socket) => {
 
       updatedClient.playerId = hostPlayerId;
       updatedClient.playerName = hostName;
+
+      result.room.playerClaims = new Map();
+
+      if (hostPlayerId) {
+        result.room.playerClaims.set(hostPlayerId, {
+          clientInstanceId: updatedClient.clientInstanceId || socket.id,
+          playerName: hostName,
+          claimedAt: Date.now(),
+        });
+      }
+
       result.room.clients.set(socket.id, updatedClient);
     }
 
