@@ -651,7 +651,13 @@ function authorizeAction(state, action) {
     return actor.isHost ? { ok: true } : { ok: false, message: "Nur der Host darf das Spiel beenden." };
   }
 
-  if (["TRACK_REVEALED", "NEXT_PLAYER", "TRACK_SKIPPED", "TOGGLE_DEBUG_SONG"].includes(type)) {
+  if (["TRACK_REVEALED", "NEXT_PLAYER"].includes(type)) {
+    return actor.isHost || actor.isActivePlayer
+      ? { ok: true }
+      : { ok: false, message: "Nur Host/DJ oder der aktive Spieler darf aufdecken oder zum naechsten Spieler gehen." };
+  }
+
+  if (["TRACK_SKIPPED", "TOGGLE_DEBUG_SONG"].includes(type)) {
     return actor.isHost ? { ok: true } : { ok: false, message: "Nur der Host/DJ darf diese Aktion ausfuehren." };
   }
 

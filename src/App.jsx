@@ -1296,8 +1296,8 @@ function getViewerPermissions(viewerRole) {
     canDrawTrack: isHost || isActivePlayer,
     canPlayTrack: isHost || isActivePlayer,
     canPlace: isHost || isActivePlayer,
-    canReveal: isHost,
-    canAdvance: isHost,
+    canReveal: isHost || isActivePlayer,
+    canAdvance: isHost || isActivePlayer,
   };
 }
 
@@ -1415,7 +1415,7 @@ export default function App() {
   const viewerRole = getViewerRoleFromPlayer(resolvedViewerPlayerId, gameState);
   const viewerPermissions = getViewerPermissions(viewerRole);
   const showAdminPanels = gameState.phase === "lobby" || viewerRole === "host";
-  const showSpotifyPanel = gameState.phase === "lobby" || viewerPermissions.canPlayTrack;
+  const showSpotifyPanel = showAdminPanels;
 
   const leaderboard = useMemo(() => {
     return [...gameState.players].sort((a, b) => b.score - a.score || a.wrong - b.wrong);
@@ -2353,7 +2353,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
             <Badge variant="secondary">Spotify</Badge>
             <h2 style={{ margin: "10px 0 6px" }}>Ein Host-Account fuer den Raum</h2>
             <p style={{ margin: 0, color: colors.muted }}>
-              Der Host verbindet Spotify in der Lobby oder im Spiel und speichert ein Zielgeraet. Danach starten alle berechtigten Spieler den Song ueber denselben Account.
+              Der Host verbindet Spotify in der Lobby oder im Spiel und speichert ein Zielgeraet. Der Spotify-Bereich ist nur fuer den Host sichtbar.
             </p>
           </div>
 
@@ -3212,7 +3212,7 @@ function PlayerFocusedCard({ viewerRole, activePlayer, permissions }) {
   const nextAction = permissions.canReveal
     ? "Du kannst aufdecken oder zum naechsten Spieler wechseln."
     : permissions.canPlace
-      ? "Du kannst den Song starten und in die Timeline einsortieren."
+      ? "Du kannst den Song starten, einsortieren, aufdecken und danach zum naechsten Spieler gehen."
       : "Du siehst den aktuellen Spielstand und wartest auf deinen Zug.";
 
   return (
