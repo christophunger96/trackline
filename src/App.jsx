@@ -927,6 +927,8 @@ const initialGameState = {
   usedTrackIds: [],
   usedTrackKeys: [],
   overtime: false,
+  overtimePlayerIds: [],
+  overtimePendingPlayerIds: [],
   gameLog: [],
   eventHistory: [],
   playbackRequests: [],
@@ -1209,25 +1211,34 @@ function hasTargetTie(players, targetScore) {
   return eligiblePlayers.filter((player) => player.score === topScore).length > 1;
 }
 
-function getOvertimeContenderIndexes(players, targetScore) {
-  const eligible = players
-    .map((player, index) => ({ player, index }))
-    .filter(({ player }) => player.score >= targetScore);
+function getOvertimeContenderPlayerIds(players, targetScore, allowedPlayerIds = null) {
+  const allowedSet = Array.isArray(allowedPlayerIds) && allowedPlayerIds.length ? new Set(allowedPlayerIds) : null;
+  const eligible = players.filter((player) => player.score >= targetScore && (!allowedSet || allowedSet.has(player.id)));
 
   if (eligible.length < 2) return [];
 
-  const topScore = Math.max(...eligible.map(({ player }) => player.score));
+  const topScore = Math.max(...eligible.map((player) => player.score));
 
-  return eligible.filter(({ player }) => player.score === topScore).map(({ index }) => index);
+  return eligible.filter((player) => player.score === topScore).map((player) => player.id);
 }
 
-function getNextIndexFromAllowed(currentIndex, allowedIndexes, playerCount) {
-  if (!allowedIndexes.length) return (currentIndex + 1) % playerCount;
+function getPlayerIndexById(players, playerId) {
+  return Math.max(0, players.findIndex((player) => player.id === playerId));
+}
 
-  const sortedIndexes = [...allowedIndexes].sort((a, b) => a - b);
-  const nextHigher = sortedIndexes.find((index) => index > currentIndex);
+function getNextIndexFromAllowedPlayerIds(currentIndex, allowedPlayerIds, players) {
+  if (!allowedPlayerIds.length) return (currentIndex + 1) % players.length;
 
-  return nextHigher ?? sortedIndexes[0];
+  const allowedIndexes = allowedPlayerIds
+    .map((playerId) => players.findIndex((player) => player.id === playerId))
+    .filter((index) => index >= 0)
+    .sort((a, b) => a - b);
+
+  if (!allowedIndexes.length) return (currentIndex + 1) % players.length;
+
+  const nextHigher = allowedIndexes.find((index) => index > currentIndex);
+
+  return nextHigher ?? allowedIndexes[0];
 }
 
 function getUsedTrackIdSet(state) {
@@ -1490,6 +1501,8 @@ function gameReducer(state, action) {
             ...state,
             phase: "finished",
             overtime: false,
+            overtimePlayerIds: [],
+            overtimePendingPlayerIds: [],
           },
           "GAME_FINISHED",
           finalWinner ? `Gewinner: ${finalWinner.name}` : "Limit erreicht"
@@ -1497,20 +1510,57 @@ function gameReducer(state, action) {
       }
 
       if (state.overtime) {
-        if (finalWinner && !targetTie) {
+        const currentPlayerId = state.players[state.activePlayerIndex]?.id;
+        const currentOvertimePlayerIds =
+          Array.isArray(state.overtimePlayerIds) && state.overtimePlayerIds.length
+            ? state.overtimePlayerIds
+            : getOvertimeContenderPlayerIds(state.players, state.targetScore);
+
+        const pendingAfterCurrent = (state.overtimePendingPlayerIds?.length ? state.overtimePendingPlayerIds : currentOvertimePlayerIds)
+          .filter((playerId) => playerId !== currentPlayerId);
+
+        if (pendingAfterCurrent.length > 0) {
+          const nextOvertimeIndex = getNextIndexFromAllowedPlayerIds(state.activePlayerIndex, pendingAfterCurrent, state.players);
+
+          return addEvent(
+            {
+              ...state,
+              activePlayerIndex: nextOvertimeIndex,
+              turnNumber: state.turnNumber + 1,
+              currentTrack: null,
+              selectedInsertIndex: null,
+              lastResult: null,
+              showDebugSong: false,
+              overtime: true,
+              overtimePlayerIds: currentOvertimePlayerIds,
+              overtimePendingPlayerIds: pendingAfterCurrent,
+              phase: "ready",
+            },
+            "OVERTIME_NEXT_PLAYER",
+            state.players[nextOvertimeIndex]?.name || "Verlaengerung"
+          );
+        }
+
+        const nextContenderIds = getOvertimeContenderPlayerIds(state.players, state.targetScore, currentOvertimePlayerIds);
+
+        if (nextContenderIds.length <= 1) {
+          const winnerId = nextContenderIds[0] || finalWinner?.id;
+          const winner = state.players.find((player) => player.id === winnerId) || finalWinner;
+
           return addEvent(
             {
               ...state,
               phase: "finished",
               overtime: false,
+              overtimePlayerIds: [],
+              overtimePendingPlayerIds: [],
             },
             "GAME_FINISHED",
-            `Sudden-Death Gewinner: ${finalWinner.name}`
+            winner ? `Gewinner nach Verlaengerung: ${winner.name}` : "Verlaengerung beendet"
           );
         }
 
-        const overtimeIndexes = getOvertimeContenderIndexes(state.players, state.targetScore);
-        const nextOvertimeIndex = getNextIndexFromAllowed(state.activePlayerIndex, overtimeIndexes, state.players.length);
+        const nextOvertimeIndex = getNextIndexFromAllowedPlayerIds(state.activePlayerIndex, nextContenderIds, state.players);
 
         return addEvent(
           {
@@ -1522,9 +1572,11 @@ function gameReducer(state, action) {
             lastResult: null,
             showDebugSong: false,
             overtime: true,
+            overtimePlayerIds: nextContenderIds,
+            overtimePendingPlayerIds: nextContenderIds,
             phase: "ready",
           },
-          "OVERTIME_NEXT_PLAYER",
+          "OVERTIME_ROUND_CONTINUES",
           state.players[nextOvertimeIndex]?.name || "Verlaengerung"
         );
       }
@@ -1538,6 +1590,8 @@ function gameReducer(state, action) {
             ...state,
             phase: "finished",
             overtime: false,
+            overtimePlayerIds: [],
+            overtimePendingPlayerIds: [],
           },
           "GAME_FINISHED",
           `Gewinner: ${finalWinner.name}`
@@ -1545,8 +1599,8 @@ function gameReducer(state, action) {
       }
 
       if (isEndOfRound && targetReached && targetTie) {
-        const overtimeIndexes = getOvertimeContenderIndexes(state.players, state.targetScore);
-        const nextOvertimeIndex = getNextIndexFromAllowed(state.activePlayerIndex, overtimeIndexes, state.players.length);
+        const overtimePlayerIds = getOvertimeContenderPlayerIds(state.players, state.targetScore);
+        const nextOvertimeIndex = getNextIndexFromAllowedPlayerIds(state.activePlayerIndex, overtimePlayerIds, state.players);
 
         return addEvent(
           {
@@ -1558,6 +1612,8 @@ function gameReducer(state, action) {
             lastResult: null,
             showDebugSong: false,
             overtime: true,
+            overtimePlayerIds,
+            overtimePendingPlayerIds: overtimePlayerIds,
             phase: "ready",
           },
           "OVERTIME_STARTED",
@@ -1575,6 +1631,8 @@ function gameReducer(state, action) {
           lastResult: null,
           showDebugSong: false,
           overtime: false,
+          overtimePlayerIds: [],
+          overtimePendingPlayerIds: [],
           phase: "ready",
         },
         "NEXT_PLAYER",
@@ -2919,6 +2977,7 @@ export default function App() {
                     difficulty={gameState.difficulty}
                     overtime={gameState.overtime}
                     usedTrackCount={(gameState.usedTrackIds || []).length}
+                    overtimePendingCount={(gameState.overtimePendingPlayerIds || []).length}
                   />
 
                   <CurrentTrackPanel
@@ -4294,7 +4353,7 @@ function DeckPreview({ tracks, selectedPreset }) {
   );
 }
 
-function GameHeader({ activePlayer, deck, turnNumber, maxTurns, targetScore, playLimitSeconds, difficulty, overtime, usedTrackCount }) {
+function GameHeader({ activePlayer, deck, turnNumber, maxTurns, targetScore, playLimitSeconds, difficulty, overtime, usedTrackCount, overtimePendingCount }) {
   return (
     <div
       style={{
@@ -4325,7 +4384,7 @@ function GameHeader({ activePlayer, deck, turnNumber, maxTurns, targetScore, pla
         <Badge variant="secondary">Ziel {targetScore}</Badge>
         <Badge variant="secondary">{playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS}s</Badge>
         <Badge variant="secondary">{DIFFICULTY_OPTIONS.find((item) => item.id === difficulty)?.label || "Normal"}</Badge>
-        {overtime && <Badge>Sudden Death</Badge>}
+        {overtime && <Badge>Verlängerung · {overtimePendingCount || 1} offen</Badge>}
       </div>
     </div>
   );
