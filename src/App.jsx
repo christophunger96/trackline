@@ -66,6 +66,12 @@ const DIFFICULTY_OPTIONS = [
   { id: "hard", label: "Schwer", description: "mehr Randtreffer und weniger offensichtliche Songs" },
 ];
 
+
+const GAME_MODE_OPTIONS = [
+  { id: "solo", label: "Einzel", description: "Jeder Spieler hat eine eigene Timeline." },
+  { id: "teams", label: "Teams", description: "Zwei Teams, abwechselnde Teammitglieder, gemeinsame Team-Timeline." },
+];
+
 const NEW_LINE = String.fromCharCode(10);
 
 const CSV_EXAMPLE_PLACEHOLDER = [
@@ -921,6 +927,7 @@ const initialGameState = {
   maxTurns: 0,
   playLimitSeconds: DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS,
   difficulty: "normal",
+  gameMode: "solo",
   turnNumber: 1,
   showDebugSong: false,
   discardedTracks: [],
@@ -1117,18 +1124,55 @@ function sortTimeline(timeline) {
   return [...timeline].sort((a, b) => a.year - b.year || a.title.localeCompare(b.title));
 }
 
-function createInitialPlayers(names) {
+function splitIntoTeams(names, teamCount = 2) {
+  const safeNames = Array.isArray(names) && names.length ? names : ["Host"];
+  const safeTeamCount = Math.max(1, Math.min(teamCount, safeNames.length));
+  const teams = Array.from({ length: safeTeamCount }, () => []);
+
+  safeNames.forEach((name, index) => {
+    teams[index % safeTeamCount].push(name);
+  });
+
+  return teams.filter((team) => team.length > 0);
+}
+
+function createSoloPlayers(names) {
   const starters = shuffle(STARTING_TRACKS);
 
   return names.map((name, index) => ({
     id: createId("player"),
     name,
     role: index === 0 ? "host" : "player",
+    teamMembers: [],
+    activeMemberIndex: 0,
     timeline: [starters[index % starters.length]],
     score: 1,
     correct: 0,
     wrong: 0,
   }));
+}
+
+function createTeamPlayers(names) {
+  const starters = shuffle(STARTING_TRACKS);
+  const teams = splitIntoTeams(names, 2);
+
+  return teams.map((members, index) => ({
+    id: createId("team"),
+    name: `Team ${index + 1}`,
+    role: index === 0 ? "host" : "player",
+    teamMembers: members,
+    activeMemberIndex: 0,
+    timeline: [starters[index % starters.length]],
+    score: 1,
+    correct: 0,
+    wrong: 0,
+  }));
+}
+
+function createInitialPlayers(names, gameMode = "solo") {
+  const safeNames = Array.isArray(names) && names.length ? names : ["Host"];
+
+  return gameMode === "teams" && safeNames.length >= 2 ? createTeamPlayers(safeNames) : createSoloPlayers(safeNames);
 }
 
 function resetPlayersForNewRound(players) {
@@ -1137,11 +1181,61 @@ function resetPlayersForNewRound(players) {
   return players.map((player, index) => ({
     ...player,
     role: index === 0 ? "host" : "player",
+    activeMemberIndex: 0,
     timeline: [starters[index % starters.length]],
     score: 1,
     correct: 0,
     wrong: 0,
   }));
+}
+
+function isTeamPlayer(player) {
+  return Array.isArray(player?.teamMembers) && player.teamMembers.length > 0;
+}
+
+function getActiveTeamMemberName(player) {
+  if (!isTeamPlayer(player)) return "";
+
+  return player.teamMembers[player.activeMemberIndex % player.teamMembers.length] || player.teamMembers[0] || "";
+}
+
+function getPlayerTurnLabel(player) {
+  const memberName = getActiveTeamMemberName(player);
+
+  return memberName ? `${player.name} · ${memberName}` : player?.name || "-";
+}
+
+function getPlayerSubLabel(player) {
+  if (!isTeamPlayer(player)) return "";
+
+  return player.teamMembers.join(", ");
+}
+
+function advanceTeamMember(player) {
+  if (!isTeamPlayer(player)) return player;
+
+  return {
+    ...player,
+    activeMemberIndex: (Number(player.activeMemberIndex || 0) + 1) % player.teamMembers.length,
+  };
+}
+
+function advanceCurrentPlayerMember(players, activePlayerIndex) {
+  return players.map((player, index) => (index === activePlayerIndex ? advanceTeamMember(player) : player));
+}
+
+function getStartPlayerIndex(players, startPlayerName) {
+  const wantedName = String(startPlayerName || "").trim();
+
+  if (!wantedName) return 0;
+
+  const directIndex = players.findIndex((player) => player.name === wantedName);
+
+  if (directIndex >= 0) return directIndex;
+
+  const teamIndex = players.findIndex((player) => Array.isArray(player.teamMembers) && player.teamMembers.includes(wantedName));
+
+  return teamIndex >= 0 ? teamIndex : 0;
 }
 
 function isInsertSlotAllowed(timeline, insertIndex) {
@@ -1301,6 +1395,7 @@ function gameReducer(state, action) {
         maxTurns: Number(action.maxTurns ?? state.maxTurns ?? 0),
         playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || state.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS))),
         difficulty: action.difficulty || state.difficulty || "normal",
+        gameMode: state.gameMode || action.gameMode || "solo",
         gameLog: [
           {
             id: createId("log"),
@@ -1313,7 +1408,7 @@ function gameReducer(state, action) {
     }
 
     case "START_GAME": {
-      const players = createInitialPlayers(action.playerNames);
+      const players = createInitialPlayers(action.playerNames, action.gameMode || "solo");
 
       const nextState = {
         ...initialGameState,
@@ -1325,16 +1420,19 @@ function gameReducer(state, action) {
           visibility: "private",
         },
         players,
-        activePlayerIndex: Math.max(0, players.findIndex((player) => player.name === action.startPlayerName)),
+        activePlayerIndex: getStartPlayerIndex(players, action.startPlayerName),
         deck: preparePlayableDeck(action.deck),
         targetScore: Number(action.targetScore || 10),
         maxTurns: Number(action.maxTurns || 0),
         playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS))),
         difficulty: action.difficulty || "normal",
+        gameMode: action.gameMode || "solo",
         gameLog: [
           {
             id: createId("log"),
-            text: `Spiel gestartet mit ${action.playerNames.length} Spielern und ${action.deck.length} Songs im Deck.`,
+            text: action.gameMode === "teams"
+              ? `Teamspiel gestartet mit ${players.length} Teams und ${action.deck.length} Songs im Deck.`
+              : `Spiel gestartet mit ${action.playerNames.length} Spielern und ${action.deck.length} Songs im Deck.`,
           },
         ],
       };
@@ -1434,8 +1532,8 @@ function gameReducer(state, action) {
       });
 
       const logText = correct
-        ? `${activePlayer.name} hat ${state.currentTrack.title} (${state.currentTrack.year}) richtig ${placementLabel} einsortiert.`
-        : `${activePlayer.name} lag mit ${state.currentTrack.title} (${state.currentTrack.year}) falsch. Gewaehlt: ${placementLabel}.`;
+        ? `${getPlayerTurnLabel(activePlayer)} hat ${state.currentTrack.title} (${state.currentTrack.year}) richtig ${placementLabel} einsortiert.`
+        : `${getPlayerTurnLabel(activePlayer)} lag mit ${state.currentTrack.title} (${state.currentTrack.year}) falsch. Gewaehlt: ${placementLabel}.`;
 
       return addEvent(
         {
@@ -1445,7 +1543,9 @@ function gameReducer(state, action) {
           lastResult: {
             correct,
             placementLabel,
-            playerName: activePlayer.name,
+            playerName: getPlayerTurnLabel(activePlayer),
+            teamName: activePlayer.name,
+            activeMemberName: getActiveTeamMemberName(activePlayer),
             track: state.currentTrack,
           },
           discardedTracks: correct ? state.discardedTracks : [state.currentTrack, ...state.discardedTracks],
@@ -1494,11 +1594,13 @@ function gameReducer(state, action) {
       const finalWinner = getFinalWinner(state.players, state.targetScore);
       const targetTie = hasTargetTie(state.players, state.targetScore);
       const targetReached = state.players.some((player) => player.score >= state.targetScore);
+      const playersAfterTurn = advanceCurrentPlayerMember(state.players, state.activePlayerIndex);
 
       if (deckFinished || turnsFinished) {
         return addEvent(
           {
             ...state,
+            players: playersAfterTurn,
             phase: "finished",
             overtime: false,
             overtimePlayerIds: [],
@@ -1520,11 +1622,12 @@ function gameReducer(state, action) {
           .filter((playerId) => playerId !== currentPlayerId);
 
         if (pendingAfterCurrent.length > 0) {
-          const nextOvertimeIndex = getNextIndexFromAllowedPlayerIds(state.activePlayerIndex, pendingAfterCurrent, state.players);
+          const nextOvertimeIndex = getNextIndexFromAllowedPlayerIds(state.activePlayerIndex, pendingAfterCurrent, playersAfterTurn);
 
           return addEvent(
             {
               ...state,
+              players: playersAfterTurn,
               activePlayerIndex: nextOvertimeIndex,
               turnNumber: state.turnNumber + 1,
               currentTrack: null,
@@ -1537,7 +1640,7 @@ function gameReducer(state, action) {
               phase: "ready",
             },
             "OVERTIME_NEXT_PLAYER",
-            state.players[nextOvertimeIndex]?.name || "Verlaengerung"
+            getPlayerTurnLabel(playersAfterTurn[nextOvertimeIndex]) || "Verlaengerung"
           );
         }
 
@@ -1550,6 +1653,7 @@ function gameReducer(state, action) {
           return addEvent(
             {
               ...state,
+              players: playersAfterTurn,
               phase: "finished",
               overtime: false,
               overtimePlayerIds: [],
@@ -1560,11 +1664,12 @@ function gameReducer(state, action) {
           );
         }
 
-        const nextOvertimeIndex = getNextIndexFromAllowedPlayerIds(state.activePlayerIndex, nextContenderIds, state.players);
+        const nextOvertimeIndex = getNextIndexFromAllowedPlayerIds(state.activePlayerIndex, nextContenderIds, playersAfterTurn);
 
         return addEvent(
           {
             ...state,
+            players: playersAfterTurn,
             activePlayerIndex: nextOvertimeIndex,
             turnNumber: state.turnNumber + 1,
             currentTrack: null,
@@ -1577,7 +1682,7 @@ function gameReducer(state, action) {
             phase: "ready",
           },
           "OVERTIME_ROUND_CONTINUES",
-          state.players[nextOvertimeIndex]?.name || "Verlaengerung"
+          getPlayerTurnLabel(playersAfterTurn[nextOvertimeIndex]) || "Verlaengerung"
         );
       }
 
@@ -1588,6 +1693,7 @@ function gameReducer(state, action) {
         return addEvent(
           {
             ...state,
+            players: playersAfterTurn,
             phase: "finished",
             overtime: false,
             overtimePlayerIds: [],
@@ -1600,11 +1706,12 @@ function gameReducer(state, action) {
 
       if (isEndOfRound && targetReached && targetTie) {
         const overtimePlayerIds = getOvertimeContenderPlayerIds(state.players, state.targetScore);
-        const nextOvertimeIndex = getNextIndexFromAllowedPlayerIds(state.activePlayerIndex, overtimePlayerIds, state.players);
+        const nextOvertimeIndex = getNextIndexFromAllowedPlayerIds(state.activePlayerIndex, overtimePlayerIds, playersAfterTurn);
 
         return addEvent(
           {
             ...state,
+            players: playersAfterTurn,
             activePlayerIndex: nextOvertimeIndex,
             turnNumber: state.turnNumber + 1,
             currentTrack: null,
@@ -1617,13 +1724,14 @@ function gameReducer(state, action) {
             phase: "ready",
           },
           "OVERTIME_STARTED",
-          state.players[nextOvertimeIndex]?.name || "Verlaengerung"
+          getPlayerTurnLabel(playersAfterTurn[nextOvertimeIndex]) || "Verlaengerung"
         );
       }
 
       return addEvent(
         {
           ...state,
+          players: playersAfterTurn,
           activePlayerIndex: normalNextIndex,
           turnNumber: state.turnNumber + 1,
           currentTrack: null,
@@ -1636,7 +1744,7 @@ function gameReducer(state, action) {
           phase: "ready",
         },
         "NEXT_PLAYER",
-        state.players[normalNextIndex]?.name || "naechster Spieler"
+        getPlayerTurnLabel(playersAfterTurn[normalNextIndex]) || "naechster Spieler"
       );
     }
 
@@ -2431,6 +2539,7 @@ export default function App() {
   const [customTracks, setCustomTracks] = useState(() => loadStoredCustomTracks());
   const [selectedPreset, setSelectedPreset] = useState("all");
   const [selectedDifficulty, setSelectedDifficulty] = useState("normal");
+  const [selectedGameMode, setSelectedGameMode] = useState("solo");
   const [roomCode, setRoomCode] = useState(() => getInitialRoomCode());
   const [discordClientId, setDiscordClientId] = useState(() => localStorage.getItem(DISCORD_CLIENT_ID_STORAGE_KEY) || DISCORD_CLIENT_ID_DEFAULT);
   const [discordStatus, setDiscordStatus] = useState(() =>
@@ -2852,6 +2961,7 @@ export default function App() {
       maxTurns: settings.maxTurns,
       playLimitSeconds: settings.playLimitSeconds,
       difficulty: selectedDifficulty,
+      gameMode: settings.gameMode || "solo",
       startPlayerName: settings.startPlayerName,
     });
   }
@@ -2864,6 +2974,7 @@ export default function App() {
       maxTurns: gameState.maxTurns,
       playLimitSeconds: gameState.playLimitSeconds,
       difficulty: gameState.difficulty,
+      gameMode: gameState.gameMode,
     });
   }
 
@@ -2959,6 +3070,8 @@ export default function App() {
                 setSelectedPreset={setSelectedPreset}
                 selectedDifficulty={selectedDifficulty}
                 setSelectedDifficulty={setSelectedDifficulty}
+                selectedGameMode={selectedGameMode}
+                setSelectedGameMode={setSelectedGameMode}
                 presetDeckCount={presetDeck.length}
                 deckEraSummary={getDeckEraSummary(availableDeck)}
                 roomCode={roomCode}
@@ -2986,6 +3099,7 @@ export default function App() {
                     targetScore={gameState.targetScore}
                     playLimitSeconds={gameState.playLimitSeconds}
                     difficulty={gameState.difficulty}
+                    gameMode={gameState.gameMode}
                     overtime={gameState.overtime}
                     usedTrackCount={(gameState.usedTrackIds || []).length}
                     overtimePendingCount={(gameState.overtimePendingPlayerIds || []).length}
@@ -3039,7 +3153,7 @@ export default function App() {
                   )}
 
                   <TimelineChooser
-                    playerName={activePlayer?.name}
+                    playerName={getPlayerTurnLabel(activePlayer)}
                     timeline={activeTimeline}
                     phase={gameState.phase}
                     selectedInsertIndex={gameState.selectedInsertIndex}
@@ -3935,6 +4049,8 @@ function LobbyCard({
   setSelectedPreset,
   selectedDifficulty,
   setSelectedDifficulty,
+  selectedGameMode,
+  setSelectedGameMode,
   presetDeckCount,
   deckEraSummary,
   roomCode,
@@ -4020,6 +4136,45 @@ function LobbyCard({
             ))}
           </Select>
         </label>
+
+        <div style={{ display: "grid", gap: 8 }}>
+          <span style={{ color: colors.muted, fontSize: 14 }}>Spielmodus</span>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+            {GAME_MODE_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setSelectedGameMode(option.id)}
+                disabled={option.id === "teams" && playerNames.length < 2}
+                style={{
+                  border: `1px solid ${selectedGameMode === option.id ? colors.primary : colors.border}`,
+                  borderRadius: 16,
+                  padding: "11px 10px",
+                  background: selectedGameMode === option.id ? "rgba(126,87,255,0.22)" : colors.bg,
+                  color: colors.text,
+                  cursor: option.id === "teams" && playerNames.length < 2 ? "not-allowed" : "pointer",
+                  fontWeight: 950,
+                  opacity: option.id === "teams" && playerNames.length < 2 ? 0.45 : 1,
+                  boxShadow: selectedGameMode === option.id ? "0 0 0 4px rgba(126,87,255,0.12)" : "none",
+                }}
+                title={option.description}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          {selectedGameMode === "teams" && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+              {splitIntoTeams(playerNames, 2).map((team, index) => (
+                <div key={`team-preview-${index}`} style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg }}>
+                  <strong>Team {index + 1}</strong>
+                  <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 12 }}>{team.join(", ")}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <label style={{ display: "grid", gap: 8 }}>
@@ -4142,7 +4297,7 @@ function LobbyCard({
           </div>
         </div>
 
-        <Button onClick={() => startGame({ targetScore, maxTurns, playLimitSeconds, startPlayerName })} disabled={playerNames.length < 1 || availableDeck.length < 1} style={{ padding: "14px 22px", fontSize: 16 }}>
+        <Button onClick={() => startGame({ targetScore, maxTurns, playLimitSeconds, startPlayerName, gameMode: selectedGameMode })} disabled={playerNames.length < 1 || availableDeck.length < 1} style={{ padding: "14px 22px", fontSize: 16 }}>
           Spiel starten
         </Button>
       </CardContent>
@@ -4364,7 +4519,7 @@ function DeckPreview({ tracks, selectedPreset }) {
   );
 }
 
-function GameHeader({ activePlayer, deck, turnNumber, maxTurns, targetScore, playLimitSeconds, difficulty, overtime, usedTrackCount, overtimePendingCount }) {
+function GameHeader({ activePlayer, deck, turnNumber, maxTurns, targetScore, playLimitSeconds, difficulty, gameMode, overtime, usedTrackCount, overtimePendingCount }) {
   return (
     <div
       style={{
@@ -4383,7 +4538,10 @@ function GameHeader({ activePlayer, deck, turnNumber, maxTurns, targetScore, pla
         <span style={{ display: "block", color: colors.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.8, fontWeight: 900 }}>
           Am Zug
         </span>
-        <strong style={{ fontSize: 22 }}>{activePlayer?.name || "-"}</strong>
+        <strong style={{ fontSize: 22 }}>{getPlayerTurnLabel(activePlayer)}</strong>
+        {gameMode === "teams" && getPlayerSubLabel(activePlayer) && (
+          <span style={{ display: "block", color: colors.muted, fontSize: 12, marginTop: 2 }}>{getPlayerSubLabel(activePlayer)}</span>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -4395,6 +4553,7 @@ function GameHeader({ activePlayer, deck, turnNumber, maxTurns, targetScore, pla
         <Badge variant="secondary">Ziel {targetScore}</Badge>
         <Badge variant="secondary">{playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS}s</Badge>
         <Badge variant="secondary">{DIFFICULTY_OPTIONS.find((item) => item.id === difficulty)?.label || "Normal"}</Badge>
+        <Badge variant="secondary">{gameMode === "teams" ? "Teammodus" : "Einzel"}</Badge>
         {overtime && <Badge>Verlängerung · {overtimePendingCount || 1} offen</Badge>}
       </div>
     </div>
@@ -5068,6 +5227,7 @@ function ResultPanel({ result, timeline = [], onNext, canAdvance }) {
         boxShadow: `0 18px 48px ${isCorrect ? "rgba(16,185,129,0.16)" : "rgba(239,68,68,0.14)"}`,
         overflow: "hidden",
         position: "relative",
+        animation: isSkipped ? "none" : isCorrect ? "tracklineCorrectGlow 900ms ease-out both" : "tracklineWrongShake 360ms ease-in-out both",
       }}
     >
       <style>
@@ -5083,8 +5243,46 @@ function ResultPanel({ result, timeline = [], onNext, canAdvance }) {
             70% { transform: scale(1.08); opacity: 1; }
             100% { transform: scale(1); opacity: 1; }
           }
+
+          @keyframes tracklineCorrectGlow {
+            0% { box-shadow: 0 0 0 rgba(16,185,129,0); }
+            45% { box-shadow: 0 0 0 8px rgba(16,185,129,0.18), 0 0 42px rgba(16,185,129,0.28); }
+            100% { box-shadow: 0 18px 48px rgba(16,185,129,0.16); }
+          }
+
+          @keyframes tracklineWrongShake {
+            0%, 100% { transform: translateX(0); }
+            18% { transform: translateX(-8px); }
+            36% { transform: translateX(7px); }
+            54% { transform: translateX(-5px); }
+            72% { transform: translateX(4px); }
+          }
+
+          @keyframes tracklineConfettiDot {
+            0% { transform: translateY(0) scale(0.5); opacity: 0; }
+            40% { opacity: 1; }
+            100% { transform: translateY(-52px) scale(1); opacity: 0; }
+          }
         `}
       </style>
+
+      {isCorrect && [0, 1, 2, 3, 4].map((dot) => (
+        <span
+          key={dot}
+          style={{
+            position: "absolute",
+            left: `${18 + dot * 14}%`,
+            bottom: 14,
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            background: dot % 2 ? "#fde68a" : "#86efac",
+            animation: "tracklineConfettiDot 900ms ease-out both",
+            animationDelay: `${dot * 90}ms`,
+            pointerEvents: "none",
+          }}
+        />
+      ))}
 
       <div style={{ animation: "tracklineRevealPop 520ms ease-out both", transformStyle: "preserve-3d" }}>
         <TimelineTrackCard track={result.track} />
@@ -5303,7 +5501,10 @@ function AllTimelines({ players, activePlayerIndex }) {
               >
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 6, alignItems: "center" }}>
                   <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                    <strong style={{ fontSize: 13 }}>{player.name}</strong>
+                    <div style={{ display: "grid", gap: 1 }}>
+                      <strong style={{ fontSize: 13 }}>{player.name}</strong>
+                      {getPlayerSubLabel(player) && <span style={{ color: colors.muted, fontSize: 10 }}>{getPlayerSubLabel(player)}</span>}
+                    </div>
                     {isActive && <Badge>am Zug</Badge>}
                   </div>
                   <Badge variant="secondary">{player.score}</Badge>
@@ -5387,7 +5588,7 @@ function LocalRoleCard({ viewerPlayerId, setViewerPlayerId, viewerRole, permissi
       <CardContent style={{ display: "grid", gap: 8 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
           <h3 style={{ margin: 0, fontSize: 16 }}>Deine Ansicht</h3>
-          <Badge variant="secondary">Name</Badge>
+          <Badge variant="secondary">{players.some(isTeamPlayer) ? "Team" : "Name"}</Badge>
         </div>
 
         <Select value={viewerPlayerId} onChange={handleViewerChange}>
@@ -5497,7 +5698,9 @@ function Leaderboard({ players }) {
 
                 <div style={{ minWidth: 0 }}>
                   <strong style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontSize: 14 }}>{player.name}</strong>
-                  <span style={{ color: colors.muted, fontSize: 11 }}>{player.correct}✓ · {player.wrong}×</span>
+                  <span style={{ color: colors.muted, fontSize: 11 }}>
+                    {getPlayerSubLabel(player) ? `${getPlayerSubLabel(player)} · ` : ""}{player.correct}✓ · {player.wrong}×
+                  </span>
                 </div>
 
                 <strong

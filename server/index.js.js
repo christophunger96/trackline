@@ -32,6 +32,7 @@ const initialGameState = {
   maxTurns: 0,
   playLimitSeconds: DEFAULT_PLAY_LIMIT_SECONDS,
   difficulty: "normal",
+  gameMode: "solo",
   turnNumber: 1,
   showDebugSong: false,
   discardedTracks: [],
@@ -153,18 +154,55 @@ function preparePlayableDeck(tracks) {
   return shuffle(dedupeTrackDeck(tracks));
 }
 
-function createInitialPlayers(names) {
+function splitIntoTeams(names, teamCount = 2) {
+  const safeNames = Array.isArray(names) && names.length ? names : ["Host"];
+  const safeTeamCount = Math.max(1, Math.min(teamCount, safeNames.length));
+  const teams = Array.from({ length: safeTeamCount }, () => []);
+
+  safeNames.forEach((name, index) => {
+    teams[index % safeTeamCount].push(name);
+  });
+
+  return teams.filter((team) => team.length > 0);
+}
+
+function createSoloPlayers(names) {
   const starters = shuffle(STARTING_TRACKS);
 
   return names.map((name, index) => ({
     id: createId("player"),
     name,
     role: index === 0 ? "host" : "player",
+    teamMembers: [],
+    activeMemberIndex: 0,
     timeline: [starters[index % starters.length]],
     score: 1,
     correct: 0,
     wrong: 0,
   }));
+}
+
+function createTeamPlayers(names) {
+  const starters = shuffle(STARTING_TRACKS);
+  const teams = splitIntoTeams(names, 2);
+
+  return teams.map((members, index) => ({
+    id: createId("team"),
+    name: `Team ${index + 1}`,
+    role: index === 0 ? "host" : "player",
+    teamMembers: members,
+    activeMemberIndex: 0,
+    timeline: [starters[index % starters.length]],
+    score: 1,
+    correct: 0,
+    wrong: 0,
+  }));
+}
+
+function createInitialPlayers(names, gameMode = "solo") {
+  const safeNames = Array.isArray(names) && names.length ? names : ["Host"];
+
+  return gameMode === "teams" && safeNames.length >= 2 ? createTeamPlayers(safeNames) : createSoloPlayers(safeNames);
 }
 
 function resetPlayersForNewRound(players) {
@@ -173,11 +211,61 @@ function resetPlayersForNewRound(players) {
   return players.map((player, index) => ({
     ...player,
     role: index === 0 ? "host" : "player",
+    activeMemberIndex: 0,
     timeline: [starters[index % starters.length]],
     score: 1,
     correct: 0,
     wrong: 0,
   }));
+}
+
+function isTeamPlayer(player) {
+  return Array.isArray(player?.teamMembers) && player.teamMembers.length > 0;
+}
+
+function getActiveTeamMemberName(player) {
+  if (!isTeamPlayer(player)) return "";
+
+  return player.teamMembers[player.activeMemberIndex % player.teamMembers.length] || player.teamMembers[0] || "";
+}
+
+function getPlayerTurnLabel(player) {
+  const memberName = getActiveTeamMemberName(player);
+
+  return memberName ? `${player.name} · ${memberName}` : player?.name || "-";
+}
+
+function getPlayerSubLabel(player) {
+  if (!isTeamPlayer(player)) return "";
+
+  return player.teamMembers.join(", ");
+}
+
+function advanceTeamMember(player) {
+  if (!isTeamPlayer(player)) return player;
+
+  return {
+    ...player,
+    activeMemberIndex: (Number(player.activeMemberIndex || 0) + 1) % player.teamMembers.length,
+  };
+}
+
+function advanceCurrentPlayerMember(players, activePlayerIndex) {
+  return players.map((player, index) => (index === activePlayerIndex ? advanceTeamMember(player) : player));
+}
+
+function getStartPlayerIndex(players, startPlayerName) {
+  const wantedName = String(startPlayerName || "").trim();
+
+  if (!wantedName) return 0;
+
+  const directIndex = players.findIndex((player) => player.name === wantedName);
+
+  if (directIndex >= 0) return directIndex;
+
+  const teamIndex = players.findIndex((player) => Array.isArray(player.teamMembers) && player.teamMembers.includes(wantedName));
+
+  return teamIndex >= 0 ? teamIndex : 0;
 }
 
 function isInsertSlotAllowed(timeline, insertIndex) {
@@ -323,6 +411,7 @@ function gameReducer(state, action) {
         maxTurns: Number(action.maxTurns ?? state.maxTurns ?? 0),
         playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || state.playLimitSeconds || DEFAULT_PLAY_LIMIT_SECONDS))),
         difficulty: action.difficulty || state.difficulty || "normal",
+        gameMode: state.gameMode || action.gameMode || "solo",
         gameLog: [
           {
             id: createId("log"),
@@ -337,7 +426,7 @@ function gameReducer(state, action) {
     case "START_GAME": {
       const playerNames = Array.isArray(action.playerNames) && action.playerNames.length > 0 ? action.playerNames : ["Host"];
       const deck = Array.isArray(action.deck) ? action.deck : [];
-      const players = createInitialPlayers(playerNames);
+      const players = createInitialPlayers(playerNames, action.gameMode || "solo");
 
       const nextState = {
         ...initialGameState,
@@ -349,16 +438,19 @@ function gameReducer(state, action) {
           visibility: "private",
         },
         players,
-        activePlayerIndex: Math.max(0, players.findIndex((player) => player.name === action.startPlayerName)),
+        activePlayerIndex: getStartPlayerIndex(players, action.startPlayerName),
         deck: preparePlayableDeck(deck),
         targetScore: Number(action.targetScore || 10),
         maxTurns: Number(action.maxTurns || 0),
         playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || DEFAULT_PLAY_LIMIT_SECONDS))),
         difficulty: action.difficulty || "normal",
+        gameMode: action.gameMode || "solo",
         gameLog: [
           {
             id: createId("log"),
-            text: `Spiel gestartet mit ${playerNames.length} Spielern und ${deck.length} Songs im Deck.`,
+            text: action.gameMode === "teams"
+              ? `Teamspiel gestartet mit ${players.length} Teams und ${deck.length} Songs im Deck.`
+              : `Spiel gestartet mit ${playerNames.length} Spielern und ${deck.length} Songs im Deck.`,
           },
         ],
       };
@@ -458,8 +550,8 @@ function gameReducer(state, action) {
       });
 
       const logText = correct
-        ? `${activePlayer.name} hat ${state.currentTrack.title} (${state.currentTrack.year}) richtig ${placementLabel} einsortiert.`
-        : `${activePlayer.name} lag mit ${state.currentTrack.title} (${state.currentTrack.year}) falsch. Gewaehlt: ${placementLabel}.`;
+        ? `${getPlayerTurnLabel(activePlayer)} hat ${state.currentTrack.title} (${state.currentTrack.year}) richtig ${placementLabel} einsortiert.`
+        : `${getPlayerTurnLabel(activePlayer)} lag mit ${state.currentTrack.title} (${state.currentTrack.year}) falsch. Gewaehlt: ${placementLabel}.`;
 
       return addEvent(
         {
@@ -469,7 +561,9 @@ function gameReducer(state, action) {
           lastResult: {
             correct,
             placementLabel,
-            playerName: activePlayer.name,
+            playerName: getPlayerTurnLabel(activePlayer),
+            teamName: activePlayer.name,
+            activeMemberName: getActiveTeamMemberName(activePlayer),
             track: state.currentTrack,
           },
           discardedTracks: correct ? state.discardedTracks : [state.currentTrack, ...state.discardedTracks],
@@ -518,11 +612,13 @@ function gameReducer(state, action) {
       const finalWinner = getFinalWinner(state.players, state.targetScore);
       const targetTie = hasTargetTie(state.players, state.targetScore);
       const targetReached = state.players.some((player) => player.score >= state.targetScore);
+      const playersAfterTurn = advanceCurrentPlayerMember(state.players, state.activePlayerIndex);
 
       if (deckFinished || turnsFinished) {
         return addEvent(
           {
             ...state,
+            players: playersAfterTurn,
             phase: "finished",
             overtime: false,
             overtimePlayerIds: [],
@@ -544,11 +640,12 @@ function gameReducer(state, action) {
           .filter((playerId) => playerId !== currentPlayerId);
 
         if (pendingAfterCurrent.length > 0) {
-          const nextOvertimeIndex = getNextIndexFromAllowedPlayerIds(state.activePlayerIndex, pendingAfterCurrent, state.players);
+          const nextOvertimeIndex = getNextIndexFromAllowedPlayerIds(state.activePlayerIndex, pendingAfterCurrent, playersAfterTurn);
 
           return addEvent(
             {
               ...state,
+              players: playersAfterTurn,
               activePlayerIndex: nextOvertimeIndex,
               turnNumber: state.turnNumber + 1,
               currentTrack: null,
@@ -561,7 +658,7 @@ function gameReducer(state, action) {
               phase: "ready",
             },
             "OVERTIME_NEXT_PLAYER",
-            state.players[nextOvertimeIndex]?.name || "Verlaengerung"
+            getPlayerTurnLabel(playersAfterTurn[nextOvertimeIndex]) || "Verlaengerung"
           );
         }
 
@@ -574,6 +671,7 @@ function gameReducer(state, action) {
           return addEvent(
             {
               ...state,
+              players: playersAfterTurn,
               phase: "finished",
               overtime: false,
               overtimePlayerIds: [],
@@ -584,11 +682,12 @@ function gameReducer(state, action) {
           );
         }
 
-        const nextOvertimeIndex = getNextIndexFromAllowedPlayerIds(state.activePlayerIndex, nextContenderIds, state.players);
+        const nextOvertimeIndex = getNextIndexFromAllowedPlayerIds(state.activePlayerIndex, nextContenderIds, playersAfterTurn);
 
         return addEvent(
           {
             ...state,
+            players: playersAfterTurn,
             activePlayerIndex: nextOvertimeIndex,
             turnNumber: state.turnNumber + 1,
             currentTrack: null,
@@ -601,7 +700,7 @@ function gameReducer(state, action) {
             phase: "ready",
           },
           "OVERTIME_ROUND_CONTINUES",
-          state.players[nextOvertimeIndex]?.name || "Verlaengerung"
+          getPlayerTurnLabel(playersAfterTurn[nextOvertimeIndex]) || "Verlaengerung"
         );
       }
 
@@ -612,6 +711,7 @@ function gameReducer(state, action) {
         return addEvent(
           {
             ...state,
+            players: playersAfterTurn,
             phase: "finished",
             overtime: false,
             overtimePlayerIds: [],
@@ -624,11 +724,12 @@ function gameReducer(state, action) {
 
       if (isEndOfRound && targetReached && targetTie) {
         const overtimePlayerIds = getOvertimeContenderPlayerIds(state.players, state.targetScore);
-        const nextOvertimeIndex = getNextIndexFromAllowedPlayerIds(state.activePlayerIndex, overtimePlayerIds, state.players);
+        const nextOvertimeIndex = getNextIndexFromAllowedPlayerIds(state.activePlayerIndex, overtimePlayerIds, playersAfterTurn);
 
         return addEvent(
           {
             ...state,
+            players: playersAfterTurn,
             activePlayerIndex: nextOvertimeIndex,
             turnNumber: state.turnNumber + 1,
             currentTrack: null,
@@ -641,13 +742,14 @@ function gameReducer(state, action) {
             phase: "ready",
           },
           "OVERTIME_STARTED",
-          state.players[nextOvertimeIndex]?.name || "Verlaengerung"
+          getPlayerTurnLabel(playersAfterTurn[nextOvertimeIndex]) || "Verlaengerung"
         );
       }
 
       return addEvent(
         {
           ...state,
+          players: playersAfterTurn,
           activePlayerIndex: normalNextIndex,
           turnNumber: state.turnNumber + 1,
           currentTrack: null,
@@ -660,7 +762,7 @@ function gameReducer(state, action) {
           phase: "ready",
         },
         "NEXT_PLAYER",
-        state.players[normalNextIndex]?.name || "naechster Spieler"
+        getPlayerTurnLabel(playersAfterTurn[normalNextIndex]) || "naechster Spieler"
       );
     }
 
