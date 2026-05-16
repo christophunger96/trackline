@@ -746,6 +746,8 @@ const initialGameState = {
   turnNumber: 1,
   showDebugSong: false,
   discardedTracks: [],
+  usedTrackIds: [],
+  overtime: false,
   gameLog: [],
   eventHistory: [],
   playbackRequests: [],
@@ -793,7 +795,7 @@ function Card({ children, style = {} }) {
 }
 
 function CardContent({ children, style = {} }) {
-  return <div style={{ padding: 24, ...style }}>{children}</div>;
+  return <div style={{ padding: 14, ...style }}>{children}</div>;
 }
 
 function Input(props) {
@@ -895,7 +897,17 @@ function resetPlayersForNewRound(players) {
   }));
 }
 
+function isInsertSlotAllowed(timeline, insertIndex) {
+  const orderedTimeline = sortTimeline(timeline);
+  const left = orderedTimeline[insertIndex - 1];
+  const right = orderedTimeline[insertIndex];
+
+  return !(left && right && left.year === right.year);
+}
+
 function isCorrectPlacement(timeline, track, insertIndex) {
+  if (!isInsertSlotAllowed(timeline, insertIndex)) return false;
+
   const orderedTimeline = sortTimeline(timeline);
   const left = orderedTimeline[insertIndex - 1];
   const right = orderedTimeline[insertIndex];
@@ -931,6 +943,37 @@ function getWinner(players, targetScore) {
   return players.find((player) => player.score >= targetScore) || null;
 }
 
+function getFinalWinner(players, targetScore) {
+  const eligiblePlayers = players.filter((player) => player.score >= targetScore);
+
+  if (!eligiblePlayers.length) return null;
+
+  const topScore = Math.max(...eligiblePlayers.map((player) => player.score));
+  const leaders = eligiblePlayers.filter((player) => player.score === topScore);
+
+  return leaders.length === 1 ? leaders[0] : null;
+}
+
+function hasTargetTie(players, targetScore) {
+  const eligiblePlayers = players.filter((player) => player.score >= targetScore);
+
+  if (eligiblePlayers.length < 2) return false;
+
+  const topScore = Math.max(...eligiblePlayers.map((player) => player.score));
+
+  return eligiblePlayers.filter((player) => player.score === topScore).length > 1;
+}
+
+function getUsedTrackIdSet(state) {
+  return new Set(Array.isArray(state.usedTrackIds) ? state.usedTrackIds : []);
+}
+
+function filterUnusedDeck(deck, state) {
+  const usedTrackIds = getUsedTrackIdSet(state);
+
+  return (Array.isArray(deck) ? deck : []).filter((track) => !usedTrackIds.has(track.id));
+}
+
 function addEvent(state, type, details = "") {
   const entry = {
     id: createId("event"),
@@ -956,7 +999,7 @@ function gameReducer(state, action) {
     case "NEW_ROUND": {
       if (!state.players.length || !state.room) return state;
 
-      const deck = Array.isArray(action.deck) ? action.deck : [];
+      const deck = filterUnusedDeck(action.deck, state);
       const players = resetPlayersForNewRound(state.players);
 
       const nextState = {
@@ -968,6 +1011,8 @@ function gameReducer(state, action) {
           hostName: players[0]?.name || state.room.hostName || "Host",
         },
         players,
+        usedTrackIds: state.usedTrackIds || [],
+        overtime: false,
         deck: shuffle(deck),
         targetScore: Number(action.targetScore || state.targetScore || 10),
         maxTurns: Number(action.maxTurns ?? state.maxTurns ?? 0),
@@ -997,6 +1042,7 @@ function gameReducer(state, action) {
           visibility: "private",
         },
         players,
+        activePlayerIndex: Math.max(0, players.findIndex((player) => player.name === action.startPlayerName)),
         deck: shuffle(action.deck),
         targetScore: Number(action.targetScore || 10),
         maxTurns: Number(action.maxTurns || 0),
@@ -1024,6 +1070,7 @@ function gameReducer(state, action) {
           phase: "placing",
           currentTrack: nextTrack,
           deck: remainingDeck,
+          usedTrackIds: Array.from(new Set([...(state.usedTrackIds || []), nextTrack.id])),
           selectedInsertIndex: null,
           lastResult: null,
           showDebugSong: false,
@@ -1035,6 +1082,9 @@ function gameReducer(state, action) {
 
     case "PLACEMENT_SELECTED": {
       if (state.phase !== "placing") return state;
+
+      const activePlayer = state.players[state.activePlayerIndex];
+      if (!activePlayer || !isInsertSlotAllowed(activePlayer.timeline, action.insertIndex)) return state;
 
       return addEvent(
         {
@@ -1155,22 +1205,25 @@ function gameReducer(state, action) {
     }
 
     case "NEXT_PLAYER": {
-      const winner = getWinner(state.players, state.targetScore);
+      const nextIndex = (state.activePlayerIndex + 1) % state.players.length;
+      const isEndOfRound = nextIndex === 0;
+      const finalWinner = getFinalWinner(state.players, state.targetScore);
+      const targetTie = hasTargetTie(state.players, state.targetScore);
+      const targetReached = state.players.some((player) => player.score >= state.targetScore);
       const turnsFinished = state.maxTurns > 0 && state.turnNumber >= state.maxTurns;
       const deckFinished = state.deck.length === 0;
 
-      if (winner || turnsFinished || deckFinished) {
+      if (deckFinished || turnsFinished || (isEndOfRound && finalWinner && !targetTie)) {
         return addEvent(
           {
             ...state,
             phase: "finished",
+            overtime: false,
           },
           "GAME_FINISHED",
-          winner ? `Gewinner: ${winner.name}` : "Limit erreicht"
+          finalWinner ? `Gewinner: ${finalWinner.name}` : "Limit erreicht"
         );
       }
-
-      const nextIndex = (state.activePlayerIndex + 1) % state.players.length;
 
       return addEvent(
         {
@@ -1181,6 +1234,7 @@ function gameReducer(state, action) {
           selectedInsertIndex: null,
           lastResult: null,
           showDebugSong: false,
+          overtime: Boolean(state.overtime || (isEndOfRound && targetReached && targetTie)),
           phase: "ready",
         },
         "NEXT_PLAYER",
@@ -1985,7 +2039,7 @@ export default function App() {
 
   const activePlayer = gameState.players[gameState.activePlayerIndex];
   const activeTimeline = activePlayer ? sortTimeline(activePlayer.timeline) : [];
-  const winner = getWinner(gameState.players, gameState.targetScore);
+  const winner = getFinalWinner(gameState.players, gameState.targetScore);
   const activeRoomCode = gameState.room?.code || roomCode;
 
   const resolvedViewerPlayerId = (() => {
@@ -2376,13 +2430,14 @@ export default function App() {
       maxTurns: settings.maxTurns,
       playLimitSeconds: settings.playLimitSeconds,
       difficulty: selectedDifficulty,
+      startPlayerName: settings.startPlayerName,
     });
   }
 
   function startNewRound() {
     sendGameAction({
       type: "NEW_ROUND",
-      deck: availableDeck,
+      deck: filterUnusedDeck(availableDeck, gameState),
       targetScore: gameState.targetScore,
       maxTurns: gameState.maxTurns,
       playLimitSeconds: gameState.playLimitSeconds,
@@ -2397,61 +2452,78 @@ export default function App() {
 
   const twoColumnLayout = {
     display: "grid",
-    gridTemplateColumns: "minmax(0, calc(100% - 364px)) 340px",
-    gap: 24,
+    gridTemplateColumns: "minmax(0, calc(100% - 286px)) 270px",
+    gap: 12,
     alignItems: "start",
     width: "100%",
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: colors.bg, color: colors.text, padding: 24, fontFamily: "Inter, system-ui, sans-serif" }}>
-      <div style={{ maxWidth: 1280, margin: "0 auto", display: "grid", gap: 24 }}>
-        <Header onReset={resetGame} isInGame={gameState.phase !== "lobby"} />
+    <div style={{ minHeight: "100vh", background: colors.bg, color: colors.text, padding: gameState.phase === "lobby" ? 12 : 8, fontFamily: "Inter, system-ui, sans-serif", overflowX: "hidden" }}>
+      <div style={{ maxWidth: gameState.phase === "lobby" ? 1320 : "100%", margin: "0 auto", display: "grid", gap: gameState.phase === "lobby" ? 14 : 8 }}>
+        {showAdminPanels ? (
+          <HostControlArea onReset={resetGame} isInGame={gameState.phase !== "lobby"}>
+            <WebsiteShareCard
+              room={gameState.room}
+              roomCode={roomCode}
+              playerNames={playerNames}
+              socketUrl={socketUrl}
+              syncClientCount={syncClientCount}
+            />
 
-        {showAdminPanels && (
-          <WebsiteShareCard
-            room={gameState.room}
-            roomCode={roomCode}
-            playerNames={playerNames}
-            socketUrl={socketUrl}
-            syncClientCount={syncClientCount}
-          />
-        )}
+            <MultiplayerSyncCard
+              roomCode={gameState.room?.code || roomCode}
+              socketUrl={socketUrl}
+              setSocketUrl={setSocketUrl}
+              syncEnabled={syncEnabled}
+              setSyncEnabled={setSyncEnabled}
+              syncStatus={syncStatus}
+              syncClientCount={syncClientCount}
+            />
 
-        {showAdminPanels && (
-          <MultiplayerSyncCard
-            roomCode={gameState.room?.code || roomCode}
-            socketUrl={socketUrl}
-            setSocketUrl={setSocketUrl}
-            syncEnabled={syncEnabled}
-            setSyncEnabled={setSyncEnabled}
-            syncStatus={syncStatus}
-            syncClientCount={syncClientCount}
-          />
-        )}
+            {showSpotifyPanel && (
+              <SpotifyPlayerCard
+                currentTrack={gameState.currentTrack}
+                phase={gameState.phase}
+                canPlayTrack={viewerPermissions.canPlayTrack}
+                canManageSpotify={showAdminPanels}
+                roomCode={gameState.room?.code || roomCode}
+                spotifyAuthServerUrl={socketUrl}
+                roundPlayLimitSeconds={gameState.playLimitSeconds}
+                onPlaybackRequested={() =>
+                  sendGameAction({
+                    type: "TRACK_PLAY_REQUESTED",
+                    requesterName: activePlayer?.name,
+                    playLimitSeconds: gameState.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS,
+                  })
+                }
+              />
+            )}
 
-        {showSpotifyPanel && (
-          <SpotifyPlayerCard
-            currentTrack={gameState.currentTrack}
-            phase={gameState.phase}
-            canPlayTrack={viewerPermissions.canPlayTrack}
-            canManageSpotify={showAdminPanels}
-            roomCode={gameState.room?.code || roomCode}
-            spotifyAuthServerUrl={socketUrl}
-            roundPlayLimitSeconds={gameState.playLimitSeconds}
-            onPlaybackRequested={() =>
-              sendGameAction({
-                type: "TRACK_PLAY_REQUESTED",
-                requesterName: activePlayer?.name,
-                playLimitSeconds: gameState.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS,
-              })
-            }
-          />
+            {gameState.phase !== "lobby" && (
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 12 }}>
+                <RoomCard room={gameState.room} players={gameState.players} activePlayerIndex={gameState.activePlayerIndex} />
+                <TurnOrder players={gameState.players} activePlayerIndex={gameState.activePlayerIndex} />
+              </div>
+            )}
+
+            {gameState.phase !== "lobby" && (
+              <HostAdminDetails
+                playbackRequests={gameState.playbackRequests}
+                gameLog={gameState.gameLog}
+                discardedTracks={gameState.discardedTracks}
+                eventHistory={gameState.eventHistory}
+                gameState={gameState}
+              />
+            )}
+          </HostControlArea>
+        ) : (
+          gameState.phase === "lobby" && <Header onReset={resetGame} isInGame={false} />
         )}
 
         {gameState.phase === "lobby" && (
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.35fr) minmax(280px, 0.65fr)", gap: 24 }}>
-            <main style={{ display: "grid", gap: 24, minWidth: 0 }}>
+            <main style={{ display: "grid", gap: 16, minWidth: 0 }}>
               <LobbyCard
                 playerName={playerName}
                 setPlayerName={setPlayerName}
@@ -2472,7 +2544,7 @@ export default function App() {
 
             </main>
 
-            <aside style={{ display: "grid", gap: 24, alignContent: "start", minWidth: 0 }}>
+            <aside style={{ display: "grid", gap: 16, alignContent: "start", minWidth: 0 }}>
               <RulesCard />
             </aside>
           </div>
@@ -2480,17 +2552,9 @@ export default function App() {
 
         {gameState.phase !== "lobby" && gameState.players.length > 0 && (
           <div style={twoColumnLayout}>
-            <main style={{ display: "grid", gap: 24, minWidth: 0 }}>
+            <main style={{ display: "grid", gap: 16, minWidth: 0 }}>
               <Card style={{ minWidth: 0, overflow: "hidden" }}>
-                <CardContent style={{ display: "grid", gap: 20, minWidth: 0 }}>
-                  <RoleStatusBanner
-                    viewerRole={viewerRole}
-                    activePlayer={activePlayer}
-                    permissions={viewerPermissions}
-                    syncEnabled={syncEnabled}
-                    player={gameState.players.find((item) => item.id === resolvedViewerPlayerId)}
-                  />
-
+                <CardContent style={{ display: "grid", gap: 10, minWidth: 0 }}>
                   <GameHeader
                     activePlayer={activePlayer}
                     deck={gameState.deck}
@@ -2499,6 +2563,8 @@ export default function App() {
                     targetScore={gameState.targetScore}
                     playLimitSeconds={gameState.playLimitSeconds}
                     difficulty={gameState.difficulty}
+                    overtime={gameState.overtime}
+                    usedTrackCount={(gameState.usedTrackIds || []).length}
                   />
 
                   <CurrentTrackPanel
@@ -2523,8 +2589,8 @@ export default function App() {
                     <div
                       style={{
                         border: `1px solid ${colors.border}`,
-                        borderRadius: 22,
-                        padding: 14,
+                        borderRadius: 18,
+                        padding: 10,
                         background: colors.bg,
                         display: "flex",
                         justifyContent: "space-between",
@@ -2571,7 +2637,7 @@ export default function App() {
                     />
                   )}
 
-                  {(winner || gameState.phase === "finished") && (
+                  {gameState.phase === "finished" && (
                     <FinishedPanel
                       leaderboard={leaderboard}
                       onNewRound={startNewRound}
@@ -2584,7 +2650,7 @@ export default function App() {
               <AllTimelines players={gameState.players} activePlayerIndex={gameState.activePlayerIndex} />
             </main>
 
-            <aside style={{ display: "grid", gap: 24, alignContent: "start", minWidth: 0 }}>
+            <aside style={{ display: "grid", gap: 16, alignContent: "start", minWidth: 0 }}>
               <LocalRoleCard
                 viewerPlayerId={viewerPlayerId}
                 setViewerPlayerId={setViewerPlayerId}
@@ -2596,21 +2662,7 @@ export default function App() {
                 roomCode={activeRoomCode}
               />
 
-              {showAdminPanels && <RoomCard room={gameState.room} players={gameState.players} activePlayerIndex={gameState.activePlayerIndex} />}
               <Leaderboard players={leaderboard} />
-              <TurnOrder players={gameState.players} activePlayerIndex={gameState.activePlayerIndex} />
-
-              {showAdminPanels ? (
-                <HostAdminDetails
-                  playbackRequests={gameState.playbackRequests}
-                  gameLog={gameState.gameLog}
-                  discardedTracks={gameState.discardedTracks}
-                  eventHistory={gameState.eventHistory}
-                  gameState={gameState}
-                />
-              ) : (
-                <PlayerFocusedCard viewerRole={viewerRole} activePlayer={activePlayer} permissions={viewerPermissions} />
-              )}
             </aside>
           </div>
         )}
@@ -2622,10 +2674,10 @@ export default function App() {
 
 function Header({ onReset, isInGame }) {
   return (
-    <header style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+    <header style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
       <div>
-        <h1 style={{ margin: 0, fontSize: 36, letterSpacing: -1 }}>Trackline</h1>
-        <p style={{ margin: "6px 0 0", color: colors.muted }}>Privates Musik-Timeline-Quiz als Web-Spiel</p>
+        <h1 style={{ margin: 0, fontSize: 28, letterSpacing: -0.8 }}>Trackline</h1>
+        <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>Privates Musik-Timeline-Quiz als Web-Spiel</p>
       </div>
 
       <Button variant="secondary" onClick={onReset}>
@@ -2634,6 +2686,57 @@ function Header({ onReset, isInGame }) {
     </header>
   );
 }
+
+
+function HostControlArea({ children, onReset, isInGame }) {
+  return (
+    <details
+      open={!isInGame}
+      style={{
+        border: `1px solid ${colors.border}`,
+        borderRadius: 20,
+        background: "rgba(15,23,42,0.90)",
+        overflow: "hidden",
+      }}
+    >
+      <summary
+        style={{
+          cursor: "pointer",
+          padding: "12px 14px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          listStyle: "none",
+        }}
+      >
+        <div>
+          <strong style={{ fontSize: 18 }}>Host-Bereich</strong>
+          <p style={{ margin: "3px 0 0", color: colors.muted, fontSize: 12 }}>
+            Link, Spotify, Sync und Admin. Im Spiel einklappen und darunter normal spielen.
+          </p>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <Badge variant="secondary">{isInGame ? "Einstellungen" : "Setup"}</Badge>
+          <Button variant="secondary" onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onReset();
+          }}>
+            {isInGame ? "Spiel beenden" : "Neustart"}
+          </Button>
+        </div>
+      </summary>
+
+      <div style={{ display: "grid", gap: 12, padding: "0 12px 12px" }}>
+        <Header onReset={onReset} isInGame={isInGame} />
+        {children}
+      </div>
+    </details>
+  );
+}
+
 
 function WebsiteShareCard({ room, roomCode, playerNames, socketUrl, syncClientCount = 1 }) {
   const activeRoomCode = room?.code || roomCode;
@@ -3364,7 +3467,13 @@ function LobbyCard({
   const [targetScore, setTargetScore] = useState(10);
   const [maxTurns, setMaxTurns] = useState(0);
   const [playLimitSeconds, setPlayLimitSeconds] = useState(DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS);
+  const [startPlayerName, setStartPlayerName] = useState(playerNames[0] || "");
   const targetScoreOptions = [5, 7, 10, 15];
+
+  useEffect(() => {
+    if (!playerNames.length) return;
+    if (!playerNames.includes(startPlayerName)) setStartPlayerName(playerNames[0]);
+  }, [playerNames, startPlayerName]);
 
   return (
     <Card>
@@ -3424,6 +3533,17 @@ function LobbyCard({
             ))}
           </div>
         </div>
+
+        <label style={{ display: "grid", gap: 8 }}>
+          <span style={{ color: colors.muted, fontSize: 14 }}>Startspieler</span>
+          <Select value={startPlayerName} onChange={(event) => setStartPlayerName(event.target.value)}>
+            {playerNames.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </Select>
+        </label>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <label style={{ display: "grid", gap: 8 }}>
@@ -3541,7 +3661,7 @@ function LobbyCard({
           </div>
         </div>
 
-        <Button onClick={() => startGame({ targetScore, maxTurns, playLimitSeconds })} disabled={playerNames.length < 1 || availableDeck.length < 1} style={{ padding: "14px 22px", fontSize: 16 }}>
+        <Button onClick={() => startGame({ targetScore, maxTurns, playLimitSeconds, startPlayerName })} disabled={playerNames.length < 1 || availableDeck.length < 1} style={{ padding: "14px 22px", fontSize: 16 }}>
           Spiel starten
         </Button>
       </CardContent>
@@ -3763,40 +3883,38 @@ function DeckPreview({ tracks, selectedPreset }) {
   );
 }
 
-function GameHeader({ activePlayer, deck, turnNumber, maxTurns, targetScore, playLimitSeconds, difficulty }) {
+function GameHeader({ activePlayer, deck, turnNumber, maxTurns, targetScore, playLimitSeconds, difficulty, overtime, usedTrackCount }) {
   return (
     <div
       style={{
         border: `1px solid ${colors.border}`,
-        borderRadius: 22,
-        padding: 16,
+        borderRadius: 18,
+        padding: 10,
         background: "rgba(2,6,23,0.38)",
-        display: "grid",
-        gap: 12,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 10,
+        flexWrap: "wrap",
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-        <div>
-          <Badge variant="secondary">Spielstatus</Badge>
-          <h2 style={{ fontSize: 30, margin: "10px 0 4px", letterSpacing: -0.8 }}>
-            {activePlayer?.name || "-"} ist dran
-          </h2>
-        </div>
-
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <Badge variant="secondary">
-            Runde {turnNumber}
-            {maxTurns > 0 ? ` / ${maxTurns}` : ""}
-          </Badge>
-          <Badge variant="secondary">{deck.length} im Deck</Badge>
-          <Badge variant="secondary">Ziel: {targetScore} Karten</Badge>
-          <Badge variant="secondary">{playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS}s Songzeit</Badge>
-          <Badge variant="secondary">{DIFFICULTY_OPTIONS.find((item) => item.id === difficulty)?.label || "Normal"}</Badge>
-        </div>
+      <div>
+        <span style={{ display: "block", color: colors.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.8, fontWeight: 900 }}>
+          Am Zug
+        </span>
+        <strong style={{ fontSize: 22 }}>{activePlayer?.name || "-"}</strong>
       </div>
 
-      <div style={{ color: colors.muted, fontSize: 13 }}>
-        Runde {turnNumber} · {activePlayer?.name || "-"} ist dran · {deck.length} Karten im Deck · Ziel: {targetScore} Karten · Songzeit: {playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS}s
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <Badge variant="secondary">
+          Runde {turnNumber}
+          {maxTurns > 0 ? ` / ${maxTurns}` : ""}
+        </Badge>
+        <Badge variant="secondary">{deck.length} im Deck</Badge>
+        <Badge variant="secondary">Ziel {targetScore}</Badge>
+        <Badge variant="secondary">{playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS}s</Badge>
+        <Badge variant="secondary">{DIFFICULTY_OPTIONS.find((item) => item.id === difficulty)?.label || "Normal"}</Badge>
+        {overtime && <Badge>Verlängerung</Badge>}
       </div>
     </div>
   );
@@ -3973,13 +4091,13 @@ function CurrentTrackPanel({
   return (
     <div
       style={{
-        borderRadius: 28,
+        borderRadius: 22,
         border: `1px solid ${colors.border}`,
         background: cardTheme.table,
-        padding: 22,
+        padding: 14,
         display: "grid",
         gridTemplateColumns: "max-content minmax(0, 1fr)",
-        gap: 24,
+        gap: 14,
         alignItems: "center",
         overflow: "hidden",
         minWidth: 0,
@@ -3992,7 +4110,7 @@ function CurrentTrackPanel({
       <div style={{ display: "grid", gap: 16, minWidth: 0 }}>
         <div>
           <Badge variant={currentTrack ? "default" : "secondary"}>{currentTrack ? "Aktuelle Karte" : "Bereit"}</Badge>
-          <h2 style={{ margin: "12px 0 6px", fontSize: 30, letterSpacing: -0.6 }}>
+          <h2 style={{ margin: "8px 0 4px", fontSize: 24, letterSpacing: -0.5 }}>
             {currentTrack && revealed ? currentTrack.title : currentTrack ? "Verdeckter Song" : "Noch kein Song gezogen"}
           </h2>
           <p style={{ margin: 0, color: colors.muted }}>
@@ -4053,15 +4171,13 @@ function CurrentTrackPanel({
 function TimelineChooser({ playerName, timeline, phase, selectedInsertIndex, setSelectedInsertIndex, canPlace }) {
   const orderedTimeline = sortTimeline(timeline);
   const disabled = phase !== "placing" || !canPlace;
+  const isSlotDisabled = (insertIndex) => disabled || !isInsertSlotAllowed(orderedTimeline, insertIndex);
 
   return (
-    <div style={{ display: "grid", gap: 14, minWidth: 0, maxWidth: "100%" }}>
+    <div style={{ display: "grid", gap: 8, minWidth: 0, maxWidth: "100%" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <div>
-          <h3 style={{ margin: 0 }}>Timeline von {playerName}</h3>
-          <p style={{ margin: "6px 0 0", color: colors.muted, fontSize: 13 }}>
-            Chronologisch von links nach rechts. Freie Kartenplaetze markieren moegliche Positionen.
-          </p>
+          <h3 style={{ margin: 0, fontSize: 18 }}>Timeline von {playerName}</h3>
         </div>
 
         <Badge variant="secondary">{orderedTimeline.length} Karten</Badge>
@@ -4069,8 +4185,8 @@ function TimelineChooser({ playerName, timeline, phase, selectedInsertIndex, set
 
       <div
         style={{
-          padding: "24px 18px 18px",
-          borderRadius: 24,
+          padding: "14px 12px 10px",
+          borderRadius: 18,
           background: cardTheme.table,
           border: `1px solid ${colors.border}`,
           overflowX: "auto",
@@ -4086,21 +4202,21 @@ function TimelineChooser({ playerName, timeline, phase, selectedInsertIndex, set
             gridAutoFlow: "column",
             gridAutoColumns: "max-content",
             alignItems: "end",
-            gap: 10,
+            gap: 8,
             minWidth: "max-content",
-            paddingBottom: 14,
+            paddingBottom: 8,
           }}
         >
-          <PlacementButton selected={selectedInsertIndex === 0} disabled={disabled} onClick={() => setSelectedInsertIndex(0)} label="Davor" compact />
+          <PlacementButton selected={selectedInsertIndex === 0} disabled={isSlotDisabled(0)} onClick={() => setSelectedInsertIndex(0)} label="Davor" compact />
 
           {orderedTimeline.map((track, index) => (
             <React.Fragment key={track.id}>
               <TimelineTrackCard track={track} compact />
               <PlacementButton
                 selected={selectedInsertIndex === index + 1}
-                disabled={disabled}
+                disabled={isSlotDisabled(index + 1)}
                 onClick={() => setSelectedInsertIndex(index + 1)}
-                label={index + 1 === orderedTimeline.length ? "Danach" : "Hier"}
+                label={!isInsertSlotAllowed(orderedTimeline, index + 1) ? "gleiches Jahr" : index + 1 === orderedTimeline.length ? "Danach" : "Hier"}
                 compact
               />
             </React.Fragment>
@@ -4122,15 +4238,15 @@ function TimelineChooser({ playerName, timeline, phase, selectedInsertIndex, set
 
 function TimelineTrackCard({ track, compact, index = 0 }) {
   const genreColor = getGenreColor(track.genre);
-  const width = compact ? 116 : 138;
+  const width = compact ? 96 : 128;
 
   return (
     <div
       style={{
         width,
-        minHeight: compact ? 154 : 184,
-        borderRadius: 16,
-        padding: compact ? 10 : 12,
+        minHeight: compact ? 126 : 170,
+        borderRadius: 14,
+        padding: compact ? 8 : 10,
         background: cardTheme.ivory,
         color: "#111827",
         boxShadow: "0 16px 32px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.7)",
@@ -4408,8 +4524,8 @@ function PlacementButton({ selected, disabled, onClick, label, helper, compact =
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        width: compact ? 96 : 118,
-        minHeight: compact ? 154 : 170,
+        width: compact ? 76 : 108,
+        minHeight: compact ? 126 : 156,
         borderRadius: 16,
         border: selected
           ? `2px solid ${colors.success}`
@@ -4638,42 +4754,41 @@ function FinishedPanel({ leaderboard, onNewRound, canNewRound }) {
 function AllTimelines({ players, activePlayerIndex }) {
   return (
     <Card style={{ minWidth: 0, overflow: "hidden" }}>
-      <CardContent style={{ display: "grid", gap: 12, minWidth: 0, padding: 18 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <div>
-            <h3 style={{ margin: 0 }}>Alle Timelines</h3>
-            <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 12 }}>Kompakte Übersicht aller Spieler.</p>
-          </div>
-
+      <CardContent style={{ display: "grid", gap: 8, minWidth: 0, padding: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <h3 style={{ margin: 0, fontSize: 16 }}>Alle Timelines</h3>
           <Badge variant="secondary">{players.length} Spieler</Badge>
         </div>
 
-        <div style={{ display: "grid", gap: 10 }}>
-          {players.map((player, index) => {
+        <div style={{ display: "grid", gap: 7, maxHeight: 230, overflowY: "auto", paddingRight: 2 }}>
+          {[...players]
+            .map((player, originalIndex) => ({ player, originalIndex }))
+            .sort((a, b) => (a.originalIndex === activePlayerIndex ? -1 : b.originalIndex === activePlayerIndex ? 1 : a.originalIndex - b.originalIndex))
+            .map(({ player, originalIndex }) => {
             const sortedTimeline = sortTimeline(player.timeline);
-            const isActive = index === activePlayerIndex;
+            const isActive = originalIndex === activePlayerIndex;
 
             return (
               <div
                 key={player.id}
                 style={{
                   border: `1px solid ${isActive ? colors.primary : colors.border}`,
-                  borderRadius: 16,
-                  padding: 10,
+                  borderRadius: 14,
+                  padding: 8,
                   background: isActive ? "rgba(126,87,255,0.12)" : colors.bg,
-                  boxShadow: isActive ? "0 12px 28px rgba(126,87,255,0.10)" : "none",
+                  boxShadow: isActive ? "0 10px 22px rgba(126,87,255,0.10)" : "none",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 8, alignItems: "center" }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <strong style={{ fontSize: 14 }}>{player.name}</strong>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 6, alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                    <strong style={{ fontSize: 13 }}>{player.name}</strong>
                     {isActive && <Badge>am Zug</Badge>}
                   </div>
-                  <Badge variant="secondary">{player.score} Karten</Badge>
+                  <Badge variant="secondary">{player.score}</Badge>
                 </div>
 
                 <div style={{ overflowX: "auto", overflowY: "hidden", maxWidth: "100%", minWidth: 0 }}>
-                  <div style={{ display: "flex", gap: 5, minWidth: "max-content", paddingBottom: 2, alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: 4, minWidth: "max-content", paddingBottom: 1, alignItems: "center" }}>
                     {sortedTimeline.length === 0 ? (
                       <span style={{ color: colors.muted, fontSize: 12 }}>Noch keine Karten</span>
                     ) : (
@@ -4731,15 +4846,6 @@ function PlayerFocusedCard({ viewerRole, activePlayer, permissions }) {
 }
 
 function LocalRoleCard({ viewerPlayerId, setViewerPlayerId, viewerRole, permissions, players, roomClients = [], clientInstanceId, roomCode }) {
-  const roleLabel =
-    {
-      host: "Host",
-      activePlayer: "Aktiver Spieler",
-      player: "Spieler",
-      spectator: "Zuschauer",
-    }[viewerRole] || viewerRole;
-
-  const selectedPlayer = players.find((player) => player.id === viewerPlayerId);
   const claimedByOther = new Set(
     roomClients
       .filter((client) => client.clientInstanceId && client.clientInstanceId !== clientInstanceId)
@@ -4756,17 +4862,15 @@ function LocalRoleCard({ viewerPlayerId, setViewerPlayerId, viewerRole, permissi
 
   return (
     <Card>
-      <CardContent style={{ display: "grid", gap: 14 }}>
-        <div>
-          <h3 style={{ margin: "0 0 6px" }}>Deine Ansicht</h3>
-          <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-            Waehle deinen Namen aus. Bereits belegte Namen sind gesperrt.
-          </p>
+      <CardContent style={{ display: "grid", gap: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+          <h3 style={{ margin: 0, fontSize: 16 }}>Deine Ansicht</h3>
+          <Badge variant="secondary">Name</Badge>
         </div>
 
         <Select value={viewerPlayerId} onChange={handleViewerChange}>
-          <option value="auto-host">Host automatisch beim Spielstart</option>
-          <option value="auto-player">Automatisch: Spieler per Einladungslink</option>
+          <option value="auto-host">Host automatisch</option>
+          <option value="auto-player">Automatisch per Einladungslink</option>
 
           {players.map((player) => {
             const isClaimedByOther = claimedByOther.has(player.id);
@@ -4780,26 +4884,6 @@ function LocalRoleCard({ viewerPlayerId, setViewerPlayerId, viewerRole, permissi
 
           <option value="spectator">Zuschauer</option>
         </Select>
-
-        <div
-          style={{
-            border: `1px solid ${colors.border}`,
-            borderRadius: 18,
-            padding: 14,
-            background: cardTheme.table,
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 12,
-            alignItems: "center",
-          }}
-        >
-          <div>
-            <span style={{ display: "block", color: colors.muted, fontSize: 12 }}>Aktuelle Ansicht</span>
-            <strong>{selectedPlayer?.name || roleLabel}</strong>
-          </div>
-
-          <Badge variant={viewerRole === "activePlayer" ? "default" : "secondary"}>{roleLabel}</Badge>
-        </div>
       </CardContent>
     </Card>
   );
