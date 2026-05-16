@@ -32,6 +32,8 @@ const initialGameState = {
   turnNumber: 1,
   showDebugSong: false,
   discardedTracks: [],
+  usedTrackIds: [],
+  overtime: false,
   gameLog: [],
   eventHistory: [],
   playbackRequests: [],
@@ -80,7 +82,17 @@ function resetPlayersForNewRound(players) {
   }));
 }
 
+function isInsertSlotAllowed(timeline, insertIndex) {
+  const orderedTimeline = sortTimeline(timeline);
+  const left = orderedTimeline[insertIndex - 1];
+  const right = orderedTimeline[insertIndex];
+
+  return !(left && right && left.year === right.year);
+}
+
 function isCorrectPlacement(timeline, track, insertIndex) {
+  if (!isInsertSlotAllowed(timeline, insertIndex)) return false;
+
   const orderedTimeline = sortTimeline(timeline);
   const left = orderedTimeline[insertIndex - 1];
   const right = orderedTimeline[insertIndex];
@@ -105,6 +117,37 @@ function getWinner(players, targetScore) {
   return players.find((player) => player.score >= targetScore) || null;
 }
 
+function getFinalWinner(players, targetScore) {
+  const eligiblePlayers = players.filter((player) => player.score >= targetScore);
+
+  if (!eligiblePlayers.length) return null;
+
+  const topScore = Math.max(...eligiblePlayers.map((player) => player.score));
+  const leaders = eligiblePlayers.filter((player) => player.score === topScore);
+
+  return leaders.length === 1 ? leaders[0] : null;
+}
+
+function hasTargetTie(players, targetScore) {
+  const eligiblePlayers = players.filter((player) => player.score >= targetScore);
+
+  if (eligiblePlayers.length < 2) return false;
+
+  const topScore = Math.max(...eligiblePlayers.map((player) => player.score));
+
+  return eligiblePlayers.filter((player) => player.score === topScore).length > 1;
+}
+
+function getUsedTrackIdSet(state) {
+  return new Set(Array.isArray(state.usedTrackIds) ? state.usedTrackIds : []);
+}
+
+function filterUnusedDeck(deck, state) {
+  const usedTrackIds = getUsedTrackIdSet(state);
+
+  return (Array.isArray(deck) ? deck : []).filter((track) => !usedTrackIds.has(track.id));
+}
+
 function addEvent(state, type, details = "") {
   const entry = {
     id: createId("event"),
@@ -127,7 +170,7 @@ function gameReducer(state, action) {
     case "NEW_ROUND": {
       if (!state.players.length || !state.room) return state;
 
-      const deck = Array.isArray(action.deck) ? action.deck : [];
+      const deck = filterUnusedDeck(action.deck, state);
       const players = resetPlayersForNewRound(state.players);
 
       const nextState = {
@@ -139,6 +182,8 @@ function gameReducer(state, action) {
           hostName: players[0]?.name || state.room.hostName || "Host",
         },
         players,
+        usedTrackIds: state.usedTrackIds || [],
+        overtime: false,
         deck: shuffle(deck),
         targetScore: Number(action.targetScore || state.targetScore || 10),
         maxTurns: Number(action.maxTurns ?? state.maxTurns ?? 0),
@@ -170,6 +215,7 @@ function gameReducer(state, action) {
           visibility: "private",
         },
         players,
+        activePlayerIndex: Math.max(0, players.findIndex((player) => player.name === action.startPlayerName)),
         deck: shuffle(deck),
         targetScore: Number(action.targetScore || 10),
         maxTurns: Number(action.maxTurns || 0),
@@ -197,6 +243,7 @@ function gameReducer(state, action) {
           phase: "placing",
           currentTrack: nextTrack,
           deck: remainingDeck,
+          usedTrackIds: Array.from(new Set([...(state.usedTrackIds || []), nextTrack.id])),
           selectedInsertIndex: null,
           lastResult: null,
           showDebugSong: false,
@@ -208,6 +255,9 @@ function gameReducer(state, action) {
 
     case "PLACEMENT_SELECTED": {
       if (state.phase !== "placing") return state;
+
+      const activePlayer = state.players[state.activePlayerIndex];
+      if (!activePlayer || !isInsertSlotAllowed(activePlayer.timeline, action.insertIndex)) return state;
 
       return addEvent(
         {
@@ -328,22 +378,25 @@ function gameReducer(state, action) {
     }
 
     case "NEXT_PLAYER": {
-      const winner = getWinner(state.players, state.targetScore);
+      const nextIndex = (state.activePlayerIndex + 1) % state.players.length;
+      const isEndOfRound = nextIndex === 0;
+      const finalWinner = getFinalWinner(state.players, state.targetScore);
+      const targetTie = hasTargetTie(state.players, state.targetScore);
+      const targetReached = state.players.some((player) => player.score >= state.targetScore);
       const turnsFinished = state.maxTurns > 0 && state.turnNumber >= state.maxTurns;
       const deckFinished = state.deck.length === 0;
 
-      if (winner || turnsFinished || deckFinished) {
+      if (deckFinished || turnsFinished || (isEndOfRound && finalWinner && !targetTie)) {
         return addEvent(
           {
             ...state,
             phase: "finished",
+            overtime: false,
           },
           "GAME_FINISHED",
-          winner ? `Gewinner: ${winner.name}` : "Limit erreicht"
+          finalWinner ? `Gewinner: ${finalWinner.name}` : "Limit erreicht"
         );
       }
-
-      const nextIndex = (state.activePlayerIndex + 1) % state.players.length;
 
       return addEvent(
         {
@@ -354,6 +407,7 @@ function gameReducer(state, action) {
           selectedInsertIndex: null,
           lastResult: null,
           showDebugSong: false,
+          overtime: Boolean(state.overtime || (isEndOfRound && targetReached && targetTie)),
           phase: "ready",
         },
         "NEXT_PLAYER",
