@@ -931,6 +931,9 @@ const initialGameState = {
   turnNumber: 1,
   showDebugSong: false,
   discardedTracks: [],
+  playedTrackHistory: [],
+  songReports: [],
+  blockedTrackKeys: [],
   usedTrackIds: [],
   usedTrackKeys: [],
   overtime: false,
@@ -1124,16 +1127,39 @@ function sortTimeline(timeline) {
   return [...timeline].sort((a, b) => a.year - b.year || a.title.localeCompare(b.title));
 }
 
-function splitIntoTeams(names, teamCount = 2) {
+function normalizeTeamConfig(names, teamConfig = {}) {
   const safeNames = Array.isArray(names) && names.length ? names : ["Host"];
-  const safeTeamCount = Math.max(1, Math.min(teamCount, safeNames.length));
-  const teams = Array.from({ length: safeTeamCount }, () => []);
+  const teamCount = Math.max(2, Math.min(4, Number(teamConfig.teamCount || 2), safeNames.length));
+  const teamNames = Array.from({ length: teamCount }, (_, index) => {
+    const configuredName = String(teamConfig.teamNames?.[index] || "").trim();
+    return configuredName || `Team ${index + 1}`;
+  });
+  const assignments = teamConfig.assignments && typeof teamConfig.assignments === "object" ? teamConfig.assignments : {};
+
+  return {
+    safeNames,
+    teamCount,
+    teamNames,
+    assignments,
+  };
+}
+
+function splitIntoTeams(names, teamConfig = {}) {
+  const { safeNames, teamCount, teamNames, assignments } = normalizeTeamConfig(names, teamConfig);
+  const teams = Array.from({ length: teamCount }, (_, index) => ({
+    name: teamNames[index],
+    members: [],
+  }));
 
   safeNames.forEach((name, index) => {
-    teams[index % safeTeamCount].push(name);
+    const configuredIndex = Number(assignments[name]);
+    const teamIndex = Number.isInteger(configuredIndex) && configuredIndex >= 0 && configuredIndex < teamCount ? configuredIndex : index % teamCount;
+    teams[teamIndex].members.push(name);
   });
 
-  return teams.filter((team) => team.length > 0);
+  const nonEmptyTeams = teams.filter((team) => team.members.length > 0);
+
+  return nonEmptyTeams.length ? nonEmptyTeams : [{ name: teamNames[0] || "Team 1", members: safeNames }];
 }
 
 function createSoloPlayers(names) {
@@ -1152,15 +1178,15 @@ function createSoloPlayers(names) {
   }));
 }
 
-function createTeamPlayers(names) {
+function createTeamPlayers(names, teamConfig = {}) {
   const starters = shuffle(STARTING_TRACKS);
-  const teams = splitIntoTeams(names, 2);
+  const teams = splitIntoTeams(names, teamConfig);
 
-  return teams.map((members, index) => ({
+  return teams.map((team, index) => ({
     id: createId("team"),
-    name: `Team ${index + 1}`,
+    name: team.name || `Team ${index + 1}`,
     role: index === 0 ? "host" : "player",
-    teamMembers: members,
+    teamMembers: team.members,
     activeMemberIndex: 0,
     timeline: [starters[index % starters.length]],
     score: 1,
@@ -1169,10 +1195,10 @@ function createTeamPlayers(names) {
   }));
 }
 
-function createInitialPlayers(names, gameMode = "solo") {
+function createInitialPlayers(names, gameMode = "solo", teamConfig = {}) {
   const safeNames = Array.isArray(names) && names.length ? names : ["Host"];
 
-  return gameMode === "teams" && safeNames.length >= 2 ? createTeamPlayers(safeNames) : createSoloPlayers(safeNames);
+  return gameMode === "teams" && safeNames.length >= 2 ? createTeamPlayers(safeNames, teamConfig) : createSoloPlayers(safeNames);
 }
 
 function resetPlayersForNewRound(players) {
@@ -1335,6 +1361,50 @@ function getNextIndexFromAllowedPlayerIds(currentIndex, allowedPlayerIds, player
   return nextHigher ?? allowedIndexes[0];
 }
 
+function getBlockedTrackKeySet(state) {
+  return new Set(Array.isArray(state.blockedTrackKeys) ? state.blockedTrackKeys : []);
+}
+
+function filterBlockedTracks(deck, state) {
+  const blockedTrackKeys = getBlockedTrackKeySet(state);
+
+  return (Array.isArray(deck) ? deck : []).filter((track) => !blockedTrackKeys.has(getTrackDedupeKey(track)));
+}
+
+function createPlayedTrackEntry(state, activePlayer, result = {}) {
+  const track = state.currentTrack;
+
+  return {
+    id: createId("played"),
+    trackId: track?.id || "",
+    trackKey: getTrackDedupeKey(track),
+    title: track?.title || "",
+    artist: track?.artist || "",
+    year: track?.year || "",
+    genre: track?.genre || "",
+    playerName: getPlayerTurnLabel(activePlayer),
+    teamName: activePlayer?.name || "",
+    activeMemberName: getActiveTeamMemberName(activePlayer),
+    correct: Boolean(result.correct),
+    skipped: Boolean(result.skipped),
+    createdAt: new Date().toLocaleTimeString(),
+  };
+}
+
+function createSongReportEntry(track, reason, actorName = "Host") {
+  return {
+    id: createId("report"),
+    trackId: track?.id || "",
+    trackKey: getTrackDedupeKey(track),
+    title: track?.title || "",
+    artist: track?.artist || "",
+    year: track?.year || "",
+    reason,
+    actorName,
+    createdAt: new Date().toLocaleTimeString(),
+  };
+}
+
 function getUsedTrackIdSet(state) {
   return new Set(Array.isArray(state.usedTrackIds) ? state.usedTrackIds : []);
 }
@@ -1347,7 +1417,11 @@ function filterUnusedDeck(deck, state) {
   const usedTrackIds = getUsedTrackIdSet(state);
   const usedTrackKeys = getUsedTrackKeySet(state);
 
-  return (Array.isArray(deck) ? deck : []).filter((track) => !usedTrackIds.has(track.id) && !usedTrackKeys.has(getTrackDedupeKey(track)));
+  const blockedTrackKeys = getBlockedTrackKeySet(state);
+
+  return (Array.isArray(deck) ? deck : []).filter(
+    (track) => !usedTrackIds.has(track.id) && !usedTrackKeys.has(getTrackDedupeKey(track)) && !blockedTrackKeys.has(getTrackDedupeKey(track))
+  );
 }
 
 function addEvent(state, type, details = "") {
@@ -1387,6 +1461,9 @@ function gameReducer(state, action) {
           hostName: players[0]?.name || state.room.hostName || "Host",
         },
         players,
+        playedTrackHistory: state.playedTrackHistory || [],
+        songReports: state.songReports || [],
+        blockedTrackKeys: state.blockedTrackKeys || [],
         usedTrackIds: state.usedTrackIds || [],
         usedTrackKeys: state.usedTrackKeys || [],
         overtime: false,
@@ -1408,7 +1485,7 @@ function gameReducer(state, action) {
     }
 
     case "START_GAME": {
-      const players = createInitialPlayers(action.playerNames, action.gameMode || "solo");
+      const players = createInitialPlayers(action.playerNames, action.gameMode || "solo", action.teamConfig || {});
 
       const nextState = {
         ...initialGameState,
@@ -1443,7 +1520,13 @@ function gameReducer(state, action) {
     case "TRACK_DRAWN": {
       if (state.phase !== "ready" || state.deck.length === 0) return state;
 
-      const [nextTrack, ...remainingDeck] = state.deck;
+      const blockedTrackKeys = getBlockedTrackKeySet(state);
+      const nextTrackIndex = state.deck.findIndex((track) => !blockedTrackKeys.has(getTrackDedupeKey(track)));
+
+      if (nextTrackIndex < 0) return state;
+
+      const nextTrack = state.deck[nextTrackIndex];
+      const remainingDeck = state.deck.filter((_, index) => index !== nextTrackIndex);
 
       return addEvent(
         {
@@ -1535,11 +1618,14 @@ function gameReducer(state, action) {
         ? `${getPlayerTurnLabel(activePlayer)} hat ${state.currentTrack.title} (${state.currentTrack.year}) richtig ${placementLabel} einsortiert.`
         : `${getPlayerTurnLabel(activePlayer)} lag mit ${state.currentTrack.title} (${state.currentTrack.year}) falsch. Gewaehlt: ${placementLabel}.`;
 
+      const playedEntry = createPlayedTrackEntry(state, activePlayer, { correct });
+
       return addEvent(
         {
           ...state,
           players,
           phase: "reveal",
+          playedTrackHistory: [playedEntry, ...(state.playedTrackHistory || [])].slice(0, 80),
           lastResult: {
             correct,
             placementLabel,
@@ -1562,23 +1648,28 @@ function gameReducer(state, action) {
       const activePlayer = state.players[state.activePlayerIndex];
       if (!activePlayer) return state;
 
+      const playedEntry = createPlayedTrackEntry(state, activePlayer, { correct: false, skipped: true });
+
       return addEvent(
         {
           ...state,
           phase: "reveal",
           showDebugSong: true,
+          playedTrackHistory: [playedEntry, ...(state.playedTrackHistory || [])].slice(0, 80),
           discardedTracks: [state.currentTrack, ...state.discardedTracks],
           lastResult: {
             correct: false,
             skipped: true,
             placementLabel: "uebersprungen",
-            playerName: activePlayer.name,
+            playerName: getPlayerTurnLabel(activePlayer),
+            teamName: activePlayer.name,
+            activeMemberName: getActiveTeamMemberName(activePlayer),
             track: state.currentTrack,
           },
           gameLog: [
             {
               id: createId("log"),
-              text: `${activePlayer.name} hat ${state.currentTrack.title} uebersprungen.`,
+              text: `${getPlayerTurnLabel(activePlayer)} hat ${state.currentTrack.title} uebersprungen.`,
             },
             ...state.gameLog,
           ].slice(0, 12),
@@ -1747,6 +1838,76 @@ function gameReducer(state, action) {
         getPlayerTurnLabel(playersAfterTurn[normalNextIndex]) || "naechster Spieler"
       );
     }
+
+    case "BLOCK_TRACK": {
+      const track = action.track || state.currentTrack || state.lastResult?.track;
+      const trackKey = action.trackKey || getTrackDedupeKey(track);
+
+      if (!trackKey) return state;
+
+      const reportReason = action.reason || "blockiert";
+
+      return addEvent(
+        {
+          ...state,
+          blockedTrackKeys: Array.from(new Set([...(state.blockedTrackKeys || []), trackKey])),
+          songReports: [createSongReportEntry(track, reportReason, action.actorName || "Host"), ...(state.songReports || [])].slice(0, 100),
+          deck: (state.deck || []).filter((item) => getTrackDedupeKey(item) !== trackKey),
+        },
+        "TRACK_BLOCKED",
+        track?.title || trackKey
+      );
+    }
+
+    case "UNBLOCK_TRACK": {
+      const trackKey = action.trackKey;
+
+      if (!trackKey) return state;
+
+      return addEvent(
+        {
+          ...state,
+          blockedTrackKeys: (state.blockedTrackKeys || []).filter((key) => key !== trackKey),
+        },
+        "TRACK_UNBLOCKED",
+        trackKey
+      );
+    }
+
+    case "REPORT_TRACK": {
+      const track = action.track || state.currentTrack || state.lastResult?.track;
+
+      if (!track) return state;
+
+      return addEvent(
+        {
+          ...state,
+          songReports: [createSongReportEntry(track, action.reason || "markiert", action.actorName || "Host"), ...(state.songReports || [])].slice(0, 100),
+        },
+        "TRACK_REPORTED",
+        `${track.title} · ${action.reason || "markiert"}`
+      );
+    }
+
+    case "CLEAR_SONG_REPORTS":
+      return addEvent(
+        {
+          ...state,
+          songReports: [],
+        },
+        "SONG_REPORTS_CLEARED",
+        "Song-Markierungen geleert"
+      );
+
+    case "CLEAR_BLOCKED_TRACKS":
+      return addEvent(
+        {
+          ...state,
+          blockedTrackKeys: [],
+        },
+        "BLOCKLIST_CLEARED",
+        "Blacklist geleert"
+      );
 
     case "TOGGLE_DEBUG_SONG":
       return {
@@ -2962,6 +3123,7 @@ export default function App() {
       playLimitSeconds: settings.playLimitSeconds,
       difficulty: selectedDifficulty,
       gameMode: settings.gameMode || "solo",
+      teamConfig: settings.teamConfig || null,
       startPlayerName: settings.startPlayerName,
     });
   }
@@ -3047,6 +3209,7 @@ export default function App() {
                 discardedTracks={gameState.discardedTracks}
                 eventHistory={gameState.eventHistory}
                 gameState={gameState}
+                onGameAction={sendGameAction}
               />
             )}
           </HostControlArea>
@@ -4060,12 +4223,28 @@ function LobbyCard({
   const [maxTurns, setMaxTurns] = useState(0);
   const [playLimitSeconds, setPlayLimitSeconds] = useState(DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS);
   const [startPlayerName, setStartPlayerName] = useState(playerNames[0] || "");
+  const [teamCount, setTeamCount] = useState(2);
+  const [teamNames, setTeamNames] = useState(["Team 1", "Team 2", "Team 3", "Team 4"]);
+  const [teamAssignments, setTeamAssignments] = useState({});
   const targetScoreOptions = [5, 7, 10, 15];
 
   useEffect(() => {
     if (!playerNames.length) return;
     if (!playerNames.includes(startPlayerName)) setStartPlayerName(playerNames[0]);
   }, [playerNames, startPlayerName]);
+
+  useEffect(() => {
+    setTeamAssignments((previous) => {
+      const next = {};
+
+      playerNames.forEach((name, index) => {
+        const previousValue = Number(previous[name]);
+        next[name] = Number.isInteger(previousValue) && previousValue >= 0 && previousValue < teamCount ? previousValue : index % teamCount;
+      });
+
+      return next;
+    });
+  }, [playerNames, teamCount]);
 
   return (
     <Card>
@@ -4165,17 +4344,84 @@ function LobbyCard({
           </div>
 
           {selectedGameMode === "teams" && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
-              {splitIntoTeams(playerNames, 2).map((team, index) => (
-                <div key={`team-preview-${index}`} style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg }}>
-                  <strong>Team {index + 1}</strong>
-                  <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 12 }}>{team.join(", ")}</p>
+            <div style={{ display: "grid", gap: 10, border: `1px solid ${colors.border}`, borderRadius: 18, padding: 12, background: colors.bg }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <strong>Teams einteilen</strong>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {[2, 3, 4].map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      onClick={() => setTeamCount(count)}
+                      disabled={playerNames.length < count}
+                      style={{
+                        border: `1px solid ${teamCount === count ? colors.primary : colors.border}`,
+                        borderRadius: 999,
+                        padding: "7px 10px",
+                        background: teamCount === count ? "rgba(126,87,255,0.22)" : colors.panel,
+                        color: colors.text,
+                        cursor: playerNames.length < count ? "not-allowed" : "pointer",
+                        opacity: playerNames.length < count ? 0.45 : 1,
+                        fontWeight: 900,
+                      }}
+                    >
+                      {count} Teams
+                    </button>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${teamCount}, minmax(0, 1fr))`, gap: 8 }}>
+                {Array.from({ length: teamCount }, (_, index) => (
+                  <Input
+                    key={`team-name-${index}`}
+                    value={teamNames[index] || `Team ${index + 1}`}
+                    onChange={(event) =>
+                      setTeamNames((previous) => {
+                        const next = [...previous];
+                        next[index] = event.target.value;
+                        return next;
+                      })
+                    }
+                    placeholder={`Team ${index + 1}`}
+                  />
+                ))}
+              </div>
+
+              <div style={{ display: "grid", gap: 8 }}>
+                {playerNames.map((name, index) => (
+                  <div key={`assignment-${name}`} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 180px", gap: 8, alignItems: "center" }}>
+                    <span style={{ fontWeight: 800 }}>{name}</span>
+                    <Select
+                      value={teamAssignments[name] ?? index % teamCount}
+                      onChange={(event) =>
+                        setTeamAssignments((previous) => ({
+                          ...previous,
+                          [name]: Number(event.target.value),
+                        }))
+                      }
+                    >
+                      {Array.from({ length: teamCount }, (_, teamIndex) => (
+                        <option key={`${name}-team-${teamIndex}`} value={teamIndex}>
+                          {teamNames[teamIndex] || `Team ${teamIndex + 1}`}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${teamCount}, minmax(0, 1fr))`, gap: 8 }}>
+                {splitIntoTeams(playerNames, { teamCount, teamNames, assignments: teamAssignments }).map((team, index) => (
+                  <div key={`team-preview-${index}`} style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.panel }}>
+                    <strong>{team.name}</strong>
+                    <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 12 }}>{team.members.join(", ") || "-"}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
-
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <label style={{ display: "grid", gap: 8 }}>
             <span style={{ color: colors.muted, fontSize: 14 }}>Raumcode</span>
@@ -4297,7 +4543,14 @@ function LobbyCard({
           </div>
         </div>
 
-        <Button onClick={() => startGame({ targetScore, maxTurns, playLimitSeconds, startPlayerName, gameMode: selectedGameMode })} disabled={playerNames.length < 1 || availableDeck.length < 1} style={{ padding: "14px 22px", fontSize: 16 }}>
+        <Button onClick={() => startGame({
+            targetScore,
+            maxTurns,
+            playLimitSeconds,
+            startPlayerName,
+            gameMode: selectedGameMode,
+            teamConfig: selectedGameMode === "teams" ? { teamCount, teamNames, assignments: teamAssignments } : null,
+          })} disabled={playerNames.length < 1 || availableDeck.length < 1} style={{ padding: "14px 22px", fontSize: 16 }}>
           Spiel starten
         </Button>
       </CardContent>
@@ -5756,7 +6009,7 @@ function TurnOrder({ players, activePlayerIndex }) {
 }
 
 
-function HostAdminDetails({ playbackRequests, gameLog, discardedTracks, eventHistory, gameState }) {
+function HostAdminDetails({ playbackRequests, gameLog, discardedTracks, eventHistory, gameState, onGameAction }) {
   return (
     <details
       style={{
@@ -5783,6 +6036,7 @@ function HostAdminDetails({ playbackRequests, gameLog, discardedTracks, eventHis
       </summary>
 
       <div style={{ display: "grid", gap: 14, padding: "0 16px 16px" }}>
+        <SongQualityCard gameState={gameState} onGameAction={onGameAction} />
         <PlaybackQueue playbackRequests={playbackRequests} />
         <details style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 12, background: colors.panel }}>
           <summary style={{ cursor: "pointer", fontWeight: 900 }}>Weitere technische Details</summary>
@@ -5798,6 +6052,164 @@ function HostAdminDetails({ playbackRequests, gameLog, discardedTracks, eventHis
   );
 }
 
+
+
+function SongQualityCard({ gameState, onGameAction }) {
+  const playedTracks = gameState.playedTrackHistory || [];
+  const reports = gameState.songReports || [];
+  const blockedKeys = new Set(gameState.blockedTrackKeys || []);
+  const lastTrack = gameState.lastResult?.track || gameState.currentTrack || null;
+
+  function blockTrack(track, reason = "blockiert") {
+    if (!track) return;
+
+    onGameAction?.({
+      type: "BLOCK_TRACK",
+      track,
+      trackKey: getTrackDedupeKey(track),
+      reason,
+    });
+  }
+
+  function reportTrack(track, reason) {
+    if (!track) return;
+
+    onGameAction?.({
+      type: "REPORT_TRACK",
+      track,
+      reason,
+    });
+  }
+
+  return (
+    <Card>
+      <CardContent style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div>
+            <h3 style={{ margin: "0 0 6px" }}>Songpflege</h3>
+            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+              Gespielte Songs prüfen, schlechte Treffer markieren und Songs dauerhaft für diesen Raum blockieren.
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Badge variant="secondary">{playedTracks.length} gespielt</Badge>
+            <Badge variant="secondary">{reports.length} markiert</Badge>
+            <Badge variant={blockedKeys.size ? "default" : "secondary"}>{blockedKeys.size} blockiert</Badge>
+          </div>
+        </div>
+
+        {lastTrack && (
+          <div style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 12, background: colors.bg, display: "grid", gap: 10 }}>
+            <div>
+              <strong>Aktueller/letzter Song</strong>
+              <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>
+                {lastTrack.title} · {lastTrack.artist} · {lastTrack.year}
+              </p>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Button variant="secondary" onClick={() => reportTrack(lastTrack, "falscher Spotify-Treffer")}>
+                Falscher Spotify-Treffer
+              </Button>
+              <Button variant="secondary" onClick={() => reportTrack(lastTrack, "zu unbekannt")}>
+                Zu unbekannt
+              </Button>
+              <Button variant="danger" onClick={() => blockTrack(lastTrack, "blockiert")}>
+                Song blockieren
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <details style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 12, background: colors.panel }}>
+          <summary style={{ cursor: "pointer", fontWeight: 900 }}>Gespielte Songs</summary>
+          <div style={{ display: "grid", gap: 8, maxHeight: 260, overflowY: "auto", marginTop: 12 }}>
+            {playedTracks.length === 0 && <p style={{ margin: 0, color: colors.muted }}>Noch keine gespielten Songs.</p>}
+
+            {playedTracks.slice(0, 30).map((entry) => {
+              const entryTrack = {
+                id: entry.trackId,
+                title: entry.title,
+                artist: entry.artist,
+                year: entry.year,
+                genre: entry.genre,
+              };
+              const blocked = blockedKeys.has(entry.trackKey);
+
+              return (
+                <div key={entry.id} style={{ border: `1px solid ${blocked ? "#ef4444" : colors.border}`, borderRadius: 12, padding: 10, background: colors.bg }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 8, alignItems: "center" }}>
+                    <div style={{ minWidth: 0 }}>
+                      <strong style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {entry.title} · {entry.artist}
+                      </strong>
+                      <span style={{ color: colors.muted, fontSize: 12 }}>
+                        {entry.year} · {entry.playerName} · {entry.skipped ? "übersprungen" : entry.correct ? "richtig" : "falsch"} · {entry.createdAt}
+                      </span>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      <Button variant="secondary" onClick={() => reportTrack(entryTrack, "falscher Spotify-Treffer")} style={{ padding: "6px 8px", borderRadius: 10 }}>
+                        Spotify
+                      </Button>
+                      <Button variant="secondary" onClick={() => reportTrack(entryTrack, "zu unbekannt")} style={{ padding: "6px 8px", borderRadius: 10 }}>
+                        unbekannt
+                      </Button>
+                      {blocked ? (
+                        <Button
+                          variant="secondary"
+                          onClick={() => onGameAction?.({ type: "UNBLOCK_TRACK", trackKey: entry.trackKey })}
+                          style={{ padding: "6px 8px", borderRadius: 10 }}
+                        >
+                          freigeben
+                        </Button>
+                      ) : (
+                        <Button variant="danger" onClick={() => blockTrack(entryTrack, "blockiert")} style={{ padding: "6px 8px", borderRadius: 10 }}>
+                          blocken
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </details>
+
+        <details style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 12, background: colors.panel }}>
+          <summary style={{ cursor: "pointer", fontWeight: 900 }}>Markierungen & Blacklist</summary>
+          <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Button variant="secondary" onClick={() => onGameAction?.({ type: "CLEAR_SONG_REPORTS" })} disabled={reports.length === 0}>
+                Markierungen leeren
+              </Button>
+              <Button variant="danger" onClick={() => onGameAction?.({ type: "CLEAR_BLOCKED_TRACKS" })} disabled={blockedKeys.size === 0}>
+                Blacklist leeren
+              </Button>
+            </div>
+
+            <div style={{ display: "grid", gap: 8, maxHeight: 220, overflowY: "auto" }}>
+              {reports.length === 0 && <p style={{ margin: 0, color: colors.muted }}>Noch keine Markierungen.</p>}
+
+              {reports.slice(0, 40).map((report) => (
+                <div key={report.id} style={{ border: `1px solid ${colors.border}`, borderRadius: 12, padding: 10, background: colors.bg }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                    <strong style={{ fontSize: 13 }}>{report.title} · {report.artist}</strong>
+                    <Badge variant="secondary">{report.reason}</Badge>
+                  </div>
+                  <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 12 }}>
+                    {report.year} · {report.createdAt} · {blockedKeys.has(report.trackKey) ? "blockiert" : "nicht blockiert"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </details>
+      </CardContent>
+    </Card>
+  );
+}
 
 function PlaybackQueue({ playbackRequests }) {
   return (

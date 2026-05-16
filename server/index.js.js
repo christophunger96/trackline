@@ -36,6 +36,9 @@ const initialGameState = {
   turnNumber: 1,
   showDebugSong: false,
   discardedTracks: [],
+  playedTrackHistory: [],
+  songReports: [],
+  blockedTrackKeys: [],
   usedTrackIds: [],
   usedTrackKeys: [],
   overtime: false,
@@ -154,16 +157,39 @@ function preparePlayableDeck(tracks) {
   return shuffle(dedupeTrackDeck(tracks));
 }
 
-function splitIntoTeams(names, teamCount = 2) {
+function normalizeTeamConfig(names, teamConfig = {}) {
   const safeNames = Array.isArray(names) && names.length ? names : ["Host"];
-  const safeTeamCount = Math.max(1, Math.min(teamCount, safeNames.length));
-  const teams = Array.from({ length: safeTeamCount }, () => []);
+  const teamCount = Math.max(2, Math.min(4, Number(teamConfig.teamCount || 2), safeNames.length));
+  const teamNames = Array.from({ length: teamCount }, (_, index) => {
+    const configuredName = String(teamConfig.teamNames?.[index] || "").trim();
+    return configuredName || `Team ${index + 1}`;
+  });
+  const assignments = teamConfig.assignments && typeof teamConfig.assignments === "object" ? teamConfig.assignments : {};
+
+  return {
+    safeNames,
+    teamCount,
+    teamNames,
+    assignments,
+  };
+}
+
+function splitIntoTeams(names, teamConfig = {}) {
+  const { safeNames, teamCount, teamNames, assignments } = normalizeTeamConfig(names, teamConfig);
+  const teams = Array.from({ length: teamCount }, (_, index) => ({
+    name: teamNames[index],
+    members: [],
+  }));
 
   safeNames.forEach((name, index) => {
-    teams[index % safeTeamCount].push(name);
+    const configuredIndex = Number(assignments[name]);
+    const teamIndex = Number.isInteger(configuredIndex) && configuredIndex >= 0 && configuredIndex < teamCount ? configuredIndex : index % teamCount;
+    teams[teamIndex].members.push(name);
   });
 
-  return teams.filter((team) => team.length > 0);
+  const nonEmptyTeams = teams.filter((team) => team.members.length > 0);
+
+  return nonEmptyTeams.length ? nonEmptyTeams : [{ name: teamNames[0] || "Team 1", members: safeNames }];
 }
 
 function createSoloPlayers(names) {
@@ -182,15 +208,15 @@ function createSoloPlayers(names) {
   }));
 }
 
-function createTeamPlayers(names) {
+function createTeamPlayers(names, teamConfig = {}) {
   const starters = shuffle(STARTING_TRACKS);
-  const teams = splitIntoTeams(names, 2);
+  const teams = splitIntoTeams(names, teamConfig);
 
-  return teams.map((members, index) => ({
+  return teams.map((team, index) => ({
     id: createId("team"),
-    name: `Team ${index + 1}`,
+    name: team.name || `Team ${index + 1}`,
     role: index === 0 ? "host" : "player",
-    teamMembers: members,
+    teamMembers: team.members,
     activeMemberIndex: 0,
     timeline: [starters[index % starters.length]],
     score: 1,
@@ -199,10 +225,10 @@ function createTeamPlayers(names) {
   }));
 }
 
-function createInitialPlayers(names, gameMode = "solo") {
+function createInitialPlayers(names, gameMode = "solo", teamConfig = {}) {
   const safeNames = Array.isArray(names) && names.length ? names : ["Host"];
 
-  return gameMode === "teams" && safeNames.length >= 2 ? createTeamPlayers(safeNames) : createSoloPlayers(safeNames);
+  return gameMode === "teams" && safeNames.length >= 2 ? createTeamPlayers(safeNames, teamConfig) : createSoloPlayers(safeNames);
 }
 
 function resetPlayersForNewRound(players) {
@@ -354,6 +380,50 @@ function getNextIndexFromAllowedPlayerIds(currentIndex, allowedPlayerIds, player
   return nextHigher ?? allowedIndexes[0];
 }
 
+function getBlockedTrackKeySet(state) {
+  return new Set(Array.isArray(state.blockedTrackKeys) ? state.blockedTrackKeys : []);
+}
+
+function filterBlockedTracks(deck, state) {
+  const blockedTrackKeys = getBlockedTrackKeySet(state);
+
+  return (Array.isArray(deck) ? deck : []).filter((track) => !blockedTrackKeys.has(getTrackDedupeKey(track)));
+}
+
+function createPlayedTrackEntry(state, activePlayer, result = {}) {
+  const track = state.currentTrack;
+
+  return {
+    id: createId("played"),
+    trackId: track?.id || "",
+    trackKey: getTrackDedupeKey(track),
+    title: track?.title || "",
+    artist: track?.artist || "",
+    year: track?.year || "",
+    genre: track?.genre || "",
+    playerName: getPlayerTurnLabel(activePlayer),
+    teamName: activePlayer?.name || "",
+    activeMemberName: getActiveTeamMemberName(activePlayer),
+    correct: Boolean(result.correct),
+    skipped: Boolean(result.skipped),
+    createdAt: new Date().toLocaleTimeString(),
+  };
+}
+
+function createSongReportEntry(track, reason, actorName = "Host") {
+  return {
+    id: createId("report"),
+    trackId: track?.id || "",
+    trackKey: getTrackDedupeKey(track),
+    title: track?.title || "",
+    artist: track?.artist || "",
+    year: track?.year || "",
+    reason,
+    actorName,
+    createdAt: new Date().toLocaleTimeString(),
+  };
+}
+
 function getUsedTrackIdSet(state) {
   return new Set(Array.isArray(state.usedTrackIds) ? state.usedTrackIds : []);
 }
@@ -366,7 +436,11 @@ function filterUnusedDeck(deck, state) {
   const usedTrackIds = getUsedTrackIdSet(state);
   const usedTrackKeys = getUsedTrackKeySet(state);
 
-  return (Array.isArray(deck) ? deck : []).filter((track) => !usedTrackIds.has(track.id) && !usedTrackKeys.has(getTrackDedupeKey(track)));
+  const blockedTrackKeys = getBlockedTrackKeySet(state);
+
+  return (Array.isArray(deck) ? deck : []).filter(
+    (track) => !usedTrackIds.has(track.id) && !usedTrackKeys.has(getTrackDedupeKey(track)) && !blockedTrackKeys.has(getTrackDedupeKey(track))
+  );
 }
 
 function addEvent(state, type, details = "") {
@@ -403,6 +477,9 @@ function gameReducer(state, action) {
           hostName: players[0]?.name || state.room.hostName || "Host",
         },
         players,
+        playedTrackHistory: state.playedTrackHistory || [],
+        songReports: state.songReports || [],
+        blockedTrackKeys: state.blockedTrackKeys || [],
         usedTrackIds: state.usedTrackIds || [],
         usedTrackKeys: state.usedTrackKeys || [],
         overtime: false,
@@ -426,7 +503,7 @@ function gameReducer(state, action) {
     case "START_GAME": {
       const playerNames = Array.isArray(action.playerNames) && action.playerNames.length > 0 ? action.playerNames : ["Host"];
       const deck = Array.isArray(action.deck) ? action.deck : [];
-      const players = createInitialPlayers(playerNames, action.gameMode || "solo");
+      const players = createInitialPlayers(playerNames, action.gameMode || "solo", action.teamConfig || {});
 
       const nextState = {
         ...initialGameState,
@@ -461,7 +538,13 @@ function gameReducer(state, action) {
     case "TRACK_DRAWN": {
       if (state.phase !== "ready" || state.deck.length === 0) return state;
 
-      const [nextTrack, ...remainingDeck] = state.deck;
+      const blockedTrackKeys = getBlockedTrackKeySet(state);
+      const nextTrackIndex = state.deck.findIndex((track) => !blockedTrackKeys.has(getTrackDedupeKey(track)));
+
+      if (nextTrackIndex < 0) return state;
+
+      const nextTrack = state.deck[nextTrackIndex];
+      const remainingDeck = state.deck.filter((_, index) => index !== nextTrackIndex);
 
       return addEvent(
         {
@@ -553,11 +636,14 @@ function gameReducer(state, action) {
         ? `${getPlayerTurnLabel(activePlayer)} hat ${state.currentTrack.title} (${state.currentTrack.year}) richtig ${placementLabel} einsortiert.`
         : `${getPlayerTurnLabel(activePlayer)} lag mit ${state.currentTrack.title} (${state.currentTrack.year}) falsch. Gewaehlt: ${placementLabel}.`;
 
+      const playedEntry = createPlayedTrackEntry(state, activePlayer, { correct });
+
       return addEvent(
         {
           ...state,
           players,
           phase: "reveal",
+          playedTrackHistory: [playedEntry, ...(state.playedTrackHistory || [])].slice(0, 80),
           lastResult: {
             correct,
             placementLabel,
@@ -580,23 +666,28 @@ function gameReducer(state, action) {
       const activePlayer = state.players[state.activePlayerIndex];
       if (!activePlayer) return state;
 
+      const playedEntry = createPlayedTrackEntry(state, activePlayer, { correct: false, skipped: true });
+
       return addEvent(
         {
           ...state,
           phase: "reveal",
           showDebugSong: true,
+          playedTrackHistory: [playedEntry, ...(state.playedTrackHistory || [])].slice(0, 80),
           discardedTracks: [state.currentTrack, ...state.discardedTracks],
           lastResult: {
             correct: false,
             skipped: true,
             placementLabel: "uebersprungen",
-            playerName: activePlayer.name,
+            playerName: getPlayerTurnLabel(activePlayer),
+            teamName: activePlayer.name,
+            activeMemberName: getActiveTeamMemberName(activePlayer),
             track: state.currentTrack,
           },
           gameLog: [
             {
               id: createId("log"),
-              text: `${activePlayer.name} hat ${state.currentTrack.title} uebersprungen.`,
+              text: `${getPlayerTurnLabel(activePlayer)} hat ${state.currentTrack.title} uebersprungen.`,
             },
             ...state.gameLog,
           ].slice(0, 12),
@@ -765,6 +856,76 @@ function gameReducer(state, action) {
         getPlayerTurnLabel(playersAfterTurn[normalNextIndex]) || "naechster Spieler"
       );
     }
+
+    case "BLOCK_TRACK": {
+      const track = action.track || state.currentTrack || state.lastResult?.track;
+      const trackKey = action.trackKey || getTrackDedupeKey(track);
+
+      if (!trackKey) return state;
+
+      const reportReason = action.reason || "blockiert";
+
+      return addEvent(
+        {
+          ...state,
+          blockedTrackKeys: Array.from(new Set([...(state.blockedTrackKeys || []), trackKey])),
+          songReports: [createSongReportEntry(track, reportReason, action.actorName || "Host"), ...(state.songReports || [])].slice(0, 100),
+          deck: (state.deck || []).filter((item) => getTrackDedupeKey(item) !== trackKey),
+        },
+        "TRACK_BLOCKED",
+        track?.title || trackKey
+      );
+    }
+
+    case "UNBLOCK_TRACK": {
+      const trackKey = action.trackKey;
+
+      if (!trackKey) return state;
+
+      return addEvent(
+        {
+          ...state,
+          blockedTrackKeys: (state.blockedTrackKeys || []).filter((key) => key !== trackKey),
+        },
+        "TRACK_UNBLOCKED",
+        trackKey
+      );
+    }
+
+    case "REPORT_TRACK": {
+      const track = action.track || state.currentTrack || state.lastResult?.track;
+
+      if (!track) return state;
+
+      return addEvent(
+        {
+          ...state,
+          songReports: [createSongReportEntry(track, action.reason || "markiert", action.actorName || "Host"), ...(state.songReports || [])].slice(0, 100),
+        },
+        "TRACK_REPORTED",
+        `${track.title} · ${action.reason || "markiert"}`
+      );
+    }
+
+    case "CLEAR_SONG_REPORTS":
+      return addEvent(
+        {
+          ...state,
+          songReports: [],
+        },
+        "SONG_REPORTS_CLEARED",
+        "Song-Markierungen geleert"
+      );
+
+    case "CLEAR_BLOCKED_TRACKS":
+      return addEvent(
+        {
+          ...state,
+          blockedTrackKeys: [],
+        },
+        "BLOCKLIST_CLEARED",
+        "Blacklist geleert"
+      );
 
     case "TOGGLE_DEBUG_SONG":
       return {
@@ -1172,7 +1333,7 @@ function authorizeAction(state, action) {
       : { ok: false, message: "Nur Host/DJ oder der aktive Spieler darf aufdecken oder zum naechsten Spieler gehen." };
   }
 
-  if (["TRACK_SKIPPED", "TOGGLE_DEBUG_SONG"].includes(type)) {
+  if (["TRACK_SKIPPED", "TOGGLE_DEBUG_SONG", "BLOCK_TRACK", "UNBLOCK_TRACK", "REPORT_TRACK", "CLEAR_SONG_REPORTS", "CLEAR_BLOCKED_TRACKS"].includes(type)) {
     return actor.isHost ? { ok: true } : { ok: false, message: "Nur der Host/DJ darf diese Aktion ausfuehren." };
   }
 
