@@ -1209,6 +1209,27 @@ function hasTargetTie(players, targetScore) {
   return eligiblePlayers.filter((player) => player.score === topScore).length > 1;
 }
 
+function getOvertimeContenderIndexes(players, targetScore) {
+  const eligible = players
+    .map((player, index) => ({ player, index }))
+    .filter(({ player }) => player.score >= targetScore);
+
+  if (eligible.length < 2) return [];
+
+  const topScore = Math.max(...eligible.map(({ player }) => player.score));
+
+  return eligible.filter(({ player }) => player.score === topScore).map(({ index }) => index);
+}
+
+function getNextIndexFromAllowed(currentIndex, allowedIndexes, playerCount) {
+  if (!allowedIndexes.length) return (currentIndex + 1) % playerCount;
+
+  const sortedIndexes = [...allowedIndexes].sort((a, b) => a - b);
+  const nextHigher = sortedIndexes.find((index) => index > currentIndex);
+
+  return nextHigher ?? sortedIndexes[0];
+}
+
 function getUsedTrackIdSet(state) {
   return new Set(Array.isArray(state.usedTrackIds) ? state.usedTrackIds : []);
 }
@@ -1457,15 +1478,13 @@ function gameReducer(state, action) {
     }
 
     case "NEXT_PLAYER": {
-      const nextIndex = (state.activePlayerIndex + 1) % state.players.length;
-      const isEndOfRound = nextIndex === 0;
+      const turnsFinished = state.maxTurns > 0 && state.turnNumber >= state.maxTurns;
+      const deckFinished = state.deck.length === 0;
       const finalWinner = getFinalWinner(state.players, state.targetScore);
       const targetTie = hasTargetTie(state.players, state.targetScore);
       const targetReached = state.players.some((player) => player.score >= state.targetScore);
-      const turnsFinished = state.maxTurns > 0 && state.turnNumber >= state.maxTurns;
-      const deckFinished = state.deck.length === 0;
 
-      if (deckFinished || turnsFinished || (isEndOfRound && finalWinner && !targetTie)) {
+      if (deckFinished || turnsFinished) {
         return addEvent(
           {
             ...state,
@@ -1477,20 +1496,89 @@ function gameReducer(state, action) {
         );
       }
 
+      if (state.overtime) {
+        if (finalWinner && !targetTie) {
+          return addEvent(
+            {
+              ...state,
+              phase: "finished",
+              overtime: false,
+            },
+            "GAME_FINISHED",
+            `Sudden-Death Gewinner: ${finalWinner.name}`
+          );
+        }
+
+        const overtimeIndexes = getOvertimeContenderIndexes(state.players, state.targetScore);
+        const nextOvertimeIndex = getNextIndexFromAllowed(state.activePlayerIndex, overtimeIndexes, state.players.length);
+
+        return addEvent(
+          {
+            ...state,
+            activePlayerIndex: nextOvertimeIndex,
+            turnNumber: state.turnNumber + 1,
+            currentTrack: null,
+            selectedInsertIndex: null,
+            lastResult: null,
+            showDebugSong: false,
+            overtime: true,
+            phase: "ready",
+          },
+          "OVERTIME_NEXT_PLAYER",
+          state.players[nextOvertimeIndex]?.name || "Verlaengerung"
+        );
+      }
+
+      const normalNextIndex = (state.activePlayerIndex + 1) % state.players.length;
+      const isEndOfRound = normalNextIndex === 0;
+
+      if (isEndOfRound && finalWinner && !targetTie) {
+        return addEvent(
+          {
+            ...state,
+            phase: "finished",
+            overtime: false,
+          },
+          "GAME_FINISHED",
+          `Gewinner: ${finalWinner.name}`
+        );
+      }
+
+      if (isEndOfRound && targetReached && targetTie) {
+        const overtimeIndexes = getOvertimeContenderIndexes(state.players, state.targetScore);
+        const nextOvertimeIndex = getNextIndexFromAllowed(state.activePlayerIndex, overtimeIndexes, state.players.length);
+
+        return addEvent(
+          {
+            ...state,
+            activePlayerIndex: nextOvertimeIndex,
+            turnNumber: state.turnNumber + 1,
+            currentTrack: null,
+            selectedInsertIndex: null,
+            lastResult: null,
+            showDebugSong: false,
+            overtime: true,
+            phase: "ready",
+          },
+          "OVERTIME_STARTED",
+          state.players[nextOvertimeIndex]?.name || "Verlaengerung"
+        );
+      }
+
       return addEvent(
         {
           ...state,
-          activePlayerIndex: nextIndex,
+          activePlayerIndex: normalNextIndex,
           turnNumber: state.turnNumber + 1,
           currentTrack: null,
           selectedInsertIndex: null,
           lastResult: null,
           showDebugSong: false,
-          overtime: Boolean(state.overtime || (isEndOfRound && targetReached && targetTie)),
+          overtime: false,
           phase: "ready",
         },
         "NEXT_PLAYER",
-        state.players[nextIndex]?.name || "naechster Spieler"
+        state.players[normalNextIndex]?.name || "naechster Spieler"
       );
     }
 
@@ -3134,6 +3222,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [spotifyDevices, setSpotifyDevices] = useState([]);
   const [selectedSpotifyDeviceId, setSelectedSpotifyDeviceId] = useState("");
+  const [savedDeviceId, setSavedDeviceId] = useState("");
   const [savedDeviceName, setSavedDeviceName] = useState("");
   const [spotifyDetailsOpen, setSpotifyDetailsOpen] = useState(false);
 
@@ -3223,6 +3312,16 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
   }, [roomCode, spotifyAuthServerUrl]);
 
   useEffect(() => {
+    if (!canManageSpotify) return undefined;
+
+    const intervalId = window.setInterval(() => {
+      refreshSpotifyStatus({ quiet: true });
+    }, 15000);
+
+    return () => window.clearInterval(intervalId);
+  }, [canManageSpotify, roomCode, spotifyAuthServerUrl]);
+
+  useEffect(() => {
     if (!serverLoginId || !serverLoginPending) return;
 
     const baseUrl = getSpotifyAuthServerBaseUrl();
@@ -3282,6 +3381,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
       const data = await response.json();
 
       setSpotifyConnected(Boolean(data.connected));
+      setSavedDeviceId(data.deviceId || "");
       setSavedDeviceName(data.deviceName || "");
 
       if (data.deviceId && !selectedSpotifyDeviceId) {
@@ -3291,7 +3391,9 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
       if (!quiet) {
         setStatus(
           data.connected
-            ? `Spotify verbunden${data.deviceName ? `, Zielgeraet: ${data.deviceName}` : ""}.`
+            ? data.deviceName
+              ? `Spotify verbunden, Zielgeraet: ${data.deviceName}.`
+              : "Spotify verbunden, aber noch kein Zielgeraet gespeichert."
             : "Spotify ist fuer diesen Raum noch nicht verbunden."
         );
       }
@@ -3384,6 +3486,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
         setSelectedSpotifyDeviceId(fallbackDevice.id);
       }
 
+      setSavedDeviceId(data.deviceId || savedDevice?.id || "");
       setSavedDeviceName(data.deviceName || savedDevice?.name || "");
 
       setStatus(
@@ -3424,6 +3527,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
         throw new Error(await response.text());
       }
 
+      setSavedDeviceId(selectedSpotifyDeviceId);
       setSavedDeviceName(selectedDevice?.name || "Spotify-Geraet");
       setStatus(`Zielgeraet gespeichert: ${selectedDevice?.name || "Spotify-Geraet"}.`);
     } catch (error) {
@@ -3469,6 +3573,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
 
       const data = await response.json();
       setSpotifyConnected(true);
+      setSavedDeviceId(data.deviceId || savedDeviceId);
       setSavedDeviceName(data.deviceName || savedDeviceName);
       startLocalCountdown(playLimitSeconds);
       setStatus(`Verdeckter Song laeuft auf ${data.deviceName || "Spotify"}. TimeLimit: ${playLimitSeconds} Sekunden.`);
@@ -3539,11 +3644,45 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
           >
             <div>
               <strong>Spotify bereit</strong>
-              <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>Zielgeraet: {savedDeviceName}</p>
+              <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>
+                Zielgeraet: {savedDeviceName}{savedDeviceId ? ` · ${savedDeviceId.slice(0, 6)}…` : ""}
+              </p>
             </div>
 
-            <Button variant="secondary" onClick={() => setSpotifyDetailsOpen((value) => !value)}>
-              {spotifyDetailsOpen ? "Spotify-Details ausblenden" : "Gerät / Login ändern"}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Button variant="secondary" onClick={() => refreshSpotifyStatus()} disabled={isBusy}>
+                Status prüfen
+              </Button>
+              <Button variant="secondary" onClick={() => setSpotifyDetailsOpen((value) => !value)}>
+                {spotifyDetailsOpen ? "Spotify-Details ausblenden" : "Gerät / Login ändern"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {canManageSpotify && spotifyConnected && !savedDeviceName && (
+          <div
+            style={{
+              border: "1px solid #f59e0b",
+              borderRadius: 18,
+              padding: 14,
+              background: "rgba(245,158,11,0.12)",
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <strong>Spotify verbunden, aber kein Zielgeraet gespeichert</strong>
+              <p style={{ margin: "4px 0 0", color: "#fde68a", fontSize: 13 }}>
+                Öffne Spotify einmal auf dem Host-Geraet, lade die Geraete und speichere das richtige Zielgeraet.
+              </p>
+            </div>
+
+            <Button variant="secondary" onClick={refreshSpotifyDevices} disabled={isBusy}>
+              Geraete laden
             </Button>
           </div>
         )}
@@ -3559,11 +3698,11 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
               </div>
 
               <Button variant="secondary" onClick={handleLogin} disabled={isBusy}>
-                Spotify Login vorbereiten
+                Spotify neu verbinden
               </Button>
 
               <Button variant="secondary" onClick={() => refreshSpotifyStatus()} disabled={isBusy}>
-                Status laden
+                Status prüfen
               </Button>
             </div>
 
@@ -4186,7 +4325,7 @@ function GameHeader({ activePlayer, deck, turnNumber, maxTurns, targetScore, pla
         <Badge variant="secondary">Ziel {targetScore}</Badge>
         <Badge variant="secondary">{playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS}s</Badge>
         <Badge variant="secondary">{DIFFICULTY_OPTIONS.find((item) => item.id === difficulty)?.label || "Normal"}</Badge>
-        {overtime && <Badge>Verlängerung</Badge>}
+        {overtime && <Badge>Sudden Death</Badge>}
       </div>
     </div>
   );
@@ -4959,63 +5098,104 @@ function ResultPanel({ result, timeline = [], onNext, canAdvance }) {
 
 function FinishedPanel({ leaderboard, onNewRound, canNewRound }) {
   const winner = leaderboard[0];
+  const podium = leaderboard.slice(0, 3);
+  const topScore = winner?.score || 0;
+  const tiedWinners = leaderboard.filter((player) => player.score === topScore && topScore > 0);
 
   return (
     <div
       style={{
         border: "1px solid #f59e0b",
-        background: "radial-gradient(circle at top, rgba(245,158,11,0.22), transparent 34%), rgba(120,53,15,0.35)",
+        background:
+          "radial-gradient(circle at top left, rgba(245,158,11,0.30), transparent 34%), radial-gradient(circle at bottom right, rgba(126,87,255,0.22), transparent 36%), rgba(15,23,42,0.92)",
         borderRadius: 26,
-        padding: 22,
+        padding: 20,
         display: "grid",
-        gap: 18,
+        gap: 16,
+        boxShadow: "0 22px 60px rgba(0,0,0,0.30)",
+        overflow: "hidden",
+        position: "relative",
       }}
     >
+      <style>
+        {`
+          @keyframes tracklinePodiumIn {
+            0% { transform: translateY(16px) scale(0.96); opacity: 0; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
+          }
+        `}
+      </style>
+
       <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
         <div>
           <Badge variant="secondary">Finale</Badge>
-          <h2 style={{ margin: "10px 0 4px", fontSize: 30 }}>Spiel beendet</h2>
-          <p style={{ margin: 0, color: "#fde68a" }}>Gewinner: {winner?.name || "-"} mit {winner?.score || 0} Karten.</p>
+          <h2 style={{ margin: "8px 0 4px", fontSize: 30, letterSpacing: -0.7 }}>
+            {tiedWinners.length > 1 ? "Unentschieden" : "Spiel beendet"}
+          </h2>
+          <p style={{ margin: 0, color: "#fde68a" }}>
+            {tiedWinners.length > 1
+              ? `${tiedWinners.map((player) => player.name).join(" & ")} teilen sich Platz 1 mit ${topScore} Karten.`
+              : `Gewinner: ${winner?.name || "-"} mit ${winner?.score || 0} Karten.`}
+          </p>
         </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <div
-            style={{
-              minWidth: 120,
-              borderRadius: 20,
-              padding: 16,
-              background: cardTheme.ivory,
-              color: "#111827",
-              textAlign: "center",
-              boxShadow: "0 18px 38px rgba(0,0,0,0.24)",
-            }}
-          >
-            <div style={{ fontSize: 30 }}>★</div>
-            <strong style={{ display: "block", fontSize: 24 }}>{winner?.score || 0}</strong>
-            <span style={{ color: "#64748b", fontSize: 11, fontWeight: 900, textTransform: "uppercase" }}>Karten</span>
-          </div>
-
-          <Button onClick={onNewRound} disabled={!canNewRound} style={{ padding: "14px 18px" }}>
-            Neue Runde gleiche Spieler
-          </Button>
-        </div>
+        <Button onClick={onNewRound} disabled={!canNewRound} style={{ padding: "13px 18px" }}>
+          Neue Runde gleiche Spieler
+        </Button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
-        {leaderboard.slice(0, 3).map((player, index) => (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.25fr 1fr", gap: 10, alignItems: "end" }}>
+        {[podium[1], podium[0], podium[2]].map((player, visualIndex) => {
+          const place = visualIndex === 1 ? 1 : visualIndex === 0 ? 2 : 3;
+          const isWinner = place === 1;
+
+          return (
+            <div
+              key={player?.id || `empty-${place}`}
+              style={{
+                minHeight: isWinner ? 158 : 128,
+                borderRadius: 22,
+                padding: 14,
+                background: isWinner ? cardTheme.ivory : "rgba(255,255,255,0.07)",
+                color: isWinner ? "#111827" : colors.text,
+                border: `1px solid ${isWinner ? "#f59e0b" : colors.border}`,
+                textAlign: "center",
+                display: "grid",
+                alignContent: "center",
+                gap: 8,
+                animation: "tracklinePodiumIn 420ms ease-out both",
+                animationDelay: `${visualIndex * 80}ms`,
+              }}
+            >
+              <div style={{ fontSize: isWinner ? 34 : 24 }}>{isWinner ? "★" : place === 2 ? "②" : "③"}</div>
+              <Badge variant={isWinner ? "default" : "secondary"}>#{place}</Badge>
+              <strong style={{ display: "block", fontSize: isWinner ? 20 : 16 }}>{player?.name || "-"}</strong>
+              <span style={{ color: isWinner ? "#475569" : colors.muted, fontSize: 12 }}>{player?.score || 0} Karten</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "grid", gap: 7 }}>
+        {leaderboard.map((player, index) => (
           <div
             key={player.id}
             style={{
-              borderRadius: 18,
-              padding: 14,
-              background: index === 0 ? "rgba(245,158,11,0.18)" : colors.bg,
+              display: "grid",
+              gridTemplateColumns: "34px minmax(0, 1fr) auto",
+              gap: 10,
+              alignItems: "center",
+              borderRadius: 14,
+              background: index === 0 ? "rgba(245,158,11,0.14)" : colors.bg,
               border: `1px solid ${index === 0 ? "#f59e0b" : colors.border}`,
-              textAlign: "center",
+              padding: "8px 10px",
             }}
           >
             <Badge variant={index === 0 ? "default" : "secondary"}>#{index + 1}</Badge>
-            <strong style={{ display: "block", marginTop: 8 }}>{player.name}</strong>
-            <span style={{ color: colors.muted, fontSize: 12 }}>{player.score} Karten</span>
+            <strong style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{player.name}</strong>
+            <span style={{ color: colors.muted, fontSize: 12 }}>
+              {player.score} Karten · {player.correct}✓ · {player.wrong}×
+            </span>
           </div>
         ))}
       </div>

@@ -1,11 +1,14 @@
 import { createServer } from "node:http";
 import crypto from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { Server } from "socket.io";
 
 const PORT = Number(process.env.PORT || 3001);
 const rooms = new Map();
 const spotifyLogins = new Map();
 const DEFAULT_PLAY_LIMIT_SECONDS = 20;
+const ROOM_STATE_FILE = process.env.TRACKLINE_ROOM_STATE_FILE || "./trackline-room-state.json";
 
 const STARTING_TRACKS = [
   { id: "s1", title: "Billie Jean", artist: "Michael Jackson", year: 1982, genre: "Pop" },
@@ -202,6 +205,27 @@ function hasTargetTie(players, targetScore) {
   const topScore = Math.max(...eligiblePlayers.map((player) => player.score));
 
   return eligiblePlayers.filter((player) => player.score === topScore).length > 1;
+}
+
+function getOvertimeContenderIndexes(players, targetScore) {
+  const eligible = players
+    .map((player, index) => ({ player, index }))
+    .filter(({ player }) => player.score >= targetScore);
+
+  if (eligible.length < 2) return [];
+
+  const topScore = Math.max(...eligible.map(({ player }) => player.score));
+
+  return eligible.filter(({ player }) => player.score === topScore).map(({ index }) => index);
+}
+
+function getNextIndexFromAllowed(currentIndex, allowedIndexes, playerCount) {
+  if (!allowedIndexes.length) return (currentIndex + 1) % playerCount;
+
+  const sortedIndexes = [...allowedIndexes].sort((a, b) => a - b);
+  const nextHigher = sortedIndexes.find((index) => index > currentIndex);
+
+  return nextHigher ?? sortedIndexes[0];
 }
 
 function getUsedTrackIdSet(state) {
@@ -451,15 +475,13 @@ function gameReducer(state, action) {
     }
 
     case "NEXT_PLAYER": {
-      const nextIndex = (state.activePlayerIndex + 1) % state.players.length;
-      const isEndOfRound = nextIndex === 0;
+      const turnsFinished = state.maxTurns > 0 && state.turnNumber >= state.maxTurns;
+      const deckFinished = state.deck.length === 0;
       const finalWinner = getFinalWinner(state.players, state.targetScore);
       const targetTie = hasTargetTie(state.players, state.targetScore);
       const targetReached = state.players.some((player) => player.score >= state.targetScore);
-      const turnsFinished = state.maxTurns > 0 && state.turnNumber >= state.maxTurns;
-      const deckFinished = state.deck.length === 0;
 
-      if (deckFinished || turnsFinished || (isEndOfRound && finalWinner && !targetTie)) {
+      if (deckFinished || turnsFinished) {
         return addEvent(
           {
             ...state,
@@ -471,20 +493,89 @@ function gameReducer(state, action) {
         );
       }
 
+      if (state.overtime) {
+        if (finalWinner && !targetTie) {
+          return addEvent(
+            {
+              ...state,
+              phase: "finished",
+              overtime: false,
+            },
+            "GAME_FINISHED",
+            `Sudden-Death Gewinner: ${finalWinner.name}`
+          );
+        }
+
+        const overtimeIndexes = getOvertimeContenderIndexes(state.players, state.targetScore);
+        const nextOvertimeIndex = getNextIndexFromAllowed(state.activePlayerIndex, overtimeIndexes, state.players.length);
+
+        return addEvent(
+          {
+            ...state,
+            activePlayerIndex: nextOvertimeIndex,
+            turnNumber: state.turnNumber + 1,
+            currentTrack: null,
+            selectedInsertIndex: null,
+            lastResult: null,
+            showDebugSong: false,
+            overtime: true,
+            phase: "ready",
+          },
+          "OVERTIME_NEXT_PLAYER",
+          state.players[nextOvertimeIndex]?.name || "Verlaengerung"
+        );
+      }
+
+      const normalNextIndex = (state.activePlayerIndex + 1) % state.players.length;
+      const isEndOfRound = normalNextIndex === 0;
+
+      if (isEndOfRound && finalWinner && !targetTie) {
+        return addEvent(
+          {
+            ...state,
+            phase: "finished",
+            overtime: false,
+          },
+          "GAME_FINISHED",
+          `Gewinner: ${finalWinner.name}`
+        );
+      }
+
+      if (isEndOfRound && targetReached && targetTie) {
+        const overtimeIndexes = getOvertimeContenderIndexes(state.players, state.targetScore);
+        const nextOvertimeIndex = getNextIndexFromAllowed(state.activePlayerIndex, overtimeIndexes, state.players.length);
+
+        return addEvent(
+          {
+            ...state,
+            activePlayerIndex: nextOvertimeIndex,
+            turnNumber: state.turnNumber + 1,
+            currentTrack: null,
+            selectedInsertIndex: null,
+            lastResult: null,
+            showDebugSong: false,
+            overtime: true,
+            phase: "ready",
+          },
+          "OVERTIME_STARTED",
+          state.players[nextOvertimeIndex]?.name || "Verlaengerung"
+        );
+      }
+
       return addEvent(
         {
           ...state,
-          activePlayerIndex: nextIndex,
+          activePlayerIndex: normalNextIndex,
           turnNumber: state.turnNumber + 1,
           currentTrack: null,
           selectedInsertIndex: null,
           lastResult: null,
           showDebugSong: false,
-          overtime: Boolean(state.overtime || (isEndOfRound && targetReached && targetTie)),
+          overtime: false,
           phase: "ready",
         },
         "NEXT_PLAYER",
-        state.players[nextIndex]?.name || "naechster Spieler"
+        state.players[normalNextIndex]?.name || "naechster Spieler"
       );
     }
 
@@ -738,24 +829,78 @@ function handleSpotifyToken(req, res) {
   });
 }
 
+
+function createRoomRecord(seed = {}) {
+  const savedSpotify = seed.spotify || {};
+
+  return {
+    gameState: seed.gameState || null,
+    clients: new Map(),
+    playerClaims: new Map(Array.isArray(seed.playerClaims) ? seed.playerClaims : []),
+    spotify: {
+      token: null,
+      refreshToken: null,
+      clientId: null,
+      deviceId: savedSpotify.deviceId || "",
+      deviceName: savedSpotify.deviceName || "",
+      playbackTimeout: null,
+    },
+    updatedAt: seed.updatedAt || Date.now(),
+  };
+}
+
+function serializeRoom(room) {
+  return {
+    gameState: room.gameState || null,
+    playerClaims: Array.from(room.playerClaims?.entries?.() || []),
+    spotify: {
+      deviceId: room.spotify?.deviceId || "",
+      deviceName: room.spotify?.deviceName || "",
+    },
+    updatedAt: room.updatedAt || Date.now(),
+  };
+}
+
+function savePersistedRooms() {
+  try {
+    mkdirSync(dirname(ROOM_STATE_FILE), { recursive: true });
+
+    const payload = {
+      version: 1,
+      savedAt: Date.now(),
+      rooms: Array.from(rooms.entries()).map(([roomCode, room]) => [roomCode, serializeRoom(room)]),
+    };
+
+    writeFileSync(ROOM_STATE_FILE, JSON.stringify(payload, null, 2), "utf8");
+  } catch (error) {
+    console.log(`[persist save] ${error.message}`);
+  }
+}
+
+function loadPersistedRooms() {
+  try {
+    if (!existsSync(ROOM_STATE_FILE)) return;
+
+    const payload = JSON.parse(readFileSync(ROOM_STATE_FILE, "utf8"));
+    const entries = Array.isArray(payload.rooms) ? payload.rooms : [];
+
+    for (const [roomCode, roomData] of entries) {
+      if (!roomCode) continue;
+
+      rooms.set(String(roomCode).toUpperCase(), createRoomRecord(roomData));
+    }
+
+    console.log(`[persist load] ${rooms.size} room(s) restored from ${ROOM_STATE_FILE}`);
+  } catch (error) {
+    console.log(`[persist load] ${error.message}`);
+  }
+}
+
 function getRoom(roomCode) {
   const normalizedRoomCode = String(roomCode || "DEFAULT").toUpperCase();
 
   if (!rooms.has(normalizedRoomCode)) {
-    rooms.set(normalizedRoomCode, {
-      gameState: null,
-      clients: new Map(),
-      playerClaims: new Map(),
-      spotify: {
-        token: null,
-        refreshToken: null,
-        clientId: null,
-        deviceId: null,
-        deviceName: "",
-        playbackTimeout: null,
-      },
-      updatedAt: Date.now(),
-    });
+    rooms.set(normalizedRoomCode, createRoomRecord());
   }
 
   return {
@@ -942,36 +1087,86 @@ async function spotifyFetch(room, url, options = {}) {
   return response;
 }
 
+function getMainArtistName(artist = "") {
+  return String(artist)
+    .split(" feat.")[0]
+    .split(" ft.")[0]
+    .split(" featuring ")[0]
+    .split("&")[0]
+    .trim();
+}
+
+function scoreSpotifyCandidate(track, item) {
+  const wantedTitle = normalizeTrackText(track.title);
+  const wantedArtist = normalizeTrackText(getMainArtistName(track.artist));
+  const itemTitle = normalizeTrackText(item?.name);
+  const itemArtists = Array.isArray(item?.artists) ? item.artists.map((artist) => normalizeTrackText(artist.name)).join(" ") : "";
+
+  let score = 0;
+
+  if (itemTitle === wantedTitle) score += 8;
+  if (itemTitle.includes(wantedTitle) || wantedTitle.includes(itemTitle)) score += 3;
+  if (itemArtists.includes(wantedArtist)) score += 5;
+  if (item?.popularity) score += Math.min(3, Math.floor(item.popularity / 25));
+
+  return score;
+}
+
 async function searchSpotifyUriForRoom(room, track) {
   if (track.spotifyUri) return track.spotifyUri;
 
   const accessToken = await getRoomSpotifyAccessToken(room);
-  const mainArtist = String(track.artist || "").split(" feat.")[0].split(" ft.")[0].trim();
-  const query = `track:${track.title} artist:${mainArtist}`;
-  const params = new URLSearchParams({
-    q: query,
-    type: "track",
-    limit: "1",
-  });
+  const mainArtist = getMainArtistName(track.artist);
+  const searchQueries = [
+    `track:${track.title} artist:${mainArtist}`,
+    `"${track.title}" "${mainArtist}"`,
+    `${track.title} ${mainArtist}`,
+  ];
 
-  const response = await fetch(`https://api.spotify.com/v1/search?${params.toString()}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  let bestItem = null;
+  let bestScore = -1;
+  let lastError = "";
 
-  if (!response.ok) {
-    throw new Error(`Spotify Suche fehlgeschlagen: ${await readSpotifyError(response)}`);
+  for (const query of searchQueries) {
+    const params = new URLSearchParams({
+      q: query,
+      type: "track",
+      limit: "5",
+    });
+
+    const response = await fetch(`https://api.spotify.com/v1/search?${params.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      lastError = await readSpotifyError(response);
+      continue;
+    }
+
+    const data = await response.json();
+    const items = Array.isArray(data?.tracks?.items) ? data.tracks.items : [];
+
+    for (const item of items) {
+      if (!item?.uri) continue;
+
+      const score = scoreSpotifyCandidate(track, item);
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestItem = item;
+      }
+    }
+
+    if (bestItem && bestScore >= 8) break;
   }
 
-  const data = await response.json();
-  const item = data?.tracks?.items?.[0];
-
-  if (!item?.uri) {
-    throw new Error("Keinen passenden Spotify-Track gefunden.");
+  if (!bestItem?.uri) {
+    throw new Error(lastError ? `Keinen passenden Spotify-Track gefunden: ${lastError}` : "Keinen passenden Spotify-Track gefunden.");
   }
 
-  return item.uri;
+  return bestItem.uri;
 }
 
 function getRoomFromSpotifyPath(req) {
@@ -986,8 +1181,10 @@ async function handleRoomSpotifyStatus(req, res) {
   sendJson(res, 200, {
     roomCode,
     connected: Boolean(room.spotify?.token?.accessToken),
+    hasDevice: Boolean(room.spotify?.deviceId),
     deviceId: room.spotify?.deviceId || "",
     deviceName: room.spotify?.deviceName || "",
+    restoredRoom: Boolean(room.gameState),
   });
 }
 
@@ -1023,6 +1220,8 @@ async function handleRoomSpotifyDevice(req, res) {
 
     room.spotify.deviceId = deviceId;
     room.spotify.deviceName = deviceName;
+    room.updatedAt = Date.now();
+    savePersistedRooms();
 
     sendJson(res, 200, {
       roomCode,
@@ -1195,6 +1394,8 @@ const io = new Server(httpServer, {
   },
 });
 
+loadPersistedRooms();
+
 io.on("connection", (socket) => {
   let currentRoomCode = null;
 
@@ -1298,6 +1499,8 @@ io.on("connection", (socket) => {
     });
 
     result.room.clients.set(socket.id, client);
+    result.room.updatedAt = Date.now();
+    savePersistedRooms();
 
     socket.emit("room:claimResult", {
       ok: true,
@@ -1368,6 +1571,8 @@ io.on("connection", (socket) => {
 
       result.room.clients.set(socket.id, updatedClient);
     }
+
+    savePersistedRooms();
 
     broadcastState(currentRoomCode, result.room);
 
