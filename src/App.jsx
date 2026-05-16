@@ -730,6 +730,100 @@ const CATEGORY_EXPANSION_TRACKS = [
   { id: "c620", title: "No Time to Die", artist: "Billie Eilish", year: 2020, genre: "Movie Ballad" },
 ];
 
+
+const VINTAGE_EXPANSION_TRACKS = [
+  { id: "v621", title: "Rock Around the Clock", artist: "Bill Haley & His Comets", year: 1954, genre: "Rock and Roll" },
+  { id: "v622", title: "Tutti Frutti", artist: "Little Richard", year: 1955, genre: "Rock and Roll" },
+  { id: "v623", title: "Heartbreak Hotel", artist: "Elvis Presley", year: 1956, genre: "Rock and Roll" },
+  { id: "v624", title: "Jailhouse Rock", artist: "Elvis Presley", year: 1957, genre: "Rock and Roll" },
+  { id: "v625", title: "Great Balls of Fire", artist: "Jerry Lee Lewis", year: 1957, genre: "Rock and Roll" },
+  { id: "v626", title: "La Bamba", artist: "Ritchie Valens", year: 1958, genre: "Latin Rock" },
+  { id: "v627", title: "What'd I Say", artist: "Ray Charles", year: 1959, genre: "Soul" },
+  { id: "v628", title: "Only the Lonely", artist: "Roy Orbison", year: 1960, genre: "Pop Ballad" },
+  { id: "v629", title: "The Twist", artist: "Chubby Checker", year: 1960, genre: "Party Rock and Roll" },
+  { id: "v630", title: "Hit the Road Jack", artist: "Ray Charles", year: 1961, genre: "Soul" },
+  { id: "v631", title: "Can't Help Falling in Love", artist: "Elvis Presley", year: 1961, genre: "Pop Ballad" },
+  { id: "v632", title: "Twist and Shout", artist: "The Isley Brothers", year: 1962, genre: "Soul Rock" },
+  { id: "v633", title: "You've Really Got Me", artist: "The Kinks", year: 1964, genre: "Rock" },
+  { id: "v634", title: "I Get Around", artist: "The Beach Boys", year: 1964, genre: "Pop Rock" },
+  { id: "v635", title: "My Girl", artist: "The Temptations", year: 1964, genre: "Motown Soul" },
+  { id: "v636", title: "Mr. Tambourine Man", artist: "The Byrds", year: 1965, genre: "Folk Rock" },
+  { id: "v637", title: "I Got You (I Feel Good)", artist: "James Brown", year: 1965, genre: "Funk Soul" },
+  { id: "v638", title: "Like a Rolling Stone", artist: "Bob Dylan", year: 1965, genre: "Folk Rock" },
+  { id: "v639", title: "These Boots Are Made for Walkin'", artist: "Nancy Sinatra", year: 1966, genre: "Pop" },
+  { id: "v640", title: "Paint It Black", artist: "The Rolling Stones", year: 1966, genre: "Rock" },
+  { id: "v641", title: "Sunny Afternoon", artist: "The Kinks", year: 1966, genre: "Rock" },
+  { id: "v642", title: "I'm a Believer", artist: "The Monkees", year: 1966, genre: "Pop Rock" },
+  { id: "v643", title: "A Whiter Shade of Pale", artist: "Procol Harum", year: 1967, genre: "Rock Ballad" },
+  { id: "v644", title: "Light My Fire", artist: "The Doors", year: 1967, genre: "Rock" },
+  { id: "v645", title: "Happy Together", artist: "The Turtles", year: 1967, genre: "Pop Rock" },
+  { id: "v646", title: "Mrs. Robinson", artist: "Simon & Garfunkel", year: 1968, genre: "Folk Rock" },
+  { id: "v647", title: "Born to Be Wild", artist: "Steppenwolf", year: 1968, genre: "Rock" },
+  { id: "v648", title: "Sweet Caroline", artist: "Neil Diamond", year: 1969, genre: "Pop" },
+  { id: "v649", title: "Bad Moon Rising", artist: "Creedence Clearwater Revival", year: 1969, genre: "Rock" },
+  { id: "v650", title: "Whole Lotta Love", artist: "Led Zeppelin", year: 1969, genre: "Hard Rock" },
+  { id: "v651", title: "Bridge Over Troubled Water", artist: "Simon & Garfunkel", year: 1970, genre: "Folk Ballad" },
+  { id: "v652", title: "Lola", artist: "The Kinks", year: 1970, genre: "Rock" },
+  { id: "v653", title: "Ain't No Sunshine", artist: "Bill Withers", year: 1971, genre: "Soul" },
+  { id: "v654", title: "American Pie", artist: "Don McLean", year: 1971, genre: "Folk Rock" },
+  { id: "v655", title: "Take Me Home, Country Roads", artist: "John Denver", year: 1971, genre: "Country Folk" },
+  { id: "v656", title: "Let's Stay Together", artist: "Al Green", year: 1971, genre: "Soul" },
+  { id: "v657", title: "Rocket Man", artist: "Elton John", year: 1972, genre: "Pop Rock" },
+  { id: "v658", title: "Lean on Me", artist: "Bill Withers", year: 1972, genre: "Soul" },
+  { id: "v659", title: "Stuck in the Middle with You", artist: "Stealers Wheel", year: 1972, genre: "Rock" },
+  { id: "v660", title: "Live and Let Die", artist: "Wings", year: 1973, genre: "Movie Rock" },
+  { id: "v661", title: "Killing Me Softly with His Song", artist: "Roberta Flack", year: 1973, genre: "Soul Ballad" },
+  { id: "v662", title: "Piano Man", artist: "Billy Joel", year: 1973, genre: "Pop Rock" },
+  { id: "v663", title: "Jolene", artist: "Dolly Parton", year: 1973, genre: "Country" },
+  { id: "v664", title: "Rebel Rebel", artist: "David Bowie", year: 1974, genre: "Rock" },
+  { id: "v665", title: "Sweet Home Alabama", artist: "Lynyrd Skynyrd", year: 1974, genre: "Southern Rock" },
+  { id: "v666", title: "Kung Fu Fighting", artist: "Carl Douglas", year: 1974, genre: "Disco Pop" },
+  { id: "v667", title: "Fame", artist: "David Bowie", year: 1975, genre: "Funk Rock" },
+  { id: "v668", title: "Bohemian Rhapsody", artist: "Queen", year: 1975, genre: "Rock" },
+  { id: "v669", title: "December, 1963", artist: "The Four Seasons", year: 1975, genre: "Disco Pop" },
+  { id: "v670", title: "Don't Go Breaking My Heart", artist: "Elton John & Kiki Dee", year: 1976, genre: "Pop" },
+  { id: "v671", title: "Dancing in the Moonlight", artist: "King Harvest", year: 1972, genre: "Pop Rock" },
+  { id: "v672", title: "Blitzkrieg Bop", artist: "Ramones", year: 1976, genre: "Punk Rock" },
+  { id: "v673", title: "Go Your Own Way", artist: "Fleetwood Mac", year: 1977, genre: "Rock" },
+  { id: "v674", title: "Dreams", artist: "Fleetwood Mac", year: 1977, genre: "Rock" },
+  { id: "v675", title: "Heroes", artist: "David Bowie", year: 1977, genre: "Rock" },
+  { id: "v676", title: "Psycho Killer", artist: "Talking Heads", year: 1977, genre: "New Wave" },
+  { id: "v677", title: "Mr. Blue Sky", artist: "Electric Light Orchestra", year: 1977, genre: "Pop Rock" },
+  { id: "v678", title: "Sultans of Swing", artist: "Dire Straits", year: 1978, genre: "Rock" },
+  { id: "v679", title: "September", artist: "Earth, Wind & Fire", year: 1978, genre: "Disco Funk" },
+  { id: "v680", title: "Heart of Glass", artist: "Blondie", year: 1978, genre: "New Wave Disco" },
+  { id: "v681", title: "Don't Stop Me Now", artist: "Queen", year: 1978, genre: "Rock" },
+  { id: "v682", title: "Message in a Bottle", artist: "The Police", year: 1979, genre: "New Wave Rock" },
+  { id: "v683", title: "Video Killed the Radio Star", artist: "The Buggles", year: 1979, genre: "New Wave Pop" },
+  { id: "v684", title: "Rapper's Delight", artist: "The Sugarhill Gang", year: 1979, genre: "Hip Hop" },
+  { id: "v685", title: "Call Me", artist: "Blondie", year: 1980, genre: "New Wave Rock" },
+  { id: "v686", title: "Upside Down", artist: "Diana Ross", year: 1980, genre: "Disco Pop" },
+  { id: "v687", title: "Just the Two of Us", artist: "Grover Washington Jr. feat. Bill Withers", year: 1980, genre: "Soul" },
+  { id: "v688", title: "Start Me Up", artist: "The Rolling Stones", year: 1981, genre: "Rock" },
+  { id: "v689", title: "Physical", artist: "Olivia Newton-John", year: 1981, genre: "Pop" },
+  { id: "v690", title: "Centerfold", artist: "The J. Geils Band", year: 1981, genre: "Rock" },
+  { id: "v691", title: "Come On Eileen", artist: "Dexys Midnight Runners", year: 1982, genre: "Pop" },
+  { id: "v692", title: "Maneater", artist: "Daryl Hall & John Oates", year: 1982, genre: "Pop Rock" },
+  { id: "v693", title: "Sweet Dreams", artist: "Eurythmics", year: 1983, genre: "Synthpop" },
+  { id: "v694", title: "Blue Monday", artist: "New Order", year: 1983, genre: "Electronic" },
+  { id: "v695", title: "Karma Chameleon", artist: "Culture Club", year: 1983, genre: "Pop" },
+  { id: "v696", title: "Jump", artist: "Van Halen", year: 1984, genre: "Rock" },
+  { id: "v697", title: "Smalltown Boy", artist: "Bronski Beat", year: 1984, genre: "Synthpop" },
+  { id: "v698", title: "Take On Me", artist: "a-ha", year: 1985, genre: "Synthpop" },
+  { id: "v699", title: "Everybody Wants to Rule the World", artist: "Tears for Fears", year: 1985, genre: "Pop Rock" },
+  { id: "v700", title: "Money for Nothing", artist: "Dire Straits", year: 1985, genre: "Rock" },
+  { id: "v701", title: "West End Girls", artist: "Pet Shop Boys", year: 1985, genre: "Synthpop" },
+  { id: "v702", title: "You Give Love a Bad Name", artist: "Bon Jovi", year: 1986, genre: "Rock" },
+  { id: "v703", title: "The Lady in Red", artist: "Chris de Burgh", year: 1986, genre: "Pop Ballad" },
+  { id: "v704", title: "Don't Dream It's Over", artist: "Crowded House", year: 1986, genre: "Pop Rock" },
+  { id: "v705", title: "Beds Are Burning", artist: "Midnight Oil", year: 1987, genre: "Rock" },
+  { id: "v706", title: "Never Tear Us Apart", artist: "INXS", year: 1987, genre: "Rock Ballad" },
+  { id: "v707", title: "Man in the Mirror", artist: "Michael Jackson", year: 1987, genre: "Pop" },
+  { id: "v708", title: "The Look", artist: "Roxette", year: 1988, genre: "Pop Rock" },
+  { id: "v709", title: "Buffalo Stance", artist: "Neneh Cherry", year: 1988, genre: "Hip Hop Pop" },
+  { id: "v710", title: "Personal Jesus", artist: "Depeche Mode", year: 1989, genre: "Alternative" },
+];
+
 const initialGameState = {
   phase: "lobby",
   room: null,
@@ -747,6 +841,7 @@ const initialGameState = {
   showDebugSong: false,
   discardedTracks: [],
   usedTrackIds: [],
+  usedTrackKeys: [],
   overtime: false,
   gameLog: [],
   eventHistory: [],
@@ -862,8 +957,74 @@ function createRoomCode() {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
 }
 
+function getRandomFloat() {
+  try {
+    if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+      const values = new Uint32Array(1);
+      crypto.getRandomValues(values);
+      return values[0] / 4294967296;
+    }
+  } catch {
+    // fallback
+  }
+
+  return Math.random();
+}
+
 function shuffle(array) {
-  return [...array].sort(() => Math.random() - 0.5);
+  const result = [...array];
+
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(getRandomFloat() * (index + 1));
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+
+  return result;
+}
+
+function getEraBucket(track) {
+  const year = Number(track?.year || 0);
+
+  if (year < 1960) return "1950er";
+  if (year < 1970) return "1960er";
+  if (year < 1980) return "1970er";
+  if (year < 1990) return "1980er";
+  if (year < 2000) return "1990er";
+  if (year < 2010) return "2000er";
+  if (year < 2020) return "2010er";
+
+  return "2020er";
+}
+
+function buildBalancedDeck(tracks) {
+  const buckets = new Map();
+
+  for (const track of shuffle(tracks)) {
+    const bucket = getEraBucket(track);
+    const group = buckets.get(bucket) || [];
+    group.push(track);
+    buckets.set(bucket, group);
+  }
+
+  const bucketOrder = shuffle(Array.from(buckets.keys()));
+  const result = [];
+
+  while (buckets.size > 0) {
+    for (const bucket of [...bucketOrder]) {
+      const group = buckets.get(bucket);
+
+      if (!group || group.length === 0) {
+        buckets.delete(bucket);
+        continue;
+      }
+
+      result.push(group.shift());
+
+      if (group.length === 0) buckets.delete(bucket);
+    }
+  }
+
+  return result;
 }
 
 function sortTimeline(timeline) {
@@ -968,10 +1129,15 @@ function getUsedTrackIdSet(state) {
   return new Set(Array.isArray(state.usedTrackIds) ? state.usedTrackIds : []);
 }
 
+function getUsedTrackKeySet(state) {
+  return new Set(Array.isArray(state.usedTrackKeys) ? state.usedTrackKeys : []);
+}
+
 function filterUnusedDeck(deck, state) {
   const usedTrackIds = getUsedTrackIdSet(state);
+  const usedTrackKeys = getUsedTrackKeySet(state);
 
-  return (Array.isArray(deck) ? deck : []).filter((track) => !usedTrackIds.has(track.id));
+  return (Array.isArray(deck) ? deck : []).filter((track) => !usedTrackIds.has(track.id) && !usedTrackKeys.has(getTrackDedupeKey(track)));
 }
 
 function addEvent(state, type, details = "") {
@@ -1012,8 +1178,9 @@ function gameReducer(state, action) {
         },
         players,
         usedTrackIds: state.usedTrackIds || [],
+        usedTrackKeys: state.usedTrackKeys || [],
         overtime: false,
-        deck: shuffle(deck),
+        deck: buildBalancedDeck(deck),
         targetScore: Number(action.targetScore || state.targetScore || 10),
         maxTurns: Number(action.maxTurns ?? state.maxTurns ?? 0),
         playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || state.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS))),
@@ -1043,7 +1210,7 @@ function gameReducer(state, action) {
         },
         players,
         activePlayerIndex: Math.max(0, players.findIndex((player) => player.name === action.startPlayerName)),
-        deck: shuffle(action.deck),
+        deck: buildBalancedDeck(action.deck),
         targetScore: Number(action.targetScore || 10),
         maxTurns: Number(action.maxTurns || 0),
         playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS))),
@@ -1071,6 +1238,7 @@ function gameReducer(state, action) {
           currentTrack: nextTrack,
           deck: remainingDeck,
           usedTrackIds: Array.from(new Set([...(state.usedTrackIds || []), nextTrack.id])),
+          usedTrackKeys: Array.from(new Set([...(state.usedTrackKeys || []), getTrackDedupeKey(nextTrack)])),
           selectedInsertIndex: null,
           lastResult: null,
           showDebugSong: false,
@@ -1864,6 +2032,19 @@ function filterDeckByPreset(tracks, presetId) {
   return [...padded, ...finalFallback].slice(0, Math.min(tracks.length, MIN_THEME_DECK_SIZE));
 }
 
+function getDeckEraSummary(tracks) {
+  const counts = tracks.reduce((acc, track) => {
+    const bucket = getEraBucket(track);
+    acc[bucket] = (acc[bucket] || 0) + 1;
+    return acc;
+  }, {});
+
+  return Object.entries(counts)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([era, count]) => `${era}: ${count}`)
+    .join(" · ");
+}
+
 function getViewerRoleFromPlayer(viewerPlayerId, gameState) {
   if (!viewerPlayerId || viewerPlayerId === "spectator") return "spectator";
 
@@ -2033,7 +2214,7 @@ export default function App() {
   const lastRemoteStateRef = useRef("");
   const lastEmittedStateRef = useRef("");
 
-  const fullDeck = useMemo(() => dedupeTrackDeck([...BASE_TRACK_DECK, ...THEME_TRACK_DECK, ...CATEGORY_EXPANSION_TRACKS, ...customTracks]), [customTracks]);
+  const fullDeck = useMemo(() => dedupeTrackDeck([...BASE_TRACK_DECK, ...THEME_TRACK_DECK, ...CATEGORY_EXPANSION_TRACKS, ...VINTAGE_EXPANSION_TRACKS, ...customTracks]), [customTracks]);
   const presetDeck = useMemo(() => filterDeckByPreset(fullDeck, selectedPreset), [fullDeck, selectedPreset]);
   const availableDeck = useMemo(() => filterDeckByDifficulty(presetDeck, selectedDifficulty), [presetDeck, selectedDifficulty]);
 
@@ -2538,6 +2719,7 @@ export default function App() {
                 selectedDifficulty={selectedDifficulty}
                 setSelectedDifficulty={setSelectedDifficulty}
                 presetDeckCount={presetDeck.length}
+                deckEraSummary={getDeckEraSummary(availableDeck)}
                 roomCode={roomCode}
                 setRoomCode={setRoomCode}
               />
@@ -3461,6 +3643,7 @@ function LobbyCard({
   selectedDifficulty,
   setSelectedDifficulty,
   presetDeckCount,
+  deckEraSummary,
   roomCode,
   setRoomCode,
 }) {
@@ -3573,8 +3756,13 @@ function LobbyCard({
             <span style={{ display: "block", color: colors.muted, fontSize: 12 }}>Aktives Deck</span>
             <strong>{availableDeck.length} Songs</strong>
             <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 11 }}>
-              {presetDeckCount} vor Schwierigkeit · Dubletten entfernt
+              {presetDeckCount} vor Schwierigkeit · Dubletten entfernt · Epochen gemischt
             </p>
+            {deckEraSummary && (
+              <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 10, lineHeight: 1.25 }}>
+                {deckEraSummary}
+              </p>
+            )}
           </div>
 
           <div style={{ display: "grid", gap: 8 }}>

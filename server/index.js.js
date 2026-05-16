@@ -33,6 +33,7 @@ const initialGameState = {
   showDebugSong: false,
   discardedTracks: [],
   usedTrackIds: [],
+  usedTrackKeys: [],
   overtime: false,
   gameLog: [],
   eventHistory: [],
@@ -48,11 +49,76 @@ function createRoomCode() {
 }
 
 function shuffle(array) {
-  return [...array].sort(() => Math.random() - 0.5);
+  const result = [...array];
+
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = crypto.randomInt(index + 1);
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+
+  return result;
+}
+
+function getEraBucket(track) {
+  const year = Number(track?.year || 0);
+
+  if (year < 1960) return "1950er";
+  if (year < 1970) return "1960er";
+  if (year < 1980) return "1970er";
+  if (year < 1990) return "1980er";
+  if (year < 2000) return "1990er";
+  if (year < 2010) return "2000er";
+  if (year < 2020) return "2010er";
+
+  return "2020er";
+}
+
+function buildBalancedDeck(tracks) {
+  const buckets = new Map();
+
+  for (const track of shuffle(tracks)) {
+    const bucket = getEraBucket(track);
+    const group = buckets.get(bucket) || [];
+    group.push(track);
+    buckets.set(bucket, group);
+  }
+
+  const bucketOrder = shuffle(Array.from(buckets.keys()));
+  const result = [];
+
+  while (buckets.size > 0) {
+    for (const bucket of [...bucketOrder]) {
+      const group = buckets.get(bucket);
+
+      if (!group || group.length === 0) {
+        buckets.delete(bucket);
+        continue;
+      }
+
+      result.push(group.shift());
+
+      if (group.length === 0) buckets.delete(bucket);
+    }
+  }
+
+  return result;
 }
 
 function sortTimeline(timeline) {
   return [...timeline].sort((a, b) => a.year - b.year || a.title.localeCompare(b.title));
+}
+
+function normalizeTrackText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function getTrackDedupeKey(track) {
+  return `${normalizeTrackText(track?.title)}::${normalizeTrackText(track?.artist)}`;
 }
 
 function createInitialPlayers(names) {
@@ -142,10 +208,15 @@ function getUsedTrackIdSet(state) {
   return new Set(Array.isArray(state.usedTrackIds) ? state.usedTrackIds : []);
 }
 
+function getUsedTrackKeySet(state) {
+  return new Set(Array.isArray(state.usedTrackKeys) ? state.usedTrackKeys : []);
+}
+
 function filterUnusedDeck(deck, state) {
   const usedTrackIds = getUsedTrackIdSet(state);
+  const usedTrackKeys = getUsedTrackKeySet(state);
 
-  return (Array.isArray(deck) ? deck : []).filter((track) => !usedTrackIds.has(track.id));
+  return (Array.isArray(deck) ? deck : []).filter((track) => !usedTrackIds.has(track.id) && !usedTrackKeys.has(getTrackDedupeKey(track)));
 }
 
 function addEvent(state, type, details = "") {
@@ -183,8 +254,9 @@ function gameReducer(state, action) {
         },
         players,
         usedTrackIds: state.usedTrackIds || [],
+        usedTrackKeys: state.usedTrackKeys || [],
         overtime: false,
-        deck: shuffle(deck),
+        deck: buildBalancedDeck(deck),
         targetScore: Number(action.targetScore || state.targetScore || 10),
         maxTurns: Number(action.maxTurns ?? state.maxTurns ?? 0),
         playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || state.playLimitSeconds || DEFAULT_PLAY_LIMIT_SECONDS))),
@@ -216,7 +288,7 @@ function gameReducer(state, action) {
         },
         players,
         activePlayerIndex: Math.max(0, players.findIndex((player) => player.name === action.startPlayerName)),
-        deck: shuffle(deck),
+        deck: buildBalancedDeck(deck),
         targetScore: Number(action.targetScore || 10),
         maxTurns: Number(action.maxTurns || 0),
         playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || DEFAULT_PLAY_LIMIT_SECONDS))),
@@ -244,6 +316,7 @@ function gameReducer(state, action) {
           currentTrack: nextTrack,
           deck: remainingDeck,
           usedTrackIds: Array.from(new Set([...(state.usedTrackIds || []), nextTrack.id])),
+          usedTrackKeys: Array.from(new Set([...(state.usedTrackKeys || []), getTrackDedupeKey(nextTrack)])),
           selectedInsertIndex: null,
           lastResult: null,
           showDebugSong: false,
