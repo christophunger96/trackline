@@ -122,8 +122,35 @@ function normalizeTrackText(value) {
     .trim();
 }
 
+function getTrackTitleKey(track) {
+  return normalizeTrackText(track?.title)
+    .replace(/\b(remaster(ed)?|radio edit|single version|album version|live|mono|stereo|explicit|clean)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function getTrackDedupeKey(track) {
-  return `${normalizeTrackText(track?.title)}::${normalizeTrackText(track?.artist)}`;
+  return getTrackTitleKey(track);
+}
+
+function dedupeTrackDeck(tracks) {
+  const seenTitles = new Set();
+  const result = [];
+
+  for (const track of Array.isArray(tracks) ? tracks : []) {
+    const key = getTrackDedupeKey(track);
+
+    if (!key || seenTitles.has(key)) continue;
+
+    seenTitles.add(key);
+    result.push(track);
+  }
+
+  return result;
+}
+
+function preparePlayableDeck(tracks) {
+  return shuffle(dedupeTrackDeck(tracks));
 }
 
 function createInitialPlayers(names) {
@@ -276,7 +303,7 @@ function gameReducer(state, action) {
     case "NEW_ROUND": {
       if (!state.players.length || !state.room) return state;
 
-      const deck = filterUnusedDeck(action.deck, state);
+      const deck = dedupeTrackDeck(filterUnusedDeck(action.deck, state));
       const players = resetPlayersForNewRound(state.players);
 
       const nextState = {
@@ -291,7 +318,7 @@ function gameReducer(state, action) {
         usedTrackIds: state.usedTrackIds || [],
         usedTrackKeys: state.usedTrackKeys || [],
         overtime: false,
-        deck: buildBalancedDeck(deck),
+        deck: preparePlayableDeck(deck),
         targetScore: Number(action.targetScore || state.targetScore || 10),
         maxTurns: Number(action.maxTurns ?? state.maxTurns ?? 0),
         playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || state.playLimitSeconds || DEFAULT_PLAY_LIMIT_SECONDS))),
@@ -323,7 +350,7 @@ function gameReducer(state, action) {
         },
         players,
         activePlayerIndex: Math.max(0, players.findIndex((player) => player.name === action.startPlayerName)),
-        deck: buildBalancedDeck(deck),
+        deck: preparePlayableDeck(deck),
         targetScore: Number(action.targetScore || 10),
         maxTurns: Number(action.maxTurns || 0),
         playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || DEFAULT_PLAY_LIMIT_SECONDS))),

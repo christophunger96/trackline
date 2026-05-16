@@ -1281,7 +1281,7 @@ function gameReducer(state, action) {
     case "NEW_ROUND": {
       if (!state.players.length || !state.room) return state;
 
-      const deck = filterUnusedDeck(action.deck, state);
+      const deck = dedupeTrackDeck(filterUnusedDeck(action.deck, state));
       const players = resetPlayersForNewRound(state.players);
 
       const nextState = {
@@ -1296,7 +1296,7 @@ function gameReducer(state, action) {
         usedTrackIds: state.usedTrackIds || [],
         usedTrackKeys: state.usedTrackKeys || [],
         overtime: false,
-        deck: buildBalancedDeck(deck),
+        deck: preparePlayableDeck(deck),
         targetScore: Number(action.targetScore || state.targetScore || 10),
         maxTurns: Number(action.maxTurns ?? state.maxTurns ?? 0),
         playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || state.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS))),
@@ -1326,7 +1326,7 @@ function gameReducer(state, action) {
         },
         players,
         activePlayerIndex: Math.max(0, players.findIndex((player) => player.name === action.startPlayerName)),
-        deck: buildBalancedDeck(action.deck),
+        deck: preparePlayableDeck(action.deck),
         targetScore: Number(action.targetScore || 10),
         maxTurns: Number(action.maxTurns || 0),
         playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS))),
@@ -2168,24 +2168,35 @@ function normalizeTrackText(value) {
     .trim();
 }
 
+function getTrackTitleKey(track) {
+  return normalizeTrackText(track?.title)
+    .replace(/\b(remaster(ed)?|radio edit|single version|album version|live|mono|stereo|explicit|clean)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function getTrackDedupeKey(track) {
-  return `${normalizeTrackText(track.title)}::${normalizeTrackText(track.artist)}`;
+  return getTrackTitleKey(track);
 }
 
 function dedupeTrackDeck(tracks) {
-  const seen = new Set();
+  const seenTitles = new Set();
   const result = [];
 
   for (const track of tracks) {
     const key = getTrackDedupeKey(track);
 
-    if (!key || seen.has(key)) continue;
+    if (!key || seenTitles.has(key)) continue;
 
-    seen.add(key);
+    seenTitles.add(key);
     result.push(track);
   }
 
   return result;
+}
+
+function preparePlayableDeck(tracks) {
+  return shuffle(dedupeTrackDeck(tracks));
 }
 
 function getTrackDifficultyScore(track) {
@@ -2445,8 +2456,8 @@ export default function App() {
   const lastEmittedStateRef = useRef("");
 
   const fullDeck = useMemo(() => dedupeTrackDeck([...BASE_TRACK_DECK, ...THEME_TRACK_DECK, ...CATEGORY_EXPANSION_TRACKS, ...VINTAGE_EXPANSION_TRACKS, ...ERA_BALANCE_EXPANSION_TRACKS, ...customTracks]), [customTracks]);
-  const presetDeck = useMemo(() => filterDeckByPreset(fullDeck, selectedPreset), [fullDeck, selectedPreset]);
-  const availableDeck = useMemo(() => filterDeckByDifficulty(presetDeck, selectedDifficulty), [presetDeck, selectedDifficulty]);
+  const presetDeck = useMemo(() => dedupeTrackDeck(filterDeckByPreset(fullDeck, selectedPreset)), [fullDeck, selectedPreset]);
+  const availableDeck = useMemo(() => dedupeTrackDeck(filterDeckByDifficulty(presetDeck, selectedDifficulty)), [presetDeck, selectedDifficulty]);
 
   const activePlayer = gameState.players[gameState.activePlayerIndex];
   const activeTimeline = activePlayer ? sortTimeline(activePlayer.timeline) : [];
