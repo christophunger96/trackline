@@ -5557,12 +5557,16 @@ function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supa
     return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
   }
 
+  function getPreferredRoomName() {
+    return getAuthDisplayName(authSession) || name;
+  }
+
   function createRoom() {
     const nextCode = normalizeCode(createdCode) || createRoomCode();
 
     onEnter({
       mode: "create",
-      name,
+      name: getPreferredRoomName(),
       roomCode: nextCode,
     });
   }
@@ -5577,7 +5581,7 @@ function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supa
 
     onEnter({
       mode: "join",
-      name,
+      name: getPreferredRoomName(),
       roomCode: nextCode,
     });
   }
@@ -5589,10 +5593,10 @@ function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supa
   useEffect(() => {
     const authName = getAuthDisplayName(authSession);
 
-    if (authName && !name.trim()) {
+    if (authName && name !== authName) {
       setName(authName);
     }
-  }, [authSession?.user?.id]);
+  }, [authSession?.user?.id, authSession?.user?.user_metadata?.display_name]);
 
   const canContinue = String(name || "").trim().length > 0;
 
@@ -5635,7 +5639,13 @@ function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supa
 
               <label style={{ display: "grid", gap: 8 }}>
                 <span style={{ color: colors.muted, fontSize: 13 }}>Dein Name</span>
-                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="z. B. Christoph" />
+                <Input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="z. B. Christoph"
+                  readOnly={Boolean(authSession)}
+                  title={authSession ? "Bei Login wird der Profilname verwendet." : ""}
+                />
               </label>
 
               <label style={{ display: "grid", gap: 8 }}>
@@ -5666,7 +5676,13 @@ function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supa
 
               <label style={{ display: "grid", gap: 8 }}>
                 <span style={{ color: colors.muted, fontSize: 13 }}>Dein Name</span>
-                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="z. B. Alex" />
+                <Input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="z. B. Alex"
+                  readOnly={Boolean(authSession)}
+                  title={authSession ? "Bei Login wird der Profilname verwendet." : ""}
+                />
               </label>
 
               <label style={{ display: "grid", gap: 8 }}>
