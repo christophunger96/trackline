@@ -107,6 +107,11 @@ function getFunctionBaseUrl(req: Request) {
   const url = new URL(req.url);
   const pathname = url.pathname;
 
+  // Supabase Edge Functions may expose the request internally as http.
+  // Spotify, however, must receive the public HTTPS redirect URI exactly
+  // as configured in the Spotify Developer Dashboard.
+  url.protocol = "https:";
+
   if (pathname.includes("/spotify/")) {
     url.pathname = pathname.replace(/\/spotify\/.*$/, "");
   } else if (pathname.includes("/room/")) {
@@ -122,7 +127,29 @@ function getCallbackUrl(req: Request) {
 }
 
 function safeJsonError(error: unknown) {
-  return error instanceof Error ? error.message : String(error || "Unbekannter Fehler");
+  if (error instanceof Error) return error.message;
+
+  if (error && typeof error === "object") {
+    const anyError = error as Record<string, unknown>;
+    const parts = [
+      anyError.message,
+      anyError.details,
+      anyError.hint,
+      anyError.code ? `Code: ${anyError.code}` : "",
+    ]
+      .filter(Boolean)
+      .map(String);
+
+    if (parts.length) return parts.join(" · ");
+
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return String(error);
+    }
+  }
+
+  return String(error || "Unbekannter Fehler");
 }
 
 async function spotifyTokenRequest(form: URLSearchParams) {
@@ -155,18 +182,42 @@ async function getRoomSpotify(admin: ReturnType<typeof createClient>, roomCode: 
 }
 
 async function saveRoomSpotify(admin: ReturnType<typeof createClient>, roomCode: string, patch: Record<string, unknown>) {
+  const payload = {
+    ...patch,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data: existing, error: selectError } = await admin
+    .from("room_spotify")
+    .select("room_code")
+    .eq("room_code", roomCode)
+    .maybeSingle();
+
+  if (selectError) throw selectError;
+
+  if (existing?.room_code) {
+    const { error } = await admin
+      .from("room_spotify")
+      .update(payload)
+      .eq("room_code", roomCode);
+
+    if (error) throw error;
+    return;
+  }
+
+  const clientId = String(payload.client_id || "").trim();
+
+  if (!clientId) {
+    throw new Error("Spotify client_id fehlt beim Erstellen des Raum-Spotify-Eintrags.");
+  }
+
   const { error } = await admin
     .from("room_spotify")
-    .upsert(
-      {
-        room_code: roomCode,
-        ...patch,
-        updated_at: new Date().toISOString(),
-      },
-      {
-        onConflict: "room_code",
-      },
-    );
+    .insert({
+      room_code: roomCode,
+      ...payload,
+      client_id: clientId,
+    });
 
   if (error) throw error;
 }
@@ -382,11 +433,16 @@ async function callback(req: Request) {
       .eq("login_id", state);
 
     return html(`
-      <html>
+      <!doctype html>
+      <html lang="de">
+        <head>
+          <meta charset="utf-8" />
+          <title>Trackline Spotify</title>
+        </head>
         <body style="font-family: system-ui; background:#020617; color:#f8fafc; display:grid; place-items:center; min-height:100vh;">
           <main style="max-width:560px; padding:24px; border:1px solid #1e293b; border-radius:18px; background:#0f172a;">
             <h1>Spotify verbunden</h1>
-            <p>Du kannst dieses Fenster schließen und zu Trackline zurückkehren.</p>
+            <p>Du kannst dieses Fenster schliessen und zu Trackline zurueckkehren.</p>
           </main>
         </body>
       </html>
