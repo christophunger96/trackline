@@ -42,7 +42,7 @@ const SYNC_SOCKET_URL_STORAGE_KEY = "trackline.sync.socketUrl";
 const SYNC_ENABLED_STORAGE_KEY = "trackline.sync.enabled";
 const CLIENT_INSTANCE_ID_STORAGE_KEY = "trackline.clientInstanceId.v1";
 const VIEWER_PLAYER_STORAGE_PREFIX = "trackline.viewerPlayer.v1.";
-const DEFAULT_SYNC_SOCKET_URL = import.meta.env?.VITE_SOCKET_URL || "optional: https://dein-render-server.onrender.com";
+const DEFAULT_SYNC_SOCKET_URL = import.meta.env?.VITE_SOCKET_URL || "nicht mehr nötig, nur Legacy-Fallback";
 const SUPABASE_URL_STORAGE_KEY = "trackline.supabase.url";
 const SUPABASE_ANON_KEY_STORAGE_KEY = "trackline.supabase.anonKey";
 const SUPABASE_ENABLED_STORAGE_KEY = "trackline.supabase.enabled";
@@ -3239,6 +3239,22 @@ function normalizeSupabaseUrl(url = "") {
   return String(url || "").trim().replace(/\/+$/, "");
 }
 
+
+function getSupabaseSpotifyFunctionUrl(config) {
+  const supabaseUrl = normalizeSupabaseUrl(config?.url);
+
+  if (!supabaseUrl) return "";
+
+  try {
+    const url = new URL(supabaseUrl);
+    const host = url.host.replace(".supabase.co", ".functions.supabase.co");
+
+    return `${url.protocol}//${host}/trackline-spotify`;
+  } catch {
+    return "";
+  }
+}
+
 function isSupabaseConfigured(config) {
   return Boolean(config?.enabled && normalizeSupabaseUrl(config.url) && String(config.anonKey || "").trim());
 }
@@ -3831,6 +3847,7 @@ export default function App() {
   const activeTimeline = activePlayer ? sortTimeline(activePlayer.timeline) : [];
   const winner = getFinalWinner(gameState.players, gameState.targetScore);
   const activeRoomCode = gameState.room?.code || roomCode;
+  const spotifyHelperUrl = getSupabaseSpotifyFunctionUrl(supabaseConfig) || socketUrl;
 
   const resolvedViewerPlayerId = (() => {
     if (viewerPlayerId === "auto-host") return gameState.room?.hostPlayerId || "spectator";
@@ -4216,10 +4233,10 @@ export default function App() {
 
   async function requestRoomSpotifyPlayback(playLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS) {
     const activeRoomCode = gameState.room?.code || roomCode;
-    const serverBaseUrl = String(socketUrl || "").trim().replace(/\/+$/, "");
+    const serverBaseUrl = String(spotifyHelperUrl || "").trim().replace(/\/+$/, "");
 
     if (!serverBaseUrl) {
-      window.alert("Optionaler Spotify/Auth Server fehlt. Der Host muss die Server-URL setzen.");
+      window.alert("Supabase Spotify Function fehlt. Prüfe Supabase-Konfiguration oder deploye die Edge Function.");
       return;
     }
 
@@ -4236,6 +4253,7 @@ export default function App() {
         },
         body: JSON.stringify({
           playLimitSeconds,
+          track: gameState.currentTrack,
         }),
       });
 
@@ -4575,7 +4593,7 @@ export default function App() {
                 canPlayTrack={viewerPermissions.canPlayTrack}
                 canManageSpotify={showAdminPanels}
                 roomCode={gameState.room?.code || roomCode}
-                spotifyAuthServerUrl={socketUrl}
+                spotifyAuthServerUrl={spotifyHelperUrl}
                 roundPlayLimitSeconds={gameState.playLimitSeconds}
                 onPlaybackRequested={() =>
                   sendGameAction({
@@ -5481,7 +5499,7 @@ function MultiplayerSyncCard({ roomCode, socketUrl, setSocketUrl, syncEnabled, s
             <Badge variant="secondary">Supabase Spielsync</Badge>
             <h2 style={{ margin: "10px 0 6px" }}>GameState über Supabase synchronisieren</h2>
             <p style={{ margin: 0, color: colors.muted }}>
-              Verbindet alle Browser mit gleichem Raumcode über Supabase. Render/Socket.io wird für den Spielsync nicht mehr genutzt.
+              Verbindet alle Browser mit gleichem Raumcode über Supabase. Render/Socket.io wird für den Spielsync nicht mehr genutzt. Spotify läuft jetzt über Supabase Edge Functions.
             </p>
           </div>
 
@@ -5493,11 +5511,11 @@ function MultiplayerSyncCard({ roomCode, socketUrl, setSocketUrl, syncEnabled, s
 
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, alignItems: "end" }}>
           <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: colors.muted, fontSize: 14 }}>Optionaler Spotify/Auth Server</span>
+            <span style={{ color: colors.muted, fontSize: 14 }}>Legacy Spotify/Auth Server</span>
             <Input
               value={socketUrl}
               onChange={(event) => setSocketUrl(event.target.value)}
-              placeholder="optional: https://dein-render-server.onrender.com"
+              placeholder="nicht mehr nötig, nur Legacy-Fallback"
             />
           </label>
 
@@ -5551,7 +5569,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
   function getSpotifyServerRedirectUri() {
     const baseUrl = getSpotifyAuthServerBaseUrl();
 
-    if (!baseUrl) return "Optionaler Spotify/Auth Server fehlt";
+    if (!baseUrl) return "Legacy Spotify/Auth Server fehlt";
 
     return `${baseUrl}/spotify/callback`;
   }
@@ -5560,7 +5578,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
     const baseUrl = getSpotifyAuthServerBaseUrl();
 
     if (!baseUrl) {
-      throw new Error("Optionaler Spotify/Auth Server fehlt.");
+      throw new Error("Legacy Spotify/Auth Server fehlt.");
     }
 
     return `${baseUrl}/room/${encodeURIComponent(roomCode)}/spotify${path}`;
@@ -5728,7 +5746,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
     const baseUrl = getSpotifyAuthServerBaseUrl();
 
     if (!baseUrl) {
-      throw new Error("Bitte zuerst eine Optionaler Spotify/Auth Server eintragen.");
+      throw new Error("Bitte zuerst eine Legacy Spotify/Auth Server eintragen.");
     }
 
     const response = await fetch(`${baseUrl}/spotify/create-login`, {
@@ -5871,7 +5889,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
 
     try {
       setIsBusy(true);
-      setStatus("Server startet den verdeckten Song auf dem gespeicherten Spotify-Geraet...");
+      setStatus("Spotify-Helfer startet den aktuellen Supabase-Song auf dem gespeicherten Spotify-Geraet...");
 
       const response = await fetch(getRoomSpotifyUrl("/play"), {
         method: "POST",
@@ -5880,6 +5898,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
         },
         body: JSON.stringify({
           playLimitSeconds,
+          track: currentTrack,
         }),
       });
 
