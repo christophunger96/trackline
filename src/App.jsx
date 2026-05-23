@@ -4363,6 +4363,24 @@ function getGameStateSyncVersion(state) {
   return String(state?.syncMeta?.version || "");
 }
 
+function getNumericSyncVersion(version) {
+  const numericVersion = Number(version);
+
+  return Number.isFinite(numericVersion) ? numericVersion : 0;
+}
+
+function isRemoteSyncVersionNewer(remoteVersion, localVersion) {
+  if (!remoteVersion) return false;
+  if (!localVersion) return true;
+
+  const remoteNumeric = getNumericSyncVersion(remoteVersion);
+  const localNumeric = getNumericSyncVersion(localVersion);
+
+  if (remoteNumeric && localNumeric) return remoteNumeric > localNumeric;
+
+  return remoteVersion !== localVersion;
+}
+
 async function upsertSupabaseGameState(config, roomCode, nextState, action = {}, trackCatalogById = null) {
   if (!isSupabaseConfigured(config)) {
     return {
@@ -4512,6 +4530,8 @@ export default function App() {
   const lastRemoteStateRef = useRef("");
   const lastEmittedStateRef = useRef("");
   const currentGameStateRef = useRef(gameState);
+  const pendingSupabaseWriteTimeoutRef = useRef(null);
+  const latestPendingSupabaseWriteRef = useRef(null);
   const roomSpotifyAutoPauseTimeoutRef = useRef(null);
 
   const fullDeck = useMemo(() => dedupeTrackDeck([...BASE_TRACK_DECK, ...THEME_TRACK_DECK, ...CATEGORY_EXPANSION_TRACKS, ...VINTAGE_EXPANSION_TRACKS, ...ERA_BALANCE_EXPANSION_TRACKS, ...SONGPOOL_1000_EXPANSION_TRACKS, ...customTracks]), [customTracks]);
@@ -4563,6 +4583,10 @@ export default function App() {
 
   useEffect(() => {
     return () => {
+      if (pendingSupabaseWriteTimeoutRef.current) {
+        window.clearTimeout(pendingSupabaseWriteTimeoutRef.current);
+      }
+
       if (roomSpotifyAutoPauseTimeoutRef.current) {
         window.clearTimeout(roomSpotifyAutoPauseTimeoutRef.current);
       }
@@ -4728,6 +4752,11 @@ export default function App() {
         const localVersion = getGameStateSyncVersion(currentGameStateRef.current);
 
         if (remoteVersion && remoteVersion !== localVersion && remoteVersion !== lastRemoteStateRef.current) {
+          if (!isRemoteSyncVersionNewer(remoteVersion, localVersion)) {
+            if (!quiet) setSyncStatus(`Lokaler Spielstand ist aktueller als Supabase: ${activeCode}`);
+            return;
+          }
+
           lastRemoteStateRef.current = remoteVersion;
           lastEmittedStateRef.current = remoteVersion;
           dispatch({ type: "SERVER_STATE_RECEIVED", gameState: remoteState });
@@ -4786,13 +4815,11 @@ export default function App() {
 
 
   useEffect(() => {
-    if (gameState.phase === "lobby") {
-      localStorage.removeItem(GAME_STATE_STORAGE_KEY);
-      return;
-    }
-
-    localStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify(gameState));
-  }, [gameState]);
+    // Supabase is the source of truth for resume/reconnect.
+    // Avoid writing the full 1000-song gameState to localStorage on every reveal/next-player action,
+    // because JSON.stringify + localStorage.setItem blocks the UI thread.
+    localStorage.removeItem(GAME_STATE_STORAGE_KEY);
+  }, [activeRoomCode]);
 
   useEffect(() => {
     const latestRequest = gameState.playbackRequests?.[0];
@@ -4993,6 +5020,43 @@ export default function App() {
       return false;
     }
   }
+  function queueSupabaseGameStateWrite(syncedState, actionWithActor) {
+    latestPendingSupabaseWriteRef.current = {
+      syncedState,
+      actionWithActor,
+      roomCode: activeRoomCode,
+      trackCatalogById,
+    };
+
+    if (pendingSupabaseWriteTimeoutRef.current) {
+      window.clearTimeout(pendingSupabaseWriteTimeoutRef.current);
+    }
+
+    setSyncStatus(`Aktion ausgeführt, speichere ${actionWithActor.type}...`);
+
+    pendingSupabaseWriteTimeoutRef.current = window.setTimeout(async () => {
+      const pendingWrite = latestPendingSupabaseWriteRef.current;
+
+      pendingSupabaseWriteTimeoutRef.current = null;
+
+      if (!pendingWrite) return;
+
+      try {
+        await upsertSupabaseGameState(
+          supabaseConfig,
+          pendingWrite.roomCode,
+          pendingWrite.syncedState,
+          pendingWrite.actionWithActor,
+          pendingWrite.trackCatalogById
+        );
+        setSyncStatus(`Supabase Sync gespeichert: ${pendingWrite.actionWithActor.type}`);
+      } catch (error) {
+        setSyncStatus(`Supabase Sync speichern fehlgeschlagen: ${error.message || "Fehler"}`);
+      }
+    }, 25);
+  }
+
+
 
   async function sendGameAction(action) {
     const actorPlayerId = resolvedViewerPlayerId || null;
@@ -5016,12 +5080,7 @@ export default function App() {
       return;
     }
 
-    try {
-      await upsertSupabaseGameState(supabaseConfig, activeRoomCode, syncedState, actionWithActor, trackCatalogById);
-      setSyncStatus(`Supabase Sync gespeichert: ${action.type}`);
-    } catch (error) {
-      setSyncStatus(`Supabase Sync speichern fehlgeschlagen: ${error.message || "Fehler"}`);
-    }
+    queueSupabaseGameStateWrite(syncedState, actionWithActor);
   }
 
   function updateSupabaseConfig(patch) {
