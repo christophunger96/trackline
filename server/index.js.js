@@ -27,6 +27,9 @@ const initialGameState = {
   activePlayerIndex: 0,
   currentTrack: null,
   selectedInsertIndex: null,
+  currentTrackJokerAwarded: false,
+  jokerClaims: [],
+  selectedJokerPlayerId: null,
   lastResult: null,
   targetScore: 10,
   maxTurns: 0,
@@ -205,6 +208,7 @@ function createSoloPlayers(names) {
     score: 1,
     correct: 0,
     wrong: 0,
+    jokers: 2,
   }));
 }
 
@@ -222,6 +226,7 @@ function createTeamPlayers(names, teamConfig = {}) {
     score: 1,
     correct: 0,
     wrong: 0,
+    jokers: 2,
   }));
 }
 
@@ -242,6 +247,7 @@ function resetPlayersForNewRound(players) {
     score: 1,
     correct: 0,
     wrong: 0,
+    jokers: 2,
   }));
 }
 
@@ -265,6 +271,38 @@ function getPlayerSubLabel(player) {
   if (!isTeamPlayer(player)) return "";
 
   return player.teamMembers.join(", ");
+}
+
+
+function getPlayerById(players, playerId) {
+  return (players || []).find((player) => player.id === playerId) || null;
+}
+
+function getPlayerJokers(player) {
+  return Math.max(0, Number(player?.jokers ?? 0));
+}
+
+function getJokerClaimNames(players, jokerClaims = []) {
+  return jokerClaims
+    .map((claim) => getPlayerById(players, claim.playerId))
+    .filter(Boolean)
+    .map((player) => player.name);
+}
+
+function getSelectedJokerPlayer(players, selectedJokerPlayerId) {
+  return getPlayerById(players, selectedJokerPlayerId);
+}
+
+function canPlayerThrowJoker(state, playerId) {
+  const activePlayer = state.players[state.activePlayerIndex];
+  const player = getPlayerById(state.players, playerId);
+
+  if (!player || !activePlayer) return false;
+  if (player.id === activePlayer.id) return false;
+  if (getPlayerJokers(player) <= 0) return false;
+  if ((state.jokerClaims || []).some((claim) => claim.playerId === player.id)) return false;
+
+  return true;
 }
 
 function advanceTeamMember(player) {
@@ -555,6 +593,9 @@ function gameReducer(state, action) {
           usedTrackIds: Array.from(new Set([...(state.usedTrackIds || []), nextTrack.id])),
           usedTrackKeys: Array.from(new Set([...(state.usedTrackKeys || []), getTrackDedupeKey(nextTrack)])),
           selectedInsertIndex: null,
+          currentTrackJokerAwarded: false,
+          jokerClaims: [],
+          selectedJokerPlayerId: null,
           lastResult: null,
           showDebugSong: false,
         },
@@ -579,8 +620,116 @@ function gameReducer(state, action) {
       );
     }
 
+    case "PLACEMENT_CONFIRMED": {
+      if (state.phase !== "placing" || !state.currentTrack || state.selectedInsertIndex === null) return state;
+
+      const activePlayer = state.players[state.activePlayerIndex];
+
+      return addEvent(
+        {
+          ...state,
+          phase: "challenge",
+          jokerClaims: [],
+          selectedJokerPlayerId: null,
+        },
+        "PLACEMENT_CONFIRMED",
+        `${getPlayerTurnLabel(activePlayer)} hat die Position bestaetigt`
+      );
+    }
+
+    case "AWARD_SONG_GUESS_JOKER": {
+      if (!["placing", "challenge"].includes(state.phase) || !state.currentTrack || state.currentTrackJokerAwarded) return state;
+
+      const activePlayer = state.players[state.activePlayerIndex];
+      if (!activePlayer) return state;
+
+      const players = state.players.map((player, index) =>
+        index === state.activePlayerIndex
+          ? {
+              ...player,
+              jokers: getPlayerJokers(player) + 1,
+            }
+          : player
+      );
+
+      return addEvent(
+        {
+          ...state,
+          players,
+          currentTrackJokerAwarded: true,
+          gameLog: [
+            {
+              id: createId("log"),
+              text: `${getPlayerTurnLabel(activePlayer)} hat Song und Interpret korrekt genannt und erhaelt +1 Joker.`,
+            },
+            ...state.gameLog,
+          ].slice(0, 12),
+        },
+        "JOKER_EARNED",
+        getPlayerTurnLabel(activePlayer)
+      );
+    }
+
+    case "JOKER_CLAIM": {
+      if (state.phase !== "challenge" || !state.currentTrack) return state;
+
+      const claimant = getPlayerById(state.players, action.playerId || action.actorPlayerId);
+      if (!claimant || !canPlayerThrowJoker(state, claimant.id)) return state;
+
+      const claim = {
+        id: createId("joker"),
+        playerId: claimant.id,
+        playerName: claimant.name,
+        createdAt: new Date().toLocaleTimeString(),
+      };
+      const nextClaims = [...(state.jokerClaims || []), claim];
+
+      return addEvent(
+        {
+          ...state,
+          jokerClaims: nextClaims,
+          selectedJokerPlayerId: nextClaims.length === 1 ? claimant.id : null,
+          gameLog: [
+            {
+              id: createId("log"),
+              text: `${claimant.name} wirft einen Joker und zweifelt die Platzierung an.`,
+            },
+            ...state.gameLog,
+          ].slice(0, 12),
+        },
+        "JOKER_THROWN",
+        claimant.name
+      );
+    }
+
+    case "RESOLVE_JOKER_TIE": {
+      if (state.phase !== "challenge" || (state.jokerClaims || []).length <= 1) return state;
+
+      const claims = state.jokerClaims || [];
+      const selectedClaim = shuffle(claims)[0];
+      const selectedPlayer = getPlayerById(state.players, selectedClaim?.playerId);
+
+      if (!selectedPlayer) return state;
+
+      return addEvent(
+        {
+          ...state,
+          selectedJokerPlayerId: selectedPlayer.id,
+          gameLog: [
+            {
+              id: createId("log"),
+              text: `Joker-Stechen: ${selectedPlayer.name} darf den Joker werfen.`,
+            },
+            ...state.gameLog,
+          ].slice(0, 12),
+        },
+        "JOKER_TIE_RESOLVED",
+        selectedPlayer.name
+      );
+    }
+
     case "TRACK_PLAY_REQUESTED": {
-      if (state.phase !== "placing" || !state.currentTrack) return state;
+      if (!["placing", "challenge"].includes(state.phase) || !state.currentTrack) return state;
 
       const activePlayer = state.players[state.activePlayerIndex];
       const requester = action.requesterName || activePlayer?.name || "Spieler";
@@ -612,29 +761,51 @@ function gameReducer(state, action) {
     }
 
     case "TRACK_REVEALED": {
-      if (state.phase !== "placing" || !state.currentTrack || state.selectedInsertIndex === null) return state;
+      if (!["placing", "challenge"].includes(state.phase) || !state.currentTrack || state.selectedInsertIndex === null) return state;
 
       const activePlayer = state.players[state.activePlayerIndex];
       if (!activePlayer) return state;
 
+      if (state.phase === "challenge" && (state.jokerClaims || []).length > 1 && !state.selectedJokerPlayerId) return state;
+
       const correct = isCorrectPlacement(activePlayer.timeline, state.currentTrack, state.selectedInsertIndex);
       const placementLabel = getPlacementLabel(activePlayer.timeline, state.selectedInsertIndex);
+      const challenger = getSelectedJokerPlayer(state.players, state.selectedJokerPlayerId);
+      const jokerWasThrown = Boolean(challenger);
+      const challengerWins = Boolean(jokerWasThrown && !correct);
 
       const players = state.players.map((player, index) => {
-        if (index !== state.activePlayerIndex) return player;
+        if (index === state.activePlayerIndex) {
+          return {
+            ...player,
+            timeline: correct ? sortedWithInsert(player.timeline, state.currentTrack) : player.timeline,
+            score: correct ? player.score + 1 : player.score,
+            correct: correct ? player.correct + 1 : player.correct,
+            wrong: correct ? player.wrong : player.wrong + 1,
+          };
+        }
 
-        return {
-          ...player,
-          timeline: correct ? sortedWithInsert(player.timeline, state.currentTrack) : player.timeline,
-          score: correct ? player.score + 1 : player.score,
-          correct: correct ? player.correct + 1 : player.correct,
-          wrong: correct ? player.wrong : player.wrong + 1,
-        };
+        if (challenger && player.id === challenger.id) {
+          return {
+            ...player,
+            jokers: Math.max(0, getPlayerJokers(player) - 1),
+            timeline: challengerWins ? sortedWithInsert(player.timeline, state.currentTrack) : player.timeline,
+            score: challengerWins ? player.score + 1 : player.score,
+            correct: challengerWins ? player.correct + 1 : player.correct,
+            wrong: challengerWins ? player.wrong : player.wrong + 1,
+          };
+        }
+
+        return player;
       });
 
-      const logText = correct
-        ? `${getPlayerTurnLabel(activePlayer)} hat ${state.currentTrack.title} (${state.currentTrack.year}) richtig ${placementLabel} einsortiert.`
-        : `${getPlayerTurnLabel(activePlayer)} lag mit ${state.currentTrack.title} (${state.currentTrack.year}) falsch. Gewaehlt: ${placementLabel}.`;
+      const logText = challenger
+        ? challengerWins
+          ? `${challenger.name} hatte mit dem Joker Recht: ${state.currentTrack.title} (${state.currentTrack.year}) war falsch einsortiert und geht an ${challenger.name}.`
+          : `${challenger.name} verliert einen Joker: ${getPlayerTurnLabel(activePlayer)} hatte ${state.currentTrack.title} (${state.currentTrack.year}) korrekt einsortiert.`
+        : correct
+          ? `${getPlayerTurnLabel(activePlayer)} hat ${state.currentTrack.title} (${state.currentTrack.year}) richtig ${placementLabel} einsortiert.`
+          : `${getPlayerTurnLabel(activePlayer)} lag mit ${state.currentTrack.title} (${state.currentTrack.year}) falsch. Gewaehlt: ${placementLabel}.`;
 
       const playedEntry = createPlayedTrackEntry(state, activePlayer, { correct });
 
@@ -646,17 +817,23 @@ function gameReducer(state, action) {
           playedTrackHistory: [playedEntry, ...(state.playedTrackHistory || [])].slice(0, 80),
           lastResult: {
             correct,
+            jokerWasThrown,
+            challengerWon: challengerWins,
+            challengerLost: Boolean(jokerWasThrown && correct),
+            challengerName: challenger?.name || "",
             placementLabel,
             playerName: getPlayerTurnLabel(activePlayer),
             teamName: activePlayer.name,
             activeMemberName: getActiveTeamMemberName(activePlayer),
             track: state.currentTrack,
           },
-          discardedTracks: correct ? state.discardedTracks : [state.currentTrack, ...state.discardedTracks],
+          jokerClaims: [],
+          selectedJokerPlayerId: null,
+          discardedTracks: !correct && !challengerWins ? [state.currentTrack, ...state.discardedTracks] : state.discardedTracks,
           gameLog: [{ id: createId("log"), text: logText }, ...state.gameLog].slice(0, 12),
         },
         "TRACK_REVEALED",
-        correct ? "richtig" : "falsch"
+        challenger ? (challengerWins ? "joker erfolgreich" : "joker verloren") : correct ? "richtig" : "falsch"
       );
     }
 
@@ -714,6 +891,9 @@ function gameReducer(state, action) {
             overtime: false,
             overtimePlayerIds: [],
             overtimePendingPlayerIds: [],
+            currentTrackJokerAwarded: false,
+            jokerClaims: [],
+            selectedJokerPlayerId: null,
           },
           "GAME_FINISHED",
           finalWinner ? `Gewinner: ${finalWinner.name}` : "Limit erreicht"
@@ -743,6 +923,9 @@ function gameReducer(state, action) {
               selectedInsertIndex: null,
               lastResult: null,
               showDebugSong: false,
+              currentTrackJokerAwarded: false,
+              jokerClaims: [],
+              selectedJokerPlayerId: null,
               overtime: true,
               overtimePlayerIds: currentOvertimePlayerIds,
               overtimePendingPlayerIds: pendingAfterCurrent,
@@ -807,6 +990,9 @@ function gameReducer(state, action) {
             overtime: false,
             overtimePlayerIds: [],
             overtimePendingPlayerIds: [],
+            currentTrackJokerAwarded: false,
+            jokerClaims: [],
+            selectedJokerPlayerId: null,
           },
           "GAME_FINISHED",
           `Gewinner: ${finalWinner.name}`
@@ -1327,10 +1513,16 @@ function authorizeAction(state, action) {
     return actor.isHost ? { ok: true } : { ok: false, message: "Nur der Host darf eine neue Runde starten." };
   }
 
-  if (["TRACK_REVEALED", "NEXT_PLAYER"].includes(type)) {
+  if (["TRACK_REVEALED", "NEXT_PLAYER", "PLACEMENT_CONFIRMED", "RESOLVE_JOKER_TIE", "AWARD_SONG_GUESS_JOKER"].includes(type)) {
     return actor.isHost || actor.isActivePlayer
       ? { ok: true }
-      : { ok: false, message: "Nur Host/DJ oder der aktive Spieler darf aufdecken oder zum naechsten Spieler gehen." };
+      : { ok: false, message: "Nur Host/DJ oder der aktive Spieler darf diese Aktion ausfuehren." };
+  }
+
+  if (type === "JOKER_CLAIM") {
+    return actor.actor && !actor.isActivePlayer
+      ? { ok: true }
+      : { ok: false, message: "Nur nicht-aktive Spieler mit Joker duerfen einen Joker werfen." };
   }
 
   if (["TRACK_SKIPPED", "TOGGLE_DEBUG_SONG", "BLOCK_TRACK", "UNBLOCK_TRACK", "REPORT_TRACK", "CLEAR_SONG_REPORTS", "CLEAR_BLOCKED_TRACKS"].includes(type)) {
