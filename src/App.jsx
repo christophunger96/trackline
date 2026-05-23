@@ -5553,12 +5553,15 @@ function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supa
   const [joinCode, setJoinCode] = useState(String(initialRoomCode || "").toUpperCase());
   const [createdCode, setCreatedCode] = useState(() => createRoomCode());
 
+  const profileRoomName = getAuthDisplayName(authSession);
+  const visibleRoomName = profileRoomName || name;
+
   function normalizeCode(value) {
     return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
   }
 
   function getPreferredRoomName() {
-    return getAuthDisplayName(authSession) || name;
+    return profileRoomName || name;
   }
 
   function createRoom() {
@@ -5591,14 +5594,12 @@ function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supa
   }
 
   useEffect(() => {
-    const authName = getAuthDisplayName(authSession);
-
-    if (authName && name !== authName) {
-      setName(authName);
+    if (profileRoomName && name !== profileRoomName) {
+      setName(profileRoomName);
     }
-  }, [authSession?.user?.id, authSession?.user?.user_metadata?.display_name]);
+  }, [profileRoomName, name]);
 
-  const canContinue = String(name || "").trim().length > 0;
+  const canContinue = String(visibleRoomName || "").trim().length > 0;
 
   return (
     <div style={{ minHeight: "100vh", background: colors.bg, color: colors.text, fontFamily: "Inter, system-ui, sans-serif", padding: 18, display: "grid", placeItems: "center" }}>
@@ -5620,7 +5621,7 @@ function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supa
         <AuthPanel
           session={authSession}
           status={authStatus}
-          defaultName={name}
+          defaultName={visibleRoomName}
           onSignUp={onAuthSignUp}
           onSignIn={onAuthSignIn}
           onLogout={onAuthLogout}
@@ -5640,7 +5641,7 @@ function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supa
               <label style={{ display: "grid", gap: 8 }}>
                 <span style={{ color: colors.muted, fontSize: 13 }}>Dein Name</span>
                 <Input
-                  value={name}
+                  value={visibleRoomName}
                   onChange={(event) => setName(event.target.value)}
                   placeholder="z. B. Christoph"
                   readOnly={Boolean(authSession)}
@@ -5677,7 +5678,7 @@ function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supa
               <label style={{ display: "grid", gap: 8 }}>
                 <span style={{ color: colors.muted, fontSize: 13 }}>Dein Name</span>
                 <Input
-                  value={name}
+                  value={visibleRoomName}
                   onChange={(event) => setName(event.target.value)}
                   placeholder="z. B. Alex"
                   readOnly={Boolean(authSession)}
