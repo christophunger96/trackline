@@ -44,6 +44,12 @@ const SYNC_ENABLED_STORAGE_KEY = "trackline.sync.enabled";
 const CLIENT_INSTANCE_ID_STORAGE_KEY = "trackline.clientInstanceId.v1";
 const VIEWER_PLAYER_STORAGE_PREFIX = "trackline.viewerPlayer.v1.";
 const DEFAULT_SYNC_SOCKET_URL = import.meta.env?.VITE_SOCKET_URL || "http://127.0.0.1:3001";
+const SUPABASE_URL_STORAGE_KEY = "trackline.supabase.url";
+const SUPABASE_ANON_KEY_STORAGE_KEY = "trackline.supabase.anonKey";
+const SUPABASE_ENABLED_STORAGE_KEY = "trackline.supabase.enabled";
+const SUPABASE_SAVED_RESULTS_STORAGE_KEY = "trackline.supabase.savedResults.v1";
+const DEFAULT_SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || "";
+const DEFAULT_SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || "";
 
 const SPOTIFY_CLIENT_ID_STORAGE_KEY = "trackline.spotify.clientId";
 const DEFAULT_SPOTIFY_CLIENT_ID = "eb70ba4d164248d8810e52caae6b40cb";
@@ -914,6 +920,116 @@ const ERA_BALANCE_EXPANSION_TRACKS = [
   { id: "b790", title: "Texas Hold 'Em", artist: "Beyoncé", year: 2024, genre: "Country Pop" },
 ];
 
+
+function createInitialJokerDuelState() {
+  return {
+    active: false,
+    playerIds: [],
+    choices: {},
+    round: 0,
+    lastResult: null,
+  };
+}
+
+const RPS_OPTIONS = [
+  { id: "rock", label: "Stein", icon: "🪨" },
+  { id: "scissors", label: "Schere", icon: "✂️" },
+  { id: "paper", label: "Papier", icon: "📄" },
+];
+
+function getRpsOption(choice) {
+  return RPS_OPTIONS.find((option) => option.id === choice) || null;
+}
+
+function getRpsChoiceLabel(choice) {
+  const option = getRpsOption(choice);
+  return option ? `${option.icon} ${option.label}` : "-";
+}
+
+function getRpsWinningChoice(choiceA, choiceB) {
+  const pair = new Set([choiceA, choiceB]);
+
+  if (pair.has("rock") && pair.has("scissors")) return "rock";
+  if (pair.has("scissors") && pair.has("paper")) return "scissors";
+  if (pair.has("paper") && pair.has("rock")) return "paper";
+
+  return null;
+}
+
+function evaluateJokerDuelRound(players, playerIds, choices) {
+  const contenders = playerIds.filter((playerId) => getPlayerById(players, playerId));
+  const revealedChoices = contenders.map((playerId) => {
+    const player = getPlayerById(players, playerId);
+
+    return {
+      playerId,
+      playerName: player?.name || "-",
+      choice: choices[playerId],
+      label: getRpsChoiceLabel(choices[playerId]),
+    };
+  });
+
+  const uniqueChoices = Array.from(new Set(revealedChoices.map((item) => item.choice).filter(Boolean)));
+
+  if (contenders.length <= 1) {
+    return {
+      status: "winner",
+      winnerId: contenders[0] || null,
+      nextPlayerIds: contenders,
+      eliminatedIds: [],
+      revealedChoices,
+      reason: "Nur noch ein Challenger steht.",
+    };
+  }
+
+  if (uniqueChoices.length <= 1) {
+    return {
+      status: "continue",
+      winnerId: null,
+      nextPlayerIds: contenders,
+      eliminatedIds: [],
+      revealedChoices,
+      reason: "Alle haben dasselbe gewählt. Die Runde wird wiederholt.",
+    };
+  }
+
+  if (uniqueChoices.length >= 3) {
+    return {
+      status: "continue",
+      winnerId: null,
+      nextPlayerIds: contenders,
+      eliminatedIds: [],
+      revealedChoices,
+      reason: "Alle drei Zeichen sind im Spiel. Niemand scheidet aus.",
+    };
+  }
+
+  const winningChoice = getRpsWinningChoice(uniqueChoices[0], uniqueChoices[1]);
+  const nextPlayerIds = contenders.filter((playerId) => choices[playerId] === winningChoice);
+  const eliminatedIds = contenders.filter((playerId) => choices[playerId] !== winningChoice);
+
+  if (nextPlayerIds.length === 1) {
+    return {
+      status: "winner",
+      winnerId: nextPlayerIds[0],
+      nextPlayerIds,
+      eliminatedIds,
+      revealedChoices,
+      reason: `${getRpsChoiceLabel(winningChoice)} gewinnt diese Runde.`,
+    };
+  }
+
+  return {
+    status: "continue",
+    winnerId: null,
+    nextPlayerIds,
+    eliminatedIds,
+    revealedChoices,
+    reason: `${getRpsChoiceLabel(winningChoice)} gewinnt. Die verbleibenden Challenger spielen weiter.`,
+  };
+}
+
+
 const initialGameState = {
   phase: "lobby",
   room: null,
@@ -923,8 +1039,10 @@ const initialGameState = {
   currentTrack: null,
   selectedInsertIndex: null,
   currentTrackJokerAwarded: false,
+  currentTrackJokerGuessReviewed: false,
   jokerClaims: [],
   selectedJokerPlayerId: null,
+  jokerDuel: createInitialJokerDuelState(),
   lastResult: null,
   targetScore: 10,
   maxTurns: 0,
@@ -1576,13 +1694,122 @@ function gameReducer(state, action) {
           usedTrackKeys: Array.from(new Set([...(state.usedTrackKeys || []), getTrackDedupeKey(nextTrack)])),
           selectedInsertIndex: null,
           currentTrackJokerAwarded: false,
+          currentTrackJokerGuessReviewed: false,
           jokerClaims: [],
           selectedJokerPlayerId: null,
+          jokerDuel: createInitialJokerDuelState(),
           lastResult: null,
           showDebugSong: false,
         },
         "TRACK_DRAWN",
         "Verdeckter Song gezogen"
+      );
+    }
+
+    case "TRACK_SWAP_JOKER": {
+      if (state.phase !== "placing" || !state.currentTrack || state.deck.length === 0) return state;
+
+      const activePlayer = state.players[state.activePlayerIndex];
+      if (!activePlayer || getPlayerJokers(activePlayer) < 1) return state;
+
+      const blockedTrackKeys = getBlockedTrackKeySet(state);
+      const nextTrackIndex = state.deck.findIndex((track) => !blockedTrackKeys.has(getTrackDedupeKey(track)));
+
+      if (nextTrackIndex < 0) return state;
+
+      const nextTrack = state.deck[nextTrackIndex];
+      const remainingDeck = state.deck.filter((_, index) => index !== nextTrackIndex);
+
+      const players = state.players.map((player, index) =>
+        index === state.activePlayerIndex
+          ? {
+              ...player,
+              jokers: Math.max(0, getPlayerJokers(player) - 1),
+            }
+          : player
+      );
+
+      return addEvent(
+        {
+          ...state,
+          players,
+          currentTrack: nextTrack,
+          deck: remainingDeck,
+          usedTrackIds: Array.from(new Set([...(state.usedTrackIds || []), nextTrack.id])),
+          usedTrackKeys: Array.from(new Set([...(state.usedTrackKeys || []), getTrackDedupeKey(nextTrack)])),
+          selectedInsertIndex: null,
+          currentTrackJokerAwarded: false,
+          currentTrackJokerGuessReviewed: false,
+          jokerClaims: [],
+          selectedJokerPlayerId: null,
+          jokerDuel: createInitialJokerDuelState(),
+          lastResult: null,
+          showDebugSong: false,
+          discardedTracks: [state.currentTrack, ...state.discardedTracks],
+          gameLog: [
+            {
+              id: createId("log"),
+              text: `${getPlayerTurnLabel(activePlayer)} nutzt den Tauschen-Joker und zieht einen neuen Song.`,
+            },
+            ...state.gameLog,
+          ].slice(0, 12),
+        },
+        "TRACK_SWAPPED",
+        `${getPlayerTurnLabel(activePlayer)} tauscht den Song`
+      );
+    }
+
+    case "TRACK_AUTO_CARD_JOKER": {
+      if (state.phase !== "placing" || !state.currentTrack) return state;
+
+      const activePlayer = state.players[state.activePlayerIndex];
+      if (!activePlayer || getPlayerJokers(activePlayer) < 3) return state;
+
+      const players = state.players.map((player, index) => {
+        if (index !== state.activePlayerIndex) return player;
+
+        return {
+          ...player,
+          jokers: Math.max(0, getPlayerJokers(player) - 3),
+          timeline: sortedWithInsert(player.timeline, state.currentTrack),
+          score: player.score + 1,
+          correct: player.correct + 1,
+        };
+      });
+
+      const playedEntry = createPlayedTrackEntry(state, activePlayer, { correct: true, autoJoker: true });
+
+      return addEvent(
+        {
+          ...state,
+          players,
+          phase: "reveal",
+          selectedInsertIndex: null,
+          currentTrackJokerAwarded: false,
+          currentTrackJokerGuessReviewed: true,
+          jokerClaims: [],
+          selectedJokerPlayerId: null,
+          jokerDuel: createInitialJokerDuelState(),
+          playedTrackHistory: [playedEntry, ...(state.playedTrackHistory || [])].slice(0, 80),
+          lastResult: {
+            correct: true,
+            autoJoker: true,
+            placementLabel: "Sicherer Karten-Joker",
+            playerName: getPlayerTurnLabel(activePlayer),
+            teamName: activePlayer.name,
+            activeMemberName: getActiveTeamMemberName(activePlayer),
+            track: state.currentTrack,
+          },
+          gameLog: [
+            {
+              id: createId("log"),
+              text: `${getPlayerTurnLabel(activePlayer)} nutzt den Sicheren-Karten-Joker und erhaelt ${state.currentTrack.title} automatisch.`,
+            },
+            ...state.gameLog,
+          ].slice(0, 12),
+        },
+        "TRACK_AUTO_CARD_JOKER",
+        `${getPlayerTurnLabel(activePlayer)} kauft die Karte`
       );
     }
 
@@ -1613,6 +1840,7 @@ function gameReducer(state, action) {
           phase: "challenge",
           jokerClaims: [],
           selectedJokerPlayerId: null,
+          jokerDuel: createInitialJokerDuelState(),
         },
         "PLACEMENT_CONFIRMED",
         `${getPlayerTurnLabel(activePlayer)} hat die Position bestaetigt`
@@ -1620,7 +1848,7 @@ function gameReducer(state, action) {
     }
 
     case "AWARD_SONG_GUESS_JOKER": {
-      if (!["placing", "challenge"].includes(state.phase) || !state.currentTrack || state.currentTrackJokerAwarded) return state;
+      if (state.phase !== "reveal" || !state.lastResult?.track || state.currentTrackJokerGuessReviewed || state.currentTrackJokerAwarded) return state;
 
       const activePlayer = state.players[state.activePlayerIndex];
       if (!activePlayer) return state;
@@ -1639,15 +1867,38 @@ function gameReducer(state, action) {
           ...state,
           players,
           currentTrackJokerAwarded: true,
+          currentTrackJokerGuessReviewed: true,
           gameLog: [
             {
               id: createId("log"),
-              text: `${getPlayerTurnLabel(activePlayer)} hat Song und Interpret korrekt genannt und erhaelt +1 Joker.`,
+              text: `${getPlayerTurnLabel(activePlayer)} erhaelt +1 Joker fuer Song und Interpret.`,
             },
             ...state.gameLog,
           ].slice(0, 12),
         },
         "JOKER_EARNED",
+        getPlayerTurnLabel(activePlayer)
+      );
+    }
+
+    case "CLEAR_SONG_GUESS_CLAIM": {
+      if (state.phase !== "reveal" || state.currentTrackJokerGuessReviewed || state.currentTrackJokerAwarded) return state;
+
+      const activePlayer = state.players[state.activePlayerIndex];
+
+      return addEvent(
+        {
+          ...state,
+          currentTrackJokerGuessReviewed: true,
+          gameLog: [
+            {
+              id: createId("log"),
+              text: `Kein Zusatz-Joker fuer ${getPlayerTurnLabel(activePlayer)} vergeben.`,
+            },
+            ...state.gameLog,
+          ].slice(0, 12),
+        },
+        "JOKER_GUESS_DENIED",
         getPlayerTurnLabel(activePlayer)
       );
     }
@@ -1671,6 +1922,7 @@ function gameReducer(state, action) {
           ...state,
           jokerClaims: nextClaims,
           selectedJokerPlayerId: nextClaims.length === 1 ? claimant.id : null,
+          jokerDuel: createInitialJokerDuelState(),
           gameLog: [
             {
               id: createId("log"),
@@ -1684,29 +1936,117 @@ function gameReducer(state, action) {
       );
     }
 
-    case "RESOLVE_JOKER_TIE": {
-      if (state.phase !== "challenge" || (state.jokerClaims || []).length <= 1) return state;
+    case "START_JOKER_DUEL": {
+      if (state.phase !== "challenge" || (state.jokerClaims || []).length <= 1 || state.selectedJokerPlayerId) return state;
 
-      const claims = state.jokerClaims || [];
-      const selectedClaim = shuffle(claims)[0];
-      const selectedPlayer = getPlayerById(state.players, selectedClaim?.playerId);
+      const playerIds = Array.from(new Set((state.jokerClaims || []).map((claim) => claim.playerId))).filter((playerId) =>
+        getPlayerById(state.players, playerId)
+      );
 
-      if (!selectedPlayer) return state;
+      if (playerIds.length <= 1) return state;
 
       return addEvent(
         {
           ...state,
-          selectedJokerPlayerId: selectedPlayer.id,
+          jokerDuel: {
+            active: true,
+            playerIds,
+            choices: {},
+            round: Number(state.jokerDuel?.round || 0) + 1,
+            lastResult: null,
+          },
           gameLog: [
             {
               id: createId("log"),
-              text: `Joker-Stechen: ${selectedPlayer.name} darf den Joker werfen.`,
+              text: `Joker-Duell gestartet: ${playerIds.map((playerId) => getPlayerById(state.players, playerId)?.name).filter(Boolean).join(", ")}.`,
             },
             ...state.gameLog,
           ].slice(0, 12),
         },
-        "JOKER_TIE_RESOLVED",
-        selectedPlayer.name
+        "JOKER_DUEL_STARTED",
+        `${playerIds.length} Challenger`
+      );
+    }
+
+    case "JOKER_DUEL_CHOICE": {
+      if (state.phase !== "challenge" || !state.jokerDuel?.active || state.selectedJokerPlayerId) return state;
+
+      const playerId = action.playerId || action.actorPlayerId;
+      const choice = action.choice;
+      const playerIds = state.jokerDuel.playerIds || [];
+
+      if (!playerIds.includes(playerId)) return state;
+      if (!RPS_OPTIONS.some((option) => option.id === choice)) return state;
+
+      const nextChoices = {
+        ...(state.jokerDuel.choices || {}),
+        [playerId]: choice,
+      };
+      const allChosen = playerIds.every((id) => nextChoices[id]);
+
+      if (!allChosen) {
+        return addEvent(
+          {
+            ...state,
+            jokerDuel: {
+              ...state.jokerDuel,
+              choices: nextChoices,
+            },
+          },
+          "JOKER_DUEL_CHOICE",
+          `${getPlayerById(state.players, playerId)?.name || "Spieler"} hat gewählt`
+        );
+      }
+
+      const result = evaluateJokerDuelRound(state.players, playerIds, nextChoices);
+
+      if (result.status === "winner" && result.winnerId) {
+        const winner = getPlayerById(state.players, result.winnerId);
+
+        return addEvent(
+          {
+            ...state,
+            selectedJokerPlayerId: result.winnerId,
+            jokerDuel: {
+              active: false,
+              playerIds: result.nextPlayerIds,
+              choices: {},
+              round: state.jokerDuel.round,
+              lastResult: result,
+            },
+            gameLog: [
+              {
+                id: createId("log"),
+                text: `Joker-Duell: ${winner?.name || "Ein Spieler"} gewinnt und darf den Joker setzen.`,
+              },
+              ...state.gameLog,
+            ].slice(0, 12),
+          },
+          "JOKER_DUEL_WINNER",
+          winner?.name || "Gewinner"
+        );
+      }
+
+      return addEvent(
+        {
+          ...state,
+          jokerDuel: {
+            active: true,
+            playerIds: result.nextPlayerIds,
+            choices: {},
+            round: Number(state.jokerDuel.round || 0) + 1,
+            lastResult: result,
+          },
+          gameLog: [
+            {
+              id: createId("log"),
+              text: `Joker-Duell: ${result.reason}`,
+            },
+            ...state.gameLog,
+          ].slice(0, 12),
+        },
+        "JOKER_DUEL_CONTINUES",
+        result.reason
       );
     }
 
@@ -1749,6 +2089,7 @@ function gameReducer(state, action) {
       if (!activePlayer) return state;
 
       if (state.phase === "challenge" && (state.jokerClaims || []).length > 1 && !state.selectedJokerPlayerId) return state;
+      if (state.phase === "challenge" && state.jokerDuel?.active) return state;
 
       const correct = isCorrectPlacement(activePlayer.timeline, state.currentTrack, state.selectedInsertIndex);
       const placementLabel = getPlacementLabel(activePlayer.timeline, state.selectedInsertIndex);
@@ -1811,6 +2152,7 @@ function gameReducer(state, action) {
           },
           jokerClaims: [],
           selectedJokerPlayerId: null,
+          jokerDuel: createInitialJokerDuelState(),
           discardedTracks: !correct && !challengerWins ? [state.currentTrack, ...state.discardedTracks] : state.discardedTracks,
           gameLog: [{ id: createId("log"), text: logText }, ...state.gameLog].slice(0, 12),
         },
@@ -1876,6 +2218,7 @@ function gameReducer(state, action) {
             currentTrackJokerAwarded: false,
             jokerClaims: [],
             selectedJokerPlayerId: null,
+            jokerDuel: createInitialJokerDuelState(),
           },
           "GAME_FINISHED",
           finalWinner ? `Gewinner: ${finalWinner.name}` : "Limit erreicht"
@@ -1908,6 +2251,7 @@ function gameReducer(state, action) {
               currentTrackJokerAwarded: false,
               jokerClaims: [],
               selectedJokerPlayerId: null,
+              jokerDuel: createInitialJokerDuelState(),
               overtime: true,
               overtimePlayerIds: currentOvertimePlayerIds,
               overtimePendingPlayerIds: pendingAfterCurrent,
@@ -1975,6 +2319,7 @@ function gameReducer(state, action) {
             currentTrackJokerAwarded: false,
             jokerClaims: [],
             selectedJokerPlayerId: null,
+            jokerDuel: createInitialJokerDuelState(),
           },
           "GAME_FINISHED",
           `Gewinner: ${finalWinner.name}`
@@ -2767,6 +3112,7 @@ function getViewerPermissions(viewerRole) {
     canConfirmPlacement: isHost || isActivePlayer,
     canReveal: isHost || isActivePlayer,
     canAwardJoker: isHost || isActivePlayer,
+    canUseActiveJoker: isHost || isActivePlayer,
     canResolveJokerTie: isHost || isActivePlayer,
     canAdvance: isHost || isActivePlayer,
   };
@@ -2864,6 +3210,460 @@ function storeViewerPlayerId(roomCode, playerId) {
 }
 
 
+
+function getInitialSupabaseConfig() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const urlFromLink = params.get("supabaseUrl") ? decodeURIComponent(params.get("supabaseUrl")) : "";
+    const keyFromLink = params.get("supabaseKey") ? decodeURIComponent(params.get("supabaseKey")) : "";
+    const storedUrl = localStorage.getItem(SUPABASE_URL_STORAGE_KEY) || "";
+    const storedKey = localStorage.getItem(SUPABASE_ANON_KEY_STORAGE_KEY) || "";
+    const url = urlFromLink || storedUrl || DEFAULT_SUPABASE_URL;
+    const anonKey = keyFromLink || storedKey || DEFAULT_SUPABASE_ANON_KEY;
+    const enabledFromLink = Boolean(urlFromLink && keyFromLink);
+
+    return {
+      url,
+      anonKey,
+      enabled: enabledFromLink || localStorage.getItem(SUPABASE_ENABLED_STORAGE_KEY) === "true" || Boolean(DEFAULT_SUPABASE_URL && DEFAULT_SUPABASE_ANON_KEY),
+    };
+  } catch {
+    return {
+      url: DEFAULT_SUPABASE_URL,
+      anonKey: DEFAULT_SUPABASE_ANON_KEY,
+      enabled: Boolean(DEFAULT_SUPABASE_URL && DEFAULT_SUPABASE_ANON_KEY),
+    };
+  }
+}
+
+function normalizeSupabaseUrl(url = "") {
+  return String(url || "").trim().replace(/\/+$/, "");
+}
+
+function isSupabaseConfigured(config) {
+  return Boolean(config?.enabled && normalizeSupabaseUrl(config.url) && String(config.anonKey || "").trim());
+}
+
+async function supabaseRestRequest(config, path, options = {}) {
+  const baseUrl = normalizeSupabaseUrl(config?.url);
+  const anonKey = String(config?.anonKey || "").trim();
+
+  if (!baseUrl || !anonKey) {
+    throw new Error("Supabase URL oder anon public key fehlt.");
+  }
+
+  const response = await fetch(`${baseUrl}/rest/v1${path}`, {
+    ...options,
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${anonKey}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Supabase Fehler ${response.status}`);
+  }
+
+  if (response.status === 204) return null;
+
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function testSupabaseConnection(config) {
+  const data = await supabaseRestRequest(config, "/rooms?select=code&limit=1", {
+    method: "GET",
+  });
+
+  return Array.isArray(data) ? data.length : 0;
+}
+
+async function registerSupabaseRoomEntry(config, { mode, roomCode, name, clientInstanceId }) {
+  if (!isSupabaseConfigured(config)) {
+    return {
+      skipped: true,
+      message: "Supabase ist noch nicht aktiviert.",
+    };
+  }
+
+  const displayName = String(name || "Spieler").trim() || "Spieler";
+  const normalizedRoomCode = String(roomCode || "").trim().toUpperCase();
+  const guestId = String(clientInstanceId || createId("guest"));
+
+  await supabaseRestRequest(config, "/profiles?on_conflict=guest_id", {
+    method: "POST",
+    headers: {
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body: JSON.stringify({
+      guest_id: guestId,
+      display_name: displayName,
+      updated_at: new Date().toISOString(),
+    }),
+  });
+
+  await supabaseRestRequest(config, "/rooms?on_conflict=code", {
+    method: "POST",
+    headers: {
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body: JSON.stringify({
+      code: normalizedRoomCode,
+      host_guest_id: mode === "create" ? guestId : null,
+      status: "lobby",
+      last_seen_at: new Date().toISOString(),
+      metadata: {
+        source: "trackline-phase2",
+      },
+    }),
+  });
+
+  await supabaseRestRequest(config, "/room_players?on_conflict=room_code,guest_id", {
+    method: "POST",
+    headers: {
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body: JSON.stringify({
+      room_code: normalizedRoomCode,
+      guest_id: guestId,
+      display_name: displayName,
+      is_host: mode === "create",
+      last_seen_at: new Date().toISOString(),
+      metadata: {
+        client_instance_id: guestId,
+      },
+    }),
+  });
+
+  return {
+    skipped: false,
+    message: mode === "create" ? "Supabase-Raum registriert." : "Supabase-Beitritt registriert.",
+  };
+}
+
+async function fetchSupabaseRoomPlayers(config, roomCode) {
+  if (!isSupabaseConfigured(config)) return [];
+
+  const normalizedRoomCode = encodeURIComponent(String(roomCode || "").trim().toUpperCase());
+
+  if (!normalizedRoomCode) return [];
+
+  const data = await supabaseRestRequest(
+    config,
+    `/room_players?select=display_name,is_host,guest_id,last_seen_at,joined_at&room_code=eq.${normalizedRoomCode}&order=is_host.desc,joined_at.asc`,
+    {
+      method: "GET",
+    }
+  );
+
+  return (Array.isArray(data) ? data : [])
+    .map((player) => ({
+      displayName: String(player.display_name || "").trim(),
+      isHost: Boolean(player.is_host),
+      guestId: player.guest_id || "",
+      lastSeenAt: player.last_seen_at || "",
+      joinedAt: player.joined_at || "",
+    }))
+    .filter((player) => player.displayName);
+}
+
+function getUniqueDisplayNamesFromSupabasePlayers(players = []) {
+  const seen = new Set();
+  const names = [];
+
+  for (const player of players) {
+    const name = String(player.displayName || "").trim();
+
+    if (!name || seen.has(name)) continue;
+
+    seen.add(name);
+    names.push(name);
+  }
+
+  return names;
+}
+
+function mergePlayerNamesWithSupabase(currentNames = [], supabasePlayers = []) {
+  const supabaseNames = getUniqueDisplayNamesFromSupabasePlayers(supabasePlayers);
+  const merged = [];
+  const seen = new Set();
+
+  for (const name of supabaseNames) {
+    if (!seen.has(name)) {
+      seen.add(name);
+      merged.push(name);
+    }
+  }
+
+  for (const name of currentNames) {
+    if (!name || seen.has(name)) continue;
+
+    seen.add(name);
+    merged.push(name);
+  }
+
+  return merged.length ? merged : currentNames;
+}
+
+function areNameListsEqual(left = [], right = []) {
+  if (left.length !== right.length) return false;
+
+  return left.every((name, index) => name === right[index]);
+}
+
+
+function getSavedSupabaseResultKeys() {
+  try {
+    return JSON.parse(localStorage.getItem(SUPABASE_SAVED_RESULTS_STORAGE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function markSupabaseResultSaved(resultKey) {
+  try {
+    const keys = getSavedSupabaseResultKeys();
+    const nextKeys = Array.from(new Set([resultKey, ...keys])).slice(0, 80);
+    localStorage.setItem(SUPABASE_SAVED_RESULTS_STORAGE_KEY, JSON.stringify(nextKeys));
+  } catch {
+    // ignore
+  }
+}
+
+function isSupabaseResultSaved(resultKey) {
+  return getSavedSupabaseResultKeys().includes(resultKey);
+}
+
+function getFinishedEvent(gameState) {
+  return (gameState.eventHistory || []).find((event) => event.type === "GAME_FINISHED") || null;
+}
+
+function getGameResultKey(roomCode, gameState) {
+  const finishedEvent = getFinishedEvent(gameState);
+  const eventId = finishedEvent?.id || `${gameState.turnNumber}-${gameState.players?.map((player) => `${player.name}:${player.score}`).join("|")}`;
+
+  return `${String(roomCode || gameState.room?.code || "ROOM").toUpperCase()}::${eventId}`;
+}
+
+function countEventsForPlayer(gameState, playerName, eventTypes = []) {
+  const name = String(playerName || "");
+  const wantedTypes = new Set(eventTypes);
+
+  return (gameState.eventHistory || []).filter((event) => {
+    if (wantedTypes.size && !wantedTypes.has(event.type)) return false;
+
+    return String(event.details || "").includes(name);
+  }).length;
+}
+
+function buildSupabaseGameSummary(gameState, leaderboard, roomPlayers = []) {
+  const winner = leaderboard[0] || null;
+  const finishedEvent = getFinishedEvent(gameState);
+  const playedTracks = gameState.playedTrackHistory || [];
+
+  return {
+    room: gameState.room,
+    finished_event_id: finishedEvent?.id || null,
+    turn_number: gameState.turnNumber,
+    game_mode: gameState.gameMode || "solo",
+    difficulty: gameState.difficulty || "normal",
+    target_score: gameState.targetScore,
+    max_turns: gameState.maxTurns,
+    play_limit_seconds: gameState.playLimitSeconds,
+    winner_name: winner?.name || "",
+    players: leaderboard.map((player) => ({
+      id: player.id,
+      name: player.name,
+      score: player.score,
+      correct: player.correct,
+      wrong: player.wrong,
+      jokers: getPlayerJokers(player),
+      team_members: player.teamMembers || [],
+    })),
+    room_players: roomPlayers,
+    played_tracks: playedTracks.slice(0, 80),
+    event_summary: (gameState.eventHistory || []).slice(0, 40).map((event) => ({
+      type: event.type,
+      details: event.details || "",
+      turn_number: event.turnNumber,
+    })),
+  };
+}
+
+async function fetchExistingPlayerStats(config, guestIds = []) {
+  const uniqueGuestIds = Array.from(new Set(guestIds.filter(Boolean)));
+
+  if (!uniqueGuestIds.length) return new Map();
+
+  const encodedList = uniqueGuestIds.map((guestId) => `"${String(guestId).replace(/"/g, '\\"')}"`).join(",");
+  const data = await supabaseRestRequest(config, `/player_stats?select=*&guest_id=in.(${encodedList})`, {
+    method: "GET",
+  });
+
+  return new Map((Array.isArray(data) ? data : []).map((row) => [row.guest_id, row]));
+}
+
+function getRoomPlayerForDisplayName(roomPlayers, displayName) {
+  const wantedName = String(displayName || "").trim();
+
+  return (roomPlayers || []).find((player) => String(player.displayName || "").trim() === wantedName) || null;
+}
+
+function buildPlayerStatPatch(existing = {}, player, gameState, roomPlayer, winnerName) {
+  const isWinner = player.name === winnerName;
+  const guestId = roomPlayer?.guestId || `name-${normalizeTrackText(player.name) || createId("guest")}`;
+  const playedChallengeEvents = countEventsForPlayer(gameState, player.name, ["JOKER_THROWN", "JOKER_DUEL_WINNER", "TRACK_REVEALED"]);
+  const swapJokersUsed = countEventsForPlayer(gameState, player.name, ["TRACK_SWAPPED"]);
+  const secureJokersUsed = countEventsForPlayer(gameState, player.name, ["TRACK_AUTO_CARD_JOKER"]);
+  const earnedJokers = countEventsForPlayer(gameState, player.name, ["JOKER_EARNED"]);
+
+  return {
+    guest_id: guestId,
+    display_name: player.name,
+    games_played: Number(existing.games_played || 0) + 1,
+    wins: Number(existing.wins || 0) + (isWinner ? 1 : 0),
+    cards_won: Number(existing.cards_won || 0) + Number(player.score || 0),
+    correct_placements: Number(existing.correct_placements || 0) + Number(player.correct || 0),
+    wrong_placements: Number(existing.wrong_placements || 0) + Number(player.wrong || 0),
+    challenge_jokers_used: Number(existing.challenge_jokers_used || 0) + playedChallengeEvents,
+    challenge_jokers_won: Number(existing.challenge_jokers_won || 0) + countEventsForPlayer(gameState, player.name, ["JOKER_DUEL_WINNER"]),
+    swap_jokers_used: Number(existing.swap_jokers_used || 0) + swapJokersUsed,
+    secure_card_jokers_used: Number(existing.secure_card_jokers_used || 0) + secureJokersUsed,
+    earned_jokers: Number(existing.earned_jokers || 0) + earnedJokers,
+    team_games: Number(existing.team_games || 0) + (gameState.gameMode === "teams" ? 1 : 0),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function saveSupabaseGameStats(config, gameState, roomCode, roomPlayers = []) {
+  if (!isSupabaseConfigured(config)) {
+    return {
+      skipped: true,
+      message: "Supabase nicht aktiv.",
+    };
+  }
+
+  if (gameState.phase !== "finished") {
+    return {
+      skipped: true,
+      message: "Spiel ist noch nicht beendet.",
+    };
+  }
+
+  const normalizedRoomCode = String(roomCode || gameState.room?.code || "").trim().toUpperCase();
+  const leaderboard = [...(gameState.players || [])].sort((a, b) => b.score - a.score || a.wrong - b.wrong);
+  const winner = leaderboard[0] || null;
+  const summary = buildSupabaseGameSummary(gameState, leaderboard, roomPlayers);
+
+  await supabaseRestRequest(config, "/game_results", {
+    method: "POST",
+    headers: {
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({
+      room_code: normalizedRoomCode,
+      game_mode: gameState.gameMode || "solo",
+      winner_name: winner?.name || "",
+      target_score: gameState.targetScore || null,
+      started_at: null,
+      finished_at: new Date().toISOString(),
+      summary,
+    }),
+  });
+
+  const roomPlayerGuestIds = leaderboard
+    .map((player) => getRoomPlayerForDisplayName(roomPlayers, player.name)?.guestId)
+    .filter(Boolean);
+  const existingStats = await fetchExistingPlayerStats(config, roomPlayerGuestIds);
+  const statRows = leaderboard.map((player) => {
+    const roomPlayer = getRoomPlayerForDisplayName(roomPlayers, player.name);
+    const guestId = roomPlayer?.guestId || `name-${normalizeTrackText(player.name)}`;
+    const existing = existingStats.get(guestId) || {};
+
+    return buildPlayerStatPatch(existing, player, gameState, roomPlayer, winner?.name || "");
+  });
+
+  for (const row of statRows) {
+    await supabaseRestRequest(config, "/player_stats?on_conflict=guest_id", {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify(row),
+    });
+  }
+
+  await supabaseRestRequest(config, `/rooms?code=eq.${encodeURIComponent(normalizedRoomCode)}`, {
+    method: "PATCH",
+    headers: {
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({
+      status: "finished",
+      updated_at: new Date().toISOString(),
+      last_seen_at: new Date().toISOString(),
+    }),
+  });
+
+  return {
+    skipped: false,
+    message: `Statistiken gespeichert: ${leaderboard.length} Spieler.`,
+  };
+}
+
+
+async function fetchSupabasePlayerStats(config, limit = 100) {
+  if (!isSupabaseConfigured(config)) return [];
+
+  const data = await supabaseRestRequest(
+    config,
+    `/player_stats?select=*&order=wins.desc,games_played.desc,cards_won.desc&limit=${Number(limit) || 100}`,
+    {
+      method: "GET",
+    }
+  );
+
+  return Array.isArray(data) ? data : [];
+}
+
+async function fetchSupabaseGameResults(config, limit = 30) {
+  if (!isSupabaseConfigured(config)) return [];
+
+  const data = await supabaseRestRequest(
+    config,
+    `/game_results?select=*&order=finished_at.desc&limit=${Number(limit) || 30}`,
+    {
+      method: "GET",
+    }
+  );
+
+  return Array.isArray(data) ? data : [];
+}
+
+function getStatsAccuracy(row) {
+  const correct = Number(row?.correct_placements || 0);
+  const wrong = Number(row?.wrong_placements || 0);
+  const total = correct + wrong;
+
+  if (!total) return 0;
+
+  return Math.round((correct / total) * 100);
+}
+
+function formatStatsDate(value) {
+  if (!value) return "-";
+
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return String(value);
+  }
+}
+
+
 function getInitialSocketUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -2887,6 +3687,7 @@ export default function App() {
 
   const [playerName, setPlayerName] = useState("");
   const [playerNames, setPlayerNames] = useState(["Christoph", "Alex"]);
+  const [showStartScreen, setShowStartScreen] = useState(true);
   const [customTracks, setCustomTracks] = useState(() => loadStoredCustomTracks());
   const [selectedPreset, setSelectedPreset] = useState("all");
   const [selectedDifficulty, setSelectedDifficulty] = useState("normal");
@@ -2898,6 +3699,16 @@ export default function App() {
   );
   const [viewerPlayerId, setViewerPlayerId] = useState(() => getInitialViewerPlayerId());
   const [socketUrl, setSocketUrl] = useState(() => getInitialSocketUrl());
+  const [supabaseConfig, setSupabaseConfig] = useState(() => getInitialSupabaseConfig());
+  const [supabaseStatus, setSupabaseStatus] = useState(() =>
+    isSupabaseConfigured(getInitialSupabaseConfig()) ? "Supabase vorbereitet." : "Supabase noch nicht aktiv."
+  );
+  const [supabaseRoomPlayers, setSupabaseRoomPlayers] = useState([]);
+  const [supabaseStatsStatus, setSupabaseStatsStatus] = useState("Noch keine Statistik gespeichert.");
+  const [showStatsPage, setShowStatsPage] = useState(false);
+  const [statsPageStatus, setStatsPageStatus] = useState("Statistiken noch nicht geladen.");
+  const [playerStatsRows, setPlayerStatsRows] = useState([]);
+  const [gameResultRows, setGameResultRows] = useState([]);
   const [syncEnabled, setSyncEnabled] = useState(() => localStorage.getItem(SYNC_ENABLED_STORAGE_KEY) === "true");
   const [syncStatus, setSyncStatus] = useState("Sync nicht verbunden.");
   const [syncClientCount, setSyncClientCount] = useState(1);
@@ -2910,6 +3721,8 @@ export default function App() {
     remainingSeconds: 0,
     endsAt: 0,
   });
+  const [activeJokerBusy, setActiveJokerBusy] = useState(false);
+  const [activeJokerFeedback, setActiveJokerFeedback] = useState(null);
 
   const socketRef = useRef(null);
   const lastRemoteStateRef = useRef("");
@@ -2951,7 +3764,8 @@ export default function App() {
   })();
   const viewerRole = getViewerRoleFromPlayer(resolvedViewerPlayerId, gameState);
   const viewerPermissions = getViewerPermissions(viewerRole);
-  const showAdminPanels = gameState.phase === "lobby" || viewerRole === "host";
+  const isSetupHost = viewerRole === "host" || viewerPlayerId === "auto-host";
+  const showAdminPanels = isSetupHost;
   const showSpotifyPanel = showAdminPanels;
 
   const leaderboard = useMemo(() => {
@@ -2971,8 +3785,120 @@ export default function App() {
   }, [socketUrl]);
 
   useEffect(() => {
+    localStorage.setItem(SUPABASE_URL_STORAGE_KEY, supabaseConfig.url || "");
+    localStorage.setItem(SUPABASE_ANON_KEY_STORAGE_KEY, supabaseConfig.anonKey || "");
+    localStorage.setItem(SUPABASE_ENABLED_STORAGE_KEY, String(Boolean(supabaseConfig.enabled)));
+  }, [supabaseConfig]);
+
+  useEffect(() => {
     localStorage.setItem(SYNC_ENABLED_STORAGE_KEY, String(syncEnabled));
   }, [syncEnabled]);
+
+
+  useEffect(() => {
+    if (!isSupabaseConfigured(supabaseConfig) || gameState.phase !== "lobby" || showStartScreen) {
+      setSupabaseRoomPlayers([]);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const activeCode = String(gameState.room?.code || roomCode || "").trim().toUpperCase();
+
+    async function loadSupabaseLobbyPlayers({ quiet = false } = {}) {
+      if (!activeCode) return;
+
+      try {
+        const players = await fetchSupabaseRoomPlayers(supabaseConfig, activeCode);
+
+        if (cancelled) return;
+
+        setSupabaseRoomPlayers(players);
+
+        const mergedNames = mergePlayerNamesWithSupabase(playerNames, players);
+
+        if (!areNameListsEqual(playerNames, mergedNames)) {
+          setPlayerNames(mergedNames);
+        }
+
+        if (!quiet) {
+          setSupabaseStatus(`Supabase Lobby: ${players.length} Spieler gefunden.`);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setSupabaseStatus(`Supabase Lobby konnte nicht geladen werden: ${error.message || "Fehler"}`);
+        }
+      }
+    }
+
+    loadSupabaseLobbyPlayers();
+
+    const intervalId = window.setInterval(() => {
+      loadSupabaseLobbyPlayers({ quiet: true });
+    }, 2500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [
+    supabaseConfig.enabled,
+    supabaseConfig.url,
+    supabaseConfig.anonKey,
+    gameState.phase,
+    gameState.room?.code,
+    roomCode,
+    showStartScreen,
+    playerNames,
+  ]);
+
+
+  useEffect(() => {
+    if (!isSupabaseConfigured(supabaseConfig)) return;
+    if (gameState.phase !== "finished") return;
+    if (!isSetupHost) return;
+
+    const resultKey = getGameResultKey(activeRoomCode, gameState);
+
+    if (isSupabaseResultSaved(resultKey)) {
+      setSupabaseStatsStatus("Statistik für dieses Spiel wurde bereits gespeichert.");
+      return;
+    }
+
+    let cancelled = false;
+
+    async function persistFinishedGame() {
+      setSupabaseStatsStatus("Speichere Spielstatistik in Supabase...");
+
+      try {
+        const result = await saveSupabaseGameStats(supabaseConfig, gameState, activeRoomCode, supabaseRoomPlayers);
+
+        if (cancelled) return;
+
+        markSupabaseResultSaved(resultKey);
+        setSupabaseStatsStatus(result.message || "Spielstatistik gespeichert.");
+      } catch (error) {
+        if (!cancelled) {
+          setSupabaseStatsStatus(`Statistik konnte nicht gespeichert werden: ${error.message || "Fehler"}`);
+        }
+      }
+    }
+
+    persistFinishedGame();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    supabaseConfig.enabled,
+    supabaseConfig.url,
+    supabaseConfig.anonKey,
+    gameState.phase,
+    gameState.eventHistory,
+    gameState.players,
+    activeRoomCode,
+    isSetupHost,
+    supabaseRoomPlayers,
+  ]);
 
   useEffect(() => {
     if (!syncEnabled) {
@@ -3175,12 +4101,59 @@ export default function App() {
     sendGameAction({ type: "AWARD_SONG_GUESS_JOKER" });
   }
 
+  function handleClearSongGuessClaim() {
+    sendGameAction({ type: "CLEAR_SONG_GUESS_CLAIM" });
+  }
+
   function handleJokerClaim() {
     sendGameAction({ type: "JOKER_CLAIM", playerId: resolvedViewerPlayerId });
   }
 
-  function handleResolveJokerTie() {
-    sendGameAction({ type: "RESOLVE_JOKER_TIE" });
+  function handleStartJokerDuel() {
+    sendGameAction({ type: "START_JOKER_DUEL" });
+  }
+
+  function triggerActiveJokerFeedback(type) {
+    const feedback =
+      type === "swap"
+        ? {
+            id: createId("joker-ui"),
+            type: "swap",
+            title: "Tauschen-Joker eingesetzt",
+            text: "1 Joker verbraucht · neuer Song wurde gezogen",
+            icon: "🔄",
+          }
+        : {
+            id: createId("joker-ui"),
+            type: "secure",
+            title: "Karte-sichern-Joker eingesetzt",
+            text: "3 Joker verbraucht · Karte wurde automatisch gesichert",
+            icon: "🛡️",
+          };
+
+    setActiveJokerBusy(true);
+    setActiveJokerFeedback(feedback);
+
+    window.setTimeout(() => setActiveJokerBusy(false), 1400);
+    window.setTimeout(() => setActiveJokerFeedback(null), 2400);
+  }
+
+  function handleJokerDuelChoice(choice) {
+    sendGameAction({ type: "JOKER_DUEL_CHOICE", playerId: resolvedViewerPlayerId, choice });
+  }
+
+  function handleSwapTrackJoker() {
+    if (activeJokerBusy) return;
+
+    triggerActiveJokerFeedback("swap");
+    sendGameAction({ type: "TRACK_SWAP_JOKER" });
+  }
+
+  function handleAutoCardJoker() {
+    if (activeJokerBusy) return;
+
+    triggerActiveJokerFeedback("secure");
+    sendGameAction({ type: "TRACK_AUTO_CARD_JOKER" });
   }
 
   function handleNextPlayer() {
@@ -3243,6 +4216,107 @@ export default function App() {
     }
 
     dispatch(actionWithActor);
+  }
+
+  function updateSupabaseConfig(patch) {
+    setSupabaseConfig((previous) => ({
+      ...previous,
+      ...patch,
+    }));
+  }
+
+  async function handleTestSupabaseConnection() {
+    if (!isSupabaseConfigured(supabaseConfig)) {
+      setSupabaseStatus("Supabase URL oder anon public key fehlt.");
+      return;
+    }
+
+    setSupabaseStatus("Supabase Verbindung wird geprüft...");
+
+    try {
+      await testSupabaseConnection(supabaseConfig);
+      setSupabaseStatus("Supabase verbunden. Schema erreichbar.");
+    } catch (error) {
+      setSupabaseStatus(`Supabase nicht bereit: ${error.message || "Fehler"}`);
+    }
+  }
+
+  async function loadStatsPageData() {
+    if (!isSupabaseConfigured(supabaseConfig)) {
+      setStatsPageStatus("Supabase ist nicht aktiv oder nicht konfiguriert.");
+      setPlayerStatsRows([]);
+      setGameResultRows([]);
+      return;
+    }
+
+    setStatsPageStatus("Lade Statistiken aus Supabase...");
+
+    try {
+      const [players, results] = await Promise.all([
+        fetchSupabasePlayerStats(supabaseConfig, 100),
+        fetchSupabaseGameResults(supabaseConfig, 30),
+      ]);
+
+      setPlayerStatsRows(players);
+      setGameResultRows(results);
+      setStatsPageStatus(`${players.length} Spielerstatistiken · ${results.length} Spiele geladen.`);
+    } catch (error) {
+      setStatsPageStatus(`Statistiken konnten nicht geladen werden: ${error.message || "Fehler"}`);
+    }
+  }
+
+  function openStatsPage() {
+    setShowStatsPage(true);
+    loadStatsPageData();
+  }
+
+  async function applyStartSetup({ mode, name, roomCode: nextRoomCode }) {
+    const safeName = String(name || "").trim() || "Spieler";
+    const safeRoomCode = String(nextRoomCode || createRoomCode()).trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || createRoomCode();
+
+    setRoomCode(safeRoomCode);
+    setPlayerName("");
+    setPlayerNames((previous) => {
+      if (mode === "create") return [safeName];
+
+      return [safeName];
+    });
+    setViewerPlayerId(mode === "create" ? "auto-host" : "auto-player");
+    setSyncEnabled(true);
+
+    if (isSupabaseConfigured(supabaseConfig)) {
+      setSupabaseStatus("Supabase Raum wird vorbereitet...");
+
+      try {
+        const result = await registerSupabaseRoomEntry(supabaseConfig, {
+          mode,
+          roomCode: safeRoomCode,
+          name: safeName,
+          clientInstanceId,
+        });
+        setSupabaseStatus(result.message);
+      } catch (error) {
+        setSupabaseStatus(`Supabase Vorbereitung fehlgeschlagen: ${error.message || "Fehler"}`);
+      }
+    }
+
+    setShowStartScreen(false);
+
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("room", safeRoomCode);
+      url.searchParams.set("role", mode === "create" ? "host" : "player");
+      url.searchParams.set("server", socketUrl);
+      window.history.replaceState(null, "", url.toString());
+    } catch {
+      // ignore URL update
+    }
+  }
+
+  function backToStartScreen() {
+    if (gameState.phase !== "lobby") return;
+
+    setShowStartScreen(true);
   }
 
   function addPlayer() {
@@ -3348,6 +4422,7 @@ export default function App() {
 
   function resetGame() {
     localStorage.removeItem(GAME_STATE_STORAGE_KEY);
+    setShowStartScreen(true);
     sendGameAction({ type: "RESET_GAME" });
   }
 
@@ -3359,17 +4434,49 @@ export default function App() {
     width: "100%",
   };
 
+  if (showStatsPage) {
+    return (
+      <StatsPage
+        config={supabaseConfig}
+        status={statsPageStatus}
+        playerStats={playerStatsRows}
+        gameResults={gameResultRows}
+        onBack={() => setShowStatsPage(false)}
+        onRefresh={loadStatsPageData}
+      />
+    );
+  }
+
+  if (gameState.phase === "lobby" && showStartScreen) {
+    return (
+      <StartScreen
+        initialRoomCode={roomCode}
+        initialName={playerNames[0] || ""}
+        socketUrl={socketUrl}
+        syncStatus={syncStatus}
+        supabaseConfig={supabaseConfig}
+        supabaseStatus={supabaseStatus}
+        supabaseStatsStatus={supabaseStatsStatus}
+        onSupabaseConfigChange={updateSupabaseConfig}
+        onTestSupabase={handleTestSupabaseConnection}
+        onOpenStatsPage={openStatsPage}
+        onEnter={applyStartSetup}
+      />
+    );
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: colors.bg, color: colors.text, padding: gameState.phase === "lobby" ? 12 : 8, fontFamily: "Inter, system-ui, sans-serif", overflowX: "hidden" }}>
       <div style={{ maxWidth: gameState.phase === "lobby" ? 1320 : "100%", margin: "0 auto", display: "grid", gap: gameState.phase === "lobby" ? 14 : 8 }}>
         {showAdminPanels ? (
-          <HostControlArea onReset={resetGame} isInGame={gameState.phase !== "lobby"}>
+          <HostControlArea onReset={resetGame} onOpenStatsPage={openStatsPage} isInGame={gameState.phase !== "lobby"}>
             <WebsiteShareCard
               room={gameState.room}
               roomCode={roomCode}
               playerNames={playerNames}
               socketUrl={socketUrl}
               syncClientCount={syncClientCount}
+              supabaseConfig={supabaseConfig}
             />
 
             <MultiplayerSyncCard
@@ -3380,6 +4487,14 @@ export default function App() {
               setSyncEnabled={setSyncEnabled}
               syncStatus={syncStatus}
               syncClientCount={syncClientCount}
+            />
+
+            <SupabaseFoundationCard
+              config={supabaseConfig}
+              status={supabaseStatus}
+              statsStatus={supabaseStatsStatus}
+              onChange={updateSupabaseConfig}
+              onTest={handleTestSupabaseConnection}
             />
 
             {showSpotifyPanel && (
@@ -3423,16 +4538,20 @@ export default function App() {
           gameState.phase === "lobby" && <Header onReset={resetGame} isInGame={false} />
         )}
 
-        {gameState.phase === "lobby" && (
+        {gameState.phase === "lobby" && isSetupHost && (
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.35fr) minmax(280px, 0.65fr)", gap: 24 }}>
             <main style={{ display: "grid", gap: 16, minWidth: 0 }}>
               <LobbyCard
                 playerName={playerName}
                 setPlayerName={setPlayerName}
                 playerNames={playerNames}
+                supabaseRoomPlayers={supabaseRoomPlayers}
+                supabaseEnabled={isSupabaseConfigured(supabaseConfig)}
                 addPlayer={addPlayer}
                 removePlayer={removePlayer}
                 startGame={startGame}
+                backToStartScreen={backToStartScreen}
+                onOpenStatsPage={openStatsPage}
                 availableDeck={availableDeck}
                 fullDeck={fullDeck}
                 selectedPreset={selectedPreset}
@@ -3453,6 +4572,18 @@ export default function App() {
               <RulesCard />
             </aside>
           </div>
+        )}
+
+        {gameState.phase === "lobby" && !isSetupHost && (
+          <PlayerLobbyWaitingView
+            roomCode={roomCode}
+            playerName={playerNames[0] || "Spieler"}
+            supabaseRoomPlayers={supabaseRoomPlayers}
+            syncStatus={syncStatus}
+            supabaseStatus={supabaseStatus}
+            onBack={() => setShowStartScreen(true)}
+            onOpenStatsPage={openStatsPage}
+          />
         )}
 
         {gameState.phase !== "lobby" && gameState.players.length > 0 && (
@@ -3482,6 +4613,9 @@ export default function App() {
                     canHostControl={viewerPermissions.canHostControl}
                     canDrawTrack={viewerPermissions.canDrawTrack}
                     canPlayTrack={viewerPermissions.canPlayTrack}
+                    canUseActiveJoker={viewerPermissions.canUseActiveJoker}
+                    activeJokers={getPlayerJokers(activePlayer)}
+                    jokerActionBusy={activeJokerBusy}
                     playbackRemainingSeconds={
                       roomPlaybackTimer.trackId === gameState.currentTrack?.id ? roomPlaybackTimer.remainingSeconds : 0
                     }
@@ -3490,7 +4624,14 @@ export default function App() {
                     onPlayTrack={handleSongStart}
                     onToggleDebug={() => sendGameAction({ type: "TOGGLE_DEBUG_SONG" })}
                     onDrawTrack={() => sendGameAction({ type: "TRACK_DRAWN" })}
+                    onSwapTrack={handleSwapTrackJoker}
+                    onAutoCard={handleAutoCardJoker}
                     onSkipTrack={() => sendGameAction({ type: "TRACK_SKIPPED" })}
+                  />
+
+                  <JokerActionNotice
+                    localFeedback={activeJokerFeedback}
+                    latestEvent={gameState.eventHistory?.[0]}
                   />
 
                   {gameState.phase === "placing" && gameState.currentTrack && (
@@ -3516,14 +4657,6 @@ export default function App() {
 
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         <ActionPill
-                          onClick={handleAwardSongGuessJoker}
-                          disabled={!viewerPermissions.canAwardJoker || gameState.currentTrackJokerAwarded}
-                          hint="Song + Interpret korrekt genannt"
-                        >
-                          +1 Joker verdienen
-                        </ActionPill>
-
-                        <ActionPill
                           onClick={handleConfirmPlacement}
                           disabled={gameState.selectedInsertIndex === null || !viewerPermissions.canConfirmPlacement}
                           hint="Joker-Fenster öffnen"
@@ -3543,7 +4676,8 @@ export default function App() {
                       canThrowJoker={canPlayerThrowJoker(gameState, resolvedViewerPlayerId)}
                       canResolveTie={viewerPermissions.canResolveJokerTie}
                       onThrowJoker={handleJokerClaim}
-                      onResolveTie={handleResolveJokerTie}
+                      onStartDuel={handleStartJokerDuel}
+                      onDuelChoice={handleJokerDuelChoice}
                       onReveal={handleRevealTrack}
                     />
                   )}
@@ -3568,15 +4702,26 @@ export default function App() {
                       timeline={activeTimeline}
                       onNext={handleNextPlayer}
                       canAdvance={viewerPermissions.canAdvance}
+                      canAwardJoker={viewerPermissions.canAwardJoker}
+                      jokerGuessReviewed={gameState.currentTrackJokerGuessReviewed}
+                      jokerGuessAwarded={gameState.currentTrackJokerAwarded}
+                      onAwardJoker={handleAwardSongGuessJoker}
+                      onDenyJoker={handleClearSongGuessClaim}
                     />
                   )}
 
                   {gameState.phase === "finished" && (
-                    <FinishedPanel
-                      leaderboard={leaderboard}
-                      onNewRound={startNewRound}
-                      canNewRound={viewerPermissions.canHostControl}
-                    />
+                    <>
+                      <FinishedPanel
+                        leaderboard={leaderboard}
+                        onNewRound={startNewRound}
+                        canNewRound={viewerPermissions.canHostControl}
+                      />
+
+                      {isSupabaseConfigured(supabaseConfig) && (
+                        <SupabaseStatsSavedNotice status={supabaseStatsStatus} />
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>
@@ -3606,7 +4751,512 @@ export default function App() {
   );
 }
 
-function Header({ onReset, isInGame }) {
+
+
+
+
+
+function StatsPage({ config, status, playerStats = [], gameResults = [], onBack, onRefresh }) {
+  const totalGames = gameResults.length;
+  const totalCards = playerStats.reduce((sum, row) => sum + Number(row.cards_won || 0), 0);
+  const totalWins = playerStats.reduce((sum, row) => sum + Number(row.wins || 0), 0);
+  const topPlayer = playerStats[0] || null;
+
+  return (
+    <div style={{ minHeight: "100vh", background: colors.bg, color: colors.text, fontFamily: "Inter, system-ui, sans-serif", padding: 18 }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto", display: "grid", gap: 16 }}>
+        <header style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div>
+            <Badge variant={isSupabaseConfigured(config) ? "default" : "secondary"}>Profil & Statistiken</Badge>
+            <h1 style={{ margin: "8px 0 4px", fontSize: 38, letterSpacing: -1 }}>Trackline Statistiken</h1>
+            <p style={{ margin: 0, color: colors.muted }}>
+              Persönliche Werte, letzte Spiele und Joker-Auswertung aus Supabase.
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Button variant="secondary" onClick={onRefresh}>
+              Aktualisieren
+            </Button>
+            <Button variant="secondary" onClick={onBack}>
+              Zurück
+            </Button>
+          </div>
+        </header>
+
+        <Card>
+          <CardContent style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 }}>
+            <InfoTile label="Geladene Spiele" value={`${totalGames}`} />
+            <InfoTile label="Spielerprofile" value={`${playerStats.length}`} />
+            <InfoTile label="Karten gesamt" value={`${totalCards}`} />
+            <InfoTile label="Top-Spieler" value={topPlayer?.display_name || "-"} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent style={{ display: "grid", gap: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <strong>Status</strong>
+              <Badge variant="secondary">{isSupabaseConfigured(config) ? "Supabase aktiv" : "Supabase fehlt"}</Badge>
+            </div>
+            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>{status}</p>
+          </CardContent>
+        </Card>
+
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.4fr) minmax(320px, 0.6fr)", gap: 16 }}>
+          <Card>
+            <CardContent style={{ display: "grid", gap: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                <h2 style={{ margin: 0 }}>Spieler-Ranking</h2>
+                <Badge variant="secondary">nach Siegen</Badge>
+              </div>
+
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
+                  <thead>
+                    <tr style={{ color: colors.muted, fontSize: 12, textAlign: "left" }}>
+                      <th style={{ padding: "8px 6px" }}>#</th>
+                      <th style={{ padding: "8px 6px" }}>Spieler</th>
+                      <th style={{ padding: "8px 6px" }}>Spiele</th>
+                      <th style={{ padding: "8px 6px" }}>Siege</th>
+                      <th style={{ padding: "8px 6px" }}>Karten</th>
+                      <th style={{ padding: "8px 6px" }}>Quote</th>
+                      <th style={{ padding: "8px 6px" }}>Joker</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {playerStats.length === 0 && (
+                      <tr>
+                        <td colSpan={7} style={{ padding: 12, color: colors.muted }}>
+                          Noch keine Spielerstatistiken vorhanden.
+                        </td>
+                      </tr>
+                    )}
+
+                    {playerStats.map((row, index) => (
+                      <tr key={row.id || row.guest_id || row.display_name} style={{ borderTop: `1px solid ${colors.border}` }}>
+                        <td style={{ padding: "10px 6px", fontWeight: 900 }}>{index + 1}</td>
+                        <td style={{ padding: "10px 6px", fontWeight: 900 }}>{row.display_name}</td>
+                        <td style={{ padding: "10px 6px" }}>{row.games_played || 0}</td>
+                        <td style={{ padding: "10px 6px" }}>{row.wins || 0}</td>
+                        <td style={{ padding: "10px 6px" }}>{row.cards_won || 0}</td>
+                        <td style={{ padding: "10px 6px" }}>{getStatsAccuracy(row)}%</td>
+                        <td style={{ padding: "10px 6px", color: colors.muted, fontSize: 12 }}>
+                          🃏 +{row.earned_jokers || 0} · 🔄 {row.swap_jokers_used || 0} · 🛡️ {row.secure_card_jokers_used || 0}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent style={{ display: "grid", gap: 12 }}>
+              <h2 style={{ margin: 0 }}>Joker-Übersicht</h2>
+
+              {playerStats.slice(0, 8).map((row) => (
+                <div
+                  key={`joker-${row.id || row.guest_id || row.display_name}`}
+                  style={{
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: 14,
+                    padding: 10,
+                    background: colors.bg,
+                    display: "grid",
+                    gap: 5,
+                  }}
+                >
+                  <strong>{row.display_name}</strong>
+                  <span style={{ color: colors.muted, fontSize: 12 }}>
+                    Challenge: {row.challenge_jokers_used || 0} genutzt · {row.challenge_jokers_won || 0} gewonnen
+                  </span>
+                  <span style={{ color: colors.muted, fontSize: 12 }}>
+                    Tauschen: {row.swap_jokers_used || 0} · Karte sichern: {row.secure_card_jokers_used || 0} · verdient: {row.earned_jokers || 0}
+                  </span>
+                </div>
+              ))}
+
+              {playerStats.length === 0 && <p style={{ margin: 0, color: colors.muted }}>Noch keine Joker-Statistiken.</p>}
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardContent style={{ display: "grid", gap: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+              <h2 style={{ margin: 0 }}>Letzte Spiele</h2>
+              <Badge variant="secondary">{gameResults.length}</Badge>
+            </div>
+
+            <div style={{ display: "grid", gap: 8 }}>
+              {gameResults.length === 0 && <p style={{ margin: 0, color: colors.muted }}>Noch keine gespeicherten Spiele.</p>}
+
+              {gameResults.map((result) => {
+                const playerSummary = Array.isArray(result.summary?.players) ? result.summary.players : [];
+
+                return (
+                  <div
+                    key={result.id}
+                    style={{
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: 16,
+                      padding: 12,
+                      background: colors.bg,
+                      display: "grid",
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                      <strong>Raum {result.room_code || "-"} · Gewinner: {result.winner_name || "-"}</strong>
+                      <Badge variant="secondary">{formatStatsDate(result.finished_at)}</Badge>
+                    </div>
+
+                    <p style={{ margin: 0, color: colors.muted, fontSize: 12 }}>
+                      Modus: {result.game_mode || "-"} · Ziel: {result.target_score || "-"} Karten
+                    </p>
+
+                    {playerSummary.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {playerSummary.slice(0, 8).map((player) => (
+                          <span
+                            key={`${result.id}-${player.name}`}
+                            style={{
+                              border: `1px solid ${colors.border}`,
+                              borderRadius: 999,
+                              padding: "5px 8px",
+                              color: colors.muted,
+                              fontSize: 12,
+                            }}
+                          >
+                            {player.name}: {player.score}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function SupabaseStatsSavedNotice({ status }) {
+  return (
+    <div
+      style={{
+        border: `1px solid ${colors.border}`,
+        borderRadius: 18,
+        padding: 12,
+        background: "rgba(126,87,255,0.10)",
+        display: "flex",
+        justifyContent: "space-between",
+        gap: 12,
+        alignItems: "center",
+        flexWrap: "wrap",
+      }}
+    >
+      <div>
+        <strong>Supabase-Statistiken</strong>
+        <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>{status || "Warte auf Speicherung..."}</p>
+      </div>
+
+      <Badge variant="secondary">Phase 4</Badge>
+    </div>
+  );
+}
+
+function PlayerLobbyWaitingView({ roomCode, playerName, supabaseRoomPlayers = [], syncStatus, supabaseStatus, onBack, onOpenStatsPage }) {
+  return (
+    <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gap: 16 }}>
+      <Card>
+        <CardContent style={{ display: "grid", gap: 16 }}>
+          <div
+            style={{
+              borderRadius: 24,
+              padding: 18,
+              background: cardTheme.table,
+              border: `1px solid ${colors.border}`,
+              display: "grid",
+              gap: 8,
+            }}
+          >
+            <Badge variant="secondary">Spieler-Lobby</Badge>
+            <h2 style={{ fontSize: 32, margin: "4px 0 0", letterSpacing: -0.8 }}>Du bist im Raum {roomCode}</h2>
+            <p style={{ color: colors.muted, margin: 0 }}>
+              {playerName} ist beigetreten. Warte, bis der Host die Runde vorbereitet und startet.
+            </p>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+            <InfoTile label="Raum" value={roomCode || "-"} />
+            <InfoTile label="Sync" value={syncStatus || "-"} />
+            <InfoTile label="Supabase" value={supabaseStatus || "-"} />
+          </div>
+
+          <div style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 12, background: colors.bg, display: "grid", gap: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+              <strong>Spieler im Raum</strong>
+              <Badge variant="secondary">{supabaseRoomPlayers.length}</Badge>
+            </div>
+
+            {supabaseRoomPlayers.length === 0 ? (
+              <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>Noch keine Supabase-Spielerliste geladen.</p>
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {supabaseRoomPlayers.map((player) => (
+                  <span
+                    key={`${player.guestId}-${player.displayName}`}
+                    style={{
+                      border: `1px solid ${player.isHost ? colors.primary : colors.border}`,
+                      borderRadius: 999,
+                      padding: "8px 11px",
+                      background: player.isHost ? "rgba(126,87,255,0.18)" : colors.chip,
+                      fontWeight: 850,
+                    }}
+                  >
+                    {player.isHost ? "Host · " : ""}
+                    {player.displayName}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Button variant="secondary" onClick={onOpenStatsPage}>
+              Statistiken
+            </Button>
+            <Button variant="secondary" onClick={onBack}>
+              Zurück zur Startseite
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SupabaseFoundationCard({ config, status, statsStatus, onChange, onTest, compact = false }) {
+  const enabled = Boolean(config?.enabled);
+
+  return (
+    <Card>
+      <CardContent style={{ display: "grid", gap: compact ? 10 : 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+          <div>
+            <Badge variant={enabled ? "default" : "secondary"}>Supabase Phase 4</Badge>
+            <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5 }}>Lobby + Statistiken speichern</h2>
+            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+              Optionaler Datenbank-Anschluss. Solange Supabase nicht aktiv ist, läuft Trackline wie bisher über den bestehenden Sync.
+            </p>
+          </div>
+
+          <Button variant="secondary" onClick={onTest}>
+            Verbindung testen
+          </Button>
+        </div>
+
+        <label style={{ display: "flex", gap: 8, alignItems: "center", color: colors.muted, fontSize: 13 }}>
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(event) => onChange?.({ enabled: event.target.checked })}
+          />
+          Supabase aktivieren
+        </label>
+
+        <div style={{ display: "grid", gridTemplateColumns: compact ? "1fr" : "minmax(0, 1fr) minmax(0, 1fr)", gap: 10 }}>
+          <label style={{ display: "grid", gap: 8 }}>
+            <span style={{ color: colors.muted, fontSize: 13 }}>Project URL</span>
+            <Input
+              value={config?.url || ""}
+              onChange={(event) => onChange?.({ url: event.target.value })}
+              placeholder="https://xxxxx.supabase.co"
+            />
+          </label>
+
+          <label style={{ display: "grid", gap: 8 }}>
+            <span style={{ color: colors.muted, fontSize: 13 }}>anon public key</span>
+            <Input
+              value={config?.anonKey || ""}
+              onChange={(event) => onChange?.({ anonKey: event.target.value })}
+              placeholder="eyJhbGciOi..."
+              type="password"
+            />
+          </label>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: compact ? "1fr" : "1fr 1fr", gap: 10 }}>
+          <div style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg }}>
+            <span style={{ display: "block", color: colors.muted, fontSize: 12 }}>Status</span>
+            <strong style={{ display: "block", marginTop: 4, fontSize: 13 }}>{status || "Nicht verbunden."}</strong>
+          </div>
+
+          <div style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg }}>
+            <span style={{ display: "block", color: colors.muted, fontSize: 12 }}>Statistiken</span>
+            <strong style={{ display: "block", marginTop: 4, fontSize: 13 }}>{statsStatus || "Noch keine Statistik gespeichert."}</strong>
+          </div>
+        </div>
+
+        {!compact && (
+          <p style={{ margin: 0, color: colors.muted, fontSize: 12 }}>
+            Phase 4 liest room_players automatisch in die Lobby ein und speichert Ergebnisse/Spielerstatistiken nach Spielende. Der Spiel-Sync bleibt vorerst beim bisherigen Server.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supabaseConfig, supabaseStatus, supabaseStatsStatus, onSupabaseConfigChange, onTestSupabase, onOpenStatsPage, onEnter }) {
+  const [name, setName] = useState(initialName || "");
+  const [joinCode, setJoinCode] = useState(String(initialRoomCode || "").toUpperCase());
+  const [createdCode, setCreatedCode] = useState(() => createRoomCode());
+
+  function normalizeCode(value) {
+    return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+  }
+
+  function createRoom() {
+    const nextCode = normalizeCode(createdCode) || createRoomCode();
+
+    onEnter({
+      mode: "create",
+      name,
+      roomCode: nextCode,
+    });
+  }
+
+  function joinRoom() {
+    const nextCode = normalizeCode(joinCode);
+
+    if (!nextCode) {
+      window.alert("Bitte gib einen Raumcode ein.");
+      return;
+    }
+
+    onEnter({
+      mode: "join",
+      name,
+      roomCode: nextCode,
+    });
+  }
+
+  function regenerateCode() {
+    setCreatedCode(createRoomCode());
+  }
+
+  const canContinue = String(name || "").trim().length > 0;
+
+  return (
+    <div style={{ minHeight: "100vh", background: colors.bg, color: colors.text, fontFamily: "Inter, system-ui, sans-serif", padding: 18, display: "grid", placeItems: "center" }}>
+      <div style={{ width: "min(1040px, 100%)", display: "grid", gap: 18 }}>
+        <header style={{ display: "grid", gap: 8, textAlign: "center" }}>
+          <Badge variant="secondary">Trackline Phase 1</Badge>
+          <h1 style={{ margin: 0, fontSize: 46, letterSpacing: -1.4 }}>Trackline starten</h1>
+          <p style={{ margin: "0 auto", color: colors.muted, maxWidth: 720, lineHeight: 1.5 }}>
+            Erstelle einen privaten Raum oder tritt einem bestehenden Raum bei. Spotify bleibt unverändert optional – der Host kann weiterhin manuell, per Discord Stream oder Spotify Jam abspielen.
+          </p>
+
+          <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
+            <Button variant="secondary" onClick={onOpenStatsPage}>
+              Profil & Statistiken ansehen
+            </Button>
+          </div>
+        </header>
+
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 16 }}>
+          <Card>
+            <CardContent style={{ display: "grid", gap: 14 }}>
+              <div>
+                <Badge>Neuer Raum</Badge>
+                <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5 }}>Raum erstellen</h2>
+                <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+                  Du wirst Host und kannst danach Spieler, Teams und Regeln vorbereiten.
+                </p>
+              </div>
+
+              <label style={{ display: "grid", gap: 8 }}>
+                <span style={{ color: colors.muted, fontSize: 13 }}>Dein Name</span>
+                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="z. B. Christoph" />
+              </label>
+
+              <label style={{ display: "grid", gap: 8 }}>
+                <span style={{ color: colors.muted, fontSize: 13 }}>Raumcode</span>
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 8 }}>
+                  <Input value={createdCode} onChange={(event) => setCreatedCode(normalizeCode(event.target.value))} />
+                  <Button variant="secondary" onClick={regenerateCode}>
+                    Neu
+                  </Button>
+                </div>
+              </label>
+
+              <Button onClick={createRoom} disabled={!canContinue} style={{ padding: "14px 18px" }}>
+                Raum erstellen
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent style={{ display: "grid", gap: 14 }}>
+              <div>
+                <Badge variant="secondary">Beitreten</Badge>
+                <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5 }}>Raum beitreten</h2>
+                <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+                  Gib den Raumcode ein. Falls die Lobby noch vorbereitet wird, kann der Host dich wie bisher als Spieler hinzufügen.
+                </p>
+              </div>
+
+              <label style={{ display: "grid", gap: 8 }}>
+                <span style={{ color: colors.muted, fontSize: 13 }}>Dein Name</span>
+                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="z. B. Alex" />
+              </label>
+
+              <label style={{ display: "grid", gap: 8 }}>
+                <span style={{ color: colors.muted, fontSize: 13 }}>Raumcode</span>
+                <Input
+                  value={joinCode}
+                  onChange={(event) => setJoinCode(normalizeCode(event.target.value))}
+                  onKeyDown={(event) => event.key === "Enter" && canContinue && joinRoom()}
+                  placeholder="ABC123"
+                />
+              </label>
+
+              <Button onClick={joinRoom} disabled={!canContinue || !normalizeCode(joinCode)} style={{ padding: "14px 18px" }}>
+                Raum beitreten
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardContent style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+            <InfoTile label="Online-Sync" value="wird aktiviert" />
+            <InfoTile label="Server" value={String(socketUrl || "").replace(/^https?:\/\//, "") || "-"} />
+            <InfoTile label="Status" value={syncStatus || "bereit"} />
+          </CardContent>
+        </Card>
+
+        <SupabaseFoundationCard
+          compact
+          config={supabaseConfig}
+          status={supabaseStatus}
+          statsStatus={supabaseStatsStatus}
+          onChange={onSupabaseConfigChange}
+          onTest={onTestSupabase}
+        />
+      </div>
+    </div>
+  );
+}
+
+function Header({ onReset, onOpenStatsPage, isInGame }) {
   return (
     <header style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
       <div>
@@ -3614,15 +5264,23 @@ function Header({ onReset, isInGame }) {
         <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>Privates Musik-Timeline-Quiz als Web-Spiel</p>
       </div>
 
-      <Button variant="secondary" onClick={onReset}>
-        {isInGame ? "Spiel beenden" : "Neustart"}
-      </Button>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {onOpenStatsPage && (
+          <Button variant="secondary" onClick={onOpenStatsPage}>
+            Statistiken
+          </Button>
+        )}
+
+        <Button variant="secondary" onClick={onReset}>
+          {isInGame ? "Spiel beenden" : "Neustart"}
+        </Button>
+      </div>
     </header>
   );
 }
 
 
-function HostControlArea({ children, onReset, isInGame }) {
+function HostControlArea({ children, onReset, onOpenStatsPage, isInGame }) {
   return (
     <details
       open={!isInGame}
@@ -3664,7 +5322,7 @@ function HostControlArea({ children, onReset, isInGame }) {
       </summary>
 
       <div style={{ display: "grid", gap: 12, padding: "0 12px 12px" }}>
-        <Header onReset={onReset} isInGame={isInGame} />
+        <Header onReset={onReset} onOpenStatsPage={onOpenStatsPage} isInGame={isInGame} />
         {children}
       </div>
     </details>
@@ -3672,14 +5330,17 @@ function HostControlArea({ children, onReset, isInGame }) {
 }
 
 
-function WebsiteShareCard({ room, roomCode, playerNames, socketUrl, syncClientCount = 1 }) {
+function WebsiteShareCard({ room, roomCode, playerNames, socketUrl, syncClientCount = 1, supabaseConfig }) {
   const activeRoomCode = room?.code || roomCode;
   const hostName = room?.hostName || playerNames[0] || "Host";
   const [copied, setCopied] = useState(false);
   const normalizedSocketUrl = String(socketUrl || "").trim().replace(/\/+$/, "");
+  const supabaseParams = isSupabaseConfigured(supabaseConfig)
+    ? `&supabaseUrl=${encodeURIComponent(normalizeSupabaseUrl(supabaseConfig.url))}&supabaseKey=${encodeURIComponent(supabaseConfig.anonKey)}`
+    : "";
   const joinUrl =
     typeof window !== "undefined"
-      ? `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(activeRoomCode)}&role=player&server=${encodeURIComponent(normalizedSocketUrl)}`
+      ? `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(activeRoomCode)}&role=player&server=${encodeURIComponent(normalizedSocketUrl)}${supabaseParams}`
       : "";
 
   async function copyJoinUrl() {
@@ -3729,6 +5390,11 @@ function WebsiteShareCard({ room, roomCode, playerNames, socketUrl, syncClientCo
         <details style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 14, background: colors.bg }}>
           <summary style={{ cursor: "pointer", fontWeight: 900 }}>Einladungslink anzeigen</summary>
           <p style={{ margin: "10px 0 0", color: colors.muted, wordBreak: "break-all", fontSize: 13 }}>{joinUrl}</p>
+          {isSupabaseConfigured(supabaseConfig) && (
+            <p style={{ margin: "8px 0 0", color: colors.muted, fontSize: 12 }}>
+              Enthält den öffentlichen Supabase anon key, damit Inkognito-/Freunde-Links automatisch in dieselbe Lobby schreiben können.
+            </p>
+          )}
         </details>
       </CardContent>
     </Card>
@@ -4436,9 +6102,13 @@ function LobbyCard({
   playerName,
   setPlayerName,
   playerNames,
+  supabaseRoomPlayers = [],
+  supabaseEnabled = false,
   addPlayer,
   removePlayer,
   startGame,
+  backToStartScreen,
+  onOpenStatsPage,
   availableDeck,
   fullDeck,
   selectedPreset,
@@ -4492,7 +6162,17 @@ function LobbyCard({
             gap: 8,
           }}
         >
-          <Badge variant="secondary">Lobby</Badge>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <Badge variant="secondary">Lobby</Badge>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Button variant="secondary" onClick={onOpenStatsPage} style={{ padding: "7px 10px", borderRadius: 12 }}>
+                Statistiken
+              </Button>
+              <Button variant="secondary" onClick={backToStartScreen} style={{ padding: "7px 10px", borderRadius: 12 }}>
+                Zur Startseite
+              </Button>
+            </div>
+          </div>
           <h2 style={{ fontSize: 30, margin: "4px 0 0", letterSpacing: -0.8 }}>Runde vorbereiten</h2>
           <p style={{ color: colors.muted, margin: 0 }}>
             Spieler hinzufügen, Ziel festlegen und dann die erste verdeckte Karte ziehen.
@@ -4537,6 +6217,49 @@ function LobbyCard({
             ))}
           </div>
         </div>
+
+        {supabaseEnabled && (
+          <div
+            style={{
+              border: `1px solid ${colors.border}`,
+              borderRadius: 16,
+              padding: 12,
+              background: "rgba(126,87,255,0.10)",
+              display: "grid",
+              gap: 8,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <strong>Auto-Join über Supabase</strong>
+              <Badge variant="secondary">{supabaseRoomPlayers.length} verbunden</Badge>
+            </div>
+
+            <p style={{ margin: 0, color: colors.muted, fontSize: 12 }}>
+              Spieler, die auf der Startseite diesem Raum beitreten, werden automatisch in diese Lobby-Liste übernommen.
+            </p>
+
+            {supabaseRoomPlayers.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {supabaseRoomPlayers.map((player) => (
+                  <span
+                    key={`${player.guestId}-${player.displayName}`}
+                    style={{
+                      border: `1px solid ${player.isHost ? colors.primary : colors.border}`,
+                      borderRadius: 999,
+                      padding: "6px 9px",
+                      background: player.isHost ? "rgba(126,87,255,0.18)" : colors.bg,
+                      fontSize: 12,
+                      fontWeight: 850,
+                    }}
+                  >
+                    {player.isHost ? "Host · " : ""}
+                    {player.displayName}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <label style={{ display: "grid", gap: 8 }}>
           <span style={{ color: colors.muted, fontSize: 14 }}>Startspieler</span>
@@ -5198,6 +6921,101 @@ function ActionPill({ children, onClick, disabled, variant = "primary", hint }) 
 
 
 
+
+function getJokerActionNoticeFromEvent(event) {
+  if (!event) return null;
+
+  if (event.type === "TRACK_SWAPPED") {
+    return {
+      id: event.id,
+      type: "swap",
+      title: "Tauschen-Joker eingesetzt",
+      text: event.details || "1 Joker verbraucht · neuer Song wurde gezogen",
+      icon: "🔄",
+    };
+  }
+
+  if (event.type === "TRACK_AUTO_CARD_JOKER") {
+    return {
+      id: event.id,
+      type: "secure",
+      title: "Karte-sichern-Joker eingesetzt",
+      text: event.details || "3 Joker verbraucht · Karte wurde automatisch gesichert",
+      icon: "🛡️",
+    };
+  }
+
+  return null;
+}
+
+function JokerActionNotice({ localFeedback, latestEvent }) {
+  const notice = localFeedback || getJokerActionNoticeFromEvent(latestEvent);
+
+  if (!notice) return null;
+
+  const isSecure = notice.type === "secure";
+
+  return (
+    <div
+      key={notice.id}
+      style={{
+        border: `1px solid ${isSecure ? "#f59e0b" : colors.primary}`,
+        borderRadius: 20,
+        padding: "12px 14px",
+        background: isSecure
+          ? "linear-gradient(135deg, rgba(245,158,11,0.22), rgba(15,23,42,0.86))"
+          : "linear-gradient(135deg, rgba(126,87,255,0.26), rgba(15,23,42,0.86))",
+        display: "flex",
+        justifyContent: "space-between",
+        gap: 12,
+        alignItems: "center",
+        boxShadow: isSecure ? "0 18px 42px rgba(245,158,11,0.16)" : "0 18px 42px rgba(126,87,255,0.18)",
+        animation: "tracklineJokerNoticeIn 520ms ease-out both, tracklineJokerNoticePulse 900ms ease-out 120ms",
+      }}
+    >
+      <style>
+        {`
+          @keyframes tracklineJokerNoticeIn {
+            0% { transform: translateY(-10px) scale(0.97); opacity: 0; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
+          }
+
+          @keyframes tracklineJokerNoticePulse {
+            0% { box-shadow: 0 0 0 0 rgba(245,158,11,0.00); }
+            35% { box-shadow: 0 0 0 7px rgba(245,158,11,0.14), 0 18px 42px rgba(0,0,0,0.22); }
+            100% { box-shadow: 0 18px 42px rgba(0,0,0,0.18); }
+          }
+        `}
+      </style>
+
+      <div style={{ display: "flex", gap: 12, alignItems: "center", minWidth: 0 }}>
+        <div
+          style={{
+            width: 46,
+            height: 46,
+            borderRadius: "50%",
+            display: "grid",
+            placeItems: "center",
+            background: isSecure ? "rgba(245,158,11,0.24)" : "rgba(126,87,255,0.24)",
+            border: `1px solid ${isSecure ? "#f59e0b" : colors.primary}`,
+            fontSize: 24,
+            flex: "0 0 auto",
+          }}
+        >
+          {notice.icon}
+        </div>
+
+        <div style={{ minWidth: 0 }}>
+          <strong style={{ display: "block", fontSize: 15 }}>{notice.title}</strong>
+          <span style={{ display: "block", color: colors.muted, fontSize: 12, marginTop: 2 }}>{notice.text}</span>
+        </div>
+      </div>
+
+      <Badge variant={isSecure ? "default" : "secondary"}>{isSecure ? "3 Joker" : "1 Joker"}</Badge>
+    </div>
+  );
+}
+
 function CurrentTrackPanel({
   phase,
   currentTrack,
@@ -5205,12 +7023,17 @@ function CurrentTrackPanel({
   canHostControl,
   canDrawTrack,
   canPlayTrack,
+  canUseActiveJoker,
+  activeJokers = 0,
+  jokerActionBusy = false,
   playbackRemainingSeconds = 0,
   playbackTotalSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS,
   playbackRequester = "",
   onPlayTrack,
   onToggleDebug,
   onDrawTrack,
+  onSwapTrack,
+  onAutoCard,
   onSkipTrack,
 }) {
   const revealed = currentTrack && (phase === "reveal" || showDebugSong);
@@ -5276,6 +7099,24 @@ function CurrentTrackPanel({
                 Song starten
               </ActionPill>
 
+              <ActionPill
+                variant="secondary"
+                onClick={onSwapTrack}
+                disabled={jokerActionBusy || !canUseActiveJoker || activeJokers < 1}
+                hint={jokerActionBusy ? "Joker läuft..." : "1 Joker"}
+              >
+                {jokerActionBusy ? "Wird genutzt..." : "Tauschen"}
+              </ActionPill>
+
+              <ActionPill
+                variant="secondary"
+                onClick={onAutoCard}
+                disabled={jokerActionBusy || !canUseActiveJoker || activeJokers < 3}
+                hint={jokerActionBusy ? "Joker läuft..." : "3 Joker"}
+              >
+                {jokerActionBusy ? "Wird genutzt..." : "Karte sichern"}
+              </ActionPill>
+
               {canHostControl && (
                 <ActionPill variant="secondary" onClick={onSkipTrack} hint="Host-only">
                   Ueberspringen
@@ -5296,25 +7137,46 @@ function CurrentTrackPanel({
 }
 
 
-function JokerChallengePanel({ gameState, activePlayer, viewerPlayerId, canReveal, canThrowJoker, canResolveTie, onThrowJoker, onResolveTie, onReveal }) {
+function JokerChallengePanel({ gameState, activePlayer, viewerPlayerId, canReveal, canThrowJoker, canResolveTie, onThrowJoker, onStartDuel, onDuelChoice, onReveal }) {
   const claims = gameState.jokerClaims || [];
   const selectedChallenger = getSelectedJokerPlayer(gameState.players, gameState.selectedJokerPlayerId);
   const claimNames = getJokerClaimNames(gameState.players, claims);
-  const needsTie = claims.length > 1 && !selectedChallenger;
-  const revealDisabled = !canReveal || needsTie;
+  const duel = gameState.jokerDuel || createInitialJokerDuelState();
+  const needsDuel = claims.length > 1 && !selectedChallenger;
+  const duelActive = Boolean(needsDuel && duel.active);
+  const revealDisabled = !canReveal || needsDuel || duelActive;
   const viewerPlayer = getPlayerById(gameState.players, viewerPlayerId);
+  const duelPlayerIds = duelActive ? duel.playerIds || [] : claims.map((claim) => claim.playerId);
+  const viewerIsInDuel = duelActive && duelPlayerIds.includes(viewerPlayerId);
+  const viewerChoice = duel.choices?.[viewerPlayerId] || "";
+  const lastDuelResult = duel.lastResult || null;
 
   return (
     <div
       style={{
-        border: `1px solid ${needsTie ? "#f59e0b" : colors.primary}`,
+        border: `1px solid ${needsDuel ? "#f59e0b" : colors.primary}`,
         borderRadius: 18,
         padding: 12,
-        background: needsTie ? "rgba(245,158,11,0.12)" : "rgba(126,87,255,0.12)",
+        background: needsDuel ? "rgba(245,158,11,0.12)" : "rgba(126,87,255,0.12)",
         display: "grid",
         gap: 10,
       }}
     >
+      <style>
+        {`
+          @keyframes jokerDuelPulse {
+            0% { transform: scale(0.985); box-shadow: 0 0 0 rgba(245,158,11,0); }
+            50% { transform: scale(1.025); box-shadow: 0 0 0 5px rgba(245,158,11,0.16); }
+            100% { transform: scale(0.985); box-shadow: 0 0 0 rgba(245,158,11,0); }
+          }
+
+          @keyframes jokerWinnerPop {
+            0% { transform: translateY(8px) scale(0.95); opacity: 0; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
+          }
+        `}
+      </style>
+
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <div>
           <strong>Joker-Fenster</strong>
@@ -5339,6 +7201,115 @@ function JokerChallengePanel({ gameState, activePlayer, viewerPlayerId, canRevea
         </p>
       )}
 
+      {claims.length > 1 && (
+        <div style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 12, background: colors.bg, display: "grid", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <strong>Schere · Stein · Papier</strong>
+            <Badge variant={selectedChallenger ? "default" : duelActive ? "default" : "secondary"}>
+              {selectedChallenger ? "entschieden" : duelActive ? `Runde ${duel.round}` : "offen"}
+            </Badge>
+          </div>
+
+          {lastDuelResult && (
+            <div style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.panel, display: "grid", gap: 8 }}>
+              <strong style={{ fontSize: 13 }}>Letzte Duellrunde</strong>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {(lastDuelResult.revealedChoices || []).map((item) => {
+                  const eliminated = (lastDuelResult.eliminatedIds || []).includes(item.playerId);
+                  const winner = lastDuelResult.winnerId === item.playerId;
+
+                  return (
+                    <span
+                      key={`${item.playerId}-${item.choice}`}
+                      style={{
+                        border: `1px solid ${winner ? "#10b981" : eliminated ? "#ef4444" : colors.border}`,
+                        borderRadius: 999,
+                        padding: "6px 9px",
+                        background: winner ? "rgba(16,185,129,0.14)" : eliminated ? "rgba(239,68,68,0.12)" : colors.bg,
+                        color: colors.text,
+                        fontSize: 12,
+                        fontWeight: 850,
+                      }}
+                    >
+                      {item.playerName}: {item.label}
+                    </span>
+                  );
+                })}
+              </div>
+              <p style={{ margin: 0, color: colors.muted, fontSize: 12 }}>{lastDuelResult.reason}</p>
+            </div>
+          )}
+
+          {!selectedChallenger && !duelActive && (
+            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+              Mehrere Joker wurden geworfen. Starte das Duell, damit nur ein Challenger übrig bleibt.
+            </p>
+          )}
+
+          {duelActive && (
+            <div style={{ display: "grid", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(duelPlayerIds.length, 4)}, minmax(0, 1fr))`, gap: 8 }}>
+                {duelPlayerIds.map((playerId) => {
+                  const player = getPlayerById(gameState.players, playerId);
+                  const hasChosen = Boolean(duel.choices?.[playerId]);
+                  const isViewer = playerId === viewerPlayerId;
+
+                  return (
+                    <div
+                      key={`duel-${playerId}`}
+                      style={{
+                        border: `1px solid ${hasChosen ? "#10b981" : isViewer ? "#f59e0b" : colors.border}`,
+                        borderRadius: 14,
+                        padding: 10,
+                        background: isViewer ? "rgba(245,158,11,0.12)" : colors.panel,
+                        textAlign: "center",
+                        animation: !hasChosen && isViewer ? "jokerDuelPulse 900ms ease-in-out infinite" : "none",
+                      }}
+                    >
+                      <div style={{ fontSize: 24 }}>{hasChosen ? "✅" : "🃏"}</div>
+                      <strong style={{ display: "block", marginTop: 4 }}>{player?.name || "-"}</strong>
+                      <span style={{ color: colors.muted, fontSize: 11 }}>
+                        {hasChosen ? (isViewer ? `gewählt: ${getRpsChoiceLabel(viewerChoice)}` : "hat gewählt") : "wartet"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {viewerIsInDuel && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+                  {RPS_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => onDuelChoice(option.id)}
+                      style={{
+                        border: `1px solid ${viewerChoice === option.id ? colors.primary : colors.border}`,
+                        borderRadius: 14,
+                        padding: "11px 10px",
+                        background: viewerChoice === option.id ? "rgba(126,87,255,0.22)" : colors.panel,
+                        color: colors.text,
+                        cursor: "pointer",
+                        fontWeight: 950,
+                      }}
+                    >
+                      <span style={{ display: "block", fontSize: 22 }}>{option.icon}</span>
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {selectedChallenger && (
+            <p style={{ margin: 0, color: "#fde68a", fontSize: 13, animation: "jokerWinnerPop 360ms ease-out both" }}>
+              {selectedChallenger.name} gewinnt das Duell und setzt den Joker ein. Alle anderen behalten ihren Joker.
+            </p>
+          )}
+        </div>
+      )}
+
       {viewerPlayer && viewerPlayer.id !== activePlayer?.id && (
         <p style={{ margin: 0, color: colors.muted, fontSize: 12 }}>
           Deine Joker: {getPlayerJokers(viewerPlayer)}
@@ -5346,23 +7317,24 @@ function JokerChallengePanel({ gameState, activePlayer, viewerPlayerId, canRevea
       )}
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
-        <Button variant="secondary" onClick={onThrowJoker} disabled={!canThrowJoker}>
+        <Button variant="secondary" onClick={onThrowJoker} disabled={!canThrowJoker || duelActive}>
           Joker werfen
         </Button>
 
-        {needsTie && (
-          <Button variant="secondary" onClick={onResolveTie} disabled={!canResolveTie}>
-            Joker-Stechen auslosen
+        {needsDuel && !duelActive && !selectedChallenger && (
+          <Button variant="secondary" onClick={onStartDuel} disabled={!canResolveTie}>
+            Duell starten
           </Button>
         )}
 
-        <ActionPill onClick={onReveal} disabled={revealDisabled} hint={needsTie ? "Erst Stechen auslosen" : "Wertung anzeigen"}>
+        <ActionPill onClick={onReveal} disabled={revealDisabled} hint={needsDuel ? "Erst Duell entscheiden" : "Wertung anzeigen"}>
           Aufdecken & werten
         </ActionPill>
       </div>
     </div>
   );
 }
+
 
 function TimelineChooser({ playerName, timeline, phase, selectedInsertIndex, setSelectedInsertIndex, canPlace }) {
   const orderedTimeline = sortTimeline(timeline);
@@ -5759,22 +7731,24 @@ function PlacementButton({ selected, disabled, onClick, label, helper, compact =
   );
 }
 
-function ResultPanel({ result, timeline = [], onNext, canAdvance }) {
+function ResultPanel({ result, timeline = [], onNext, canAdvance, canAwardJoker, jokerGuessReviewed, jokerGuessAwarded, onAwardJoker, onDenyJoker }) {
   const isSkipped = Boolean(result.skipped);
   const isCorrect = result.correct && !isSkipped;
   const accent = isSkipped ? colors.warning : isCorrect ? colors.good : colors.bad;
   const borderColor = isSkipped ? "#f59e0b" : isCorrect ? "#10b981" : "#ef4444";
   const textColor = isSkipped ? "#fde68a" : isCorrect ? "#bbf7d0" : "#fecaca";
-  const headline = result.jokerWasThrown
-    ? result.challengerWon
-      ? "Joker erfolgreich!"
-      : "Joker verloren!"
-    : isSkipped
-      ? "Song übersprungen"
-      : isCorrect
-        ? "Richtig gelegt!"
-        : "Knapp daneben";
-  const icon = isSkipped ? "↷" : isCorrect ? "✓" : "×";
+  const headline = result.autoJoker
+    ? "Karte gesichert!"
+    : result.jokerWasThrown
+      ? result.challengerWon
+        ? "Joker erfolgreich!"
+        : "Joker verloren!"
+      : isSkipped
+        ? "Song übersprungen"
+        : isCorrect
+          ? "Richtig gelegt!"
+          : "Knapp daneben";
+  const icon = result.autoJoker ? "🃏" : isSkipped ? "↷" : isCorrect ? "✓" : "×";
   const correctPlacementLabel = getCorrectPlacementLabel(timeline, result.track);
 
   return (
@@ -5877,6 +7851,12 @@ function ResultPanel({ result, timeline = [], onNext, canAdvance }) {
             <p style={{ margin: "5px 0 0", color: textColor }}>
               {result.track.title} von {result.track.artist} erschien {result.track.year}.
             </p>
+            {result.autoJoker && (
+              <p style={{ margin: "5px 0 0", color: textColor, fontSize: 13 }}>
+                Die Karte wurde mit 3 Jokern automatisch gesichert und in die Timeline gelegt.
+              </p>
+            )}
+
             {result.jokerWasThrown && (
               <p style={{ margin: "5px 0 0", color: textColor, fontSize: 13 }}>
                 {result.challengerWon
@@ -5884,10 +7864,31 @@ function ResultPanel({ result, timeline = [], onNext, canAdvance }) {
                   : `${result.challengerName} verliert den Joker, weil die Platzierung korrekt war.`}
               </p>
             )}
+
+            {!jokerGuessReviewed && !jokerGuessAwarded && (
+              <div style={{ marginTop: 10, border: `1px solid ${colors.border}`, borderRadius: 16, padding: 10, background: "rgba(0,0,0,0.14)", display: "grid", gap: 8 }}>
+                <strong style={{ fontSize: 13 }}>Zusatz-Joker für Song+Interpret?</strong>
+                <p style={{ margin: 0, color: textColor, fontSize: 12 }}>
+                  Nach dem Aufdecken entscheiden, ob die aktive Person Song und Interpret korrekt nennen konnte.
+                </p>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <Button onClick={onAwardJoker} disabled={!canAwardJoker} style={{ padding: "8px 10px", borderRadius: 12 }}>
+                    +1 Joker vergeben
+                  </Button>
+                  <Button variant="secondary" onClick={onDenyJoker} disabled={!canAwardJoker} style={{ padding: "8px 10px", borderRadius: 12 }}>
+                    Kein Joker
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {jokerGuessAwarded && (
+              <Badge>+1 Joker vergeben</Badge>
+            )}
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: isCorrect || isSkipped ? "1fr" : "1fr 1fr", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isCorrect || isSkipped || result.autoJoker ? "1fr" : "1fr 1fr", gap: 10 }}>
           <div
             style={{
               border: `1px solid ${borderColor}`,
@@ -5897,7 +7898,7 @@ function ResultPanel({ result, timeline = [], onNext, canAdvance }) {
             }}
           >
             <span style={{ display: "block", color: textColor, fontSize: 12, textTransform: "uppercase", letterSpacing: 0.8, fontWeight: 900 }}>
-              Gewählte Position
+              {result.autoJoker ? "Joker-Aktion" : "Gewählte Position"}
             </span>
             <strong style={{ display: "block", marginTop: 4 }}>{result.placementLabel}</strong>
           </div>
@@ -6564,6 +8565,8 @@ function DiscordCommandMap() {
     { command: "Song ziehen", role: "Host oder aktiver Spieler", purpose: "verdeckten Song ziehen" },
     { command: "Song starten", role: "Host oder aktiver Spieler", purpose: "Song starten / erneut abspielen" },
     { command: "Position waehlen", role: "aktiver Spieler", purpose: "Position in Timeline waehlen" },
+    { command: "Tauschen", role: "aktiver Spieler", purpose: "1 Joker ausgeben und neuen Song ziehen" },
+    { command: "Karte sichern", role: "aktiver Spieler", purpose: "3 Joker ausgeben und Karte automatisch erhalten" },
     { command: "Aufdecken", role: "Host/DJ", purpose: "Jahr aufdecken und werten" },
     { command: "Naechster Spieler", role: "Host/DJ", purpose: "naechster Spieler" },
   ];
