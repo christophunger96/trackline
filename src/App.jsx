@@ -64,6 +64,7 @@ const SPOTIFY_SCOPES = [
 
 const SPOTIFY_PLAY_EVENT_NAME = "trackline.spotify.playCurrent";
 const DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS = 20;
+const SPOTIFY_WEB_PLAYBACK_SDK_URL = "https://sdk.scdn.co/spotify-player.js";
 const PLAY_LIMIT_OPTIONS = [10, 20, 30];
 const DIFFICULTY_OPTIONS = [
   { id: "easy", label: "Leicht", description: "bekannte Hits und große Klassiker" },
@@ -5540,6 +5541,44 @@ function MultiplayerSyncCard({ roomCode, socketUrl, setSocketUrl, syncEnabled, s
   );
 }
 
+
+function loadSpotifyWebPlaybackSdk() {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("Spotify Web Playback SDK ist nur im Browser verfuegbar."));
+  }
+
+  if (window.Spotify?.Player) {
+    return Promise.resolve(window.Spotify);
+  }
+
+  if (window.__tracklineSpotifySdkPromise) {
+    return window.__tracklineSpotifySdkPromise;
+  }
+
+  window.__tracklineSpotifySdkPromise = new Promise((resolve, reject) => {
+    const existingScript = document.querySelector(`script[src="${SPOTIFY_WEB_PLAYBACK_SDK_URL}"]`);
+
+    window.onSpotifyWebPlaybackSDKReady = () => {
+      if (window.Spotify?.Player) {
+        resolve(window.Spotify);
+      } else {
+        reject(new Error("Spotify Web Playback SDK konnte nicht geladen werden."));
+      }
+    };
+
+    if (existingScript) return;
+
+    const script = document.createElement("script");
+    script.src = SPOTIFY_WEB_PLAYBACK_SDK_URL;
+    script.async = true;
+    script.onerror = () => reject(new Error("Spotify Web Playback SDK konnte nicht geladen werden."));
+
+    document.body.appendChild(script);
+  });
+
+  return window.__tracklineSpotifySdkPromise;
+}
+
 function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify, roomCode, spotifyAuthServerUrl, roundPlayLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS, onPlaybackRequested }) {
   const [clientId] = useState(() => {
     const storedClientId = localStorage.getItem(SPOTIFY_CLIENT_ID_STORAGE_KEY);
@@ -5559,8 +5598,14 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
   const [savedDeviceId, setSavedDeviceId] = useState("");
   const [savedDeviceName, setSavedDeviceName] = useState("");
   const [spotifyDetailsOpen, setSpotifyDetailsOpen] = useState(false);
+  const [webPlayerReady, setWebPlayerReady] = useState(false);
+  const [webPlayerDeviceId, setWebPlayerDeviceId] = useState("");
+  const [webPlayerDeviceName, setWebPlayerDeviceName] = useState("");
+  const [webPlayerConnected, setWebPlayerConnected] = useState(false);
 
   const countdownIntervalRef = useRef(null);
+  const webPlayerRef = useRef(null);
+  const webPlayerTokenRef = useRef(null);
 
   function getSpotifyAuthServerBaseUrl() {
     return String(spotifyAuthServerUrl || "").trim().replace(/\/+$/, "");
@@ -5582,6 +5627,125 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
     }
 
     return `${baseUrl}/room/${encodeURIComponent(roomCode)}/spotify${path}`;
+  }
+
+
+  async function getSpotifyWebToken() {
+    const response = await fetch(getRoomSpotifyUrl("/web-token"));
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const data = await response.json();
+
+    if (!data.accessToken) {
+      throw new Error("Spotify Web Token fehlt.");
+    }
+
+    webPlayerTokenRef.current = data.accessToken;
+
+    return data.accessToken;
+  }
+
+  async function startBrowserSpotifyPlayer() {
+    try {
+      setIsBusy(true);
+      setStatus("Trackline Browser-Player wird gestartet...");
+
+      const Spotify = await loadSpotifyWebPlaybackSdk();
+
+      if (webPlayerRef.current) {
+        try {
+          await webPlayerRef.current.disconnect();
+        } catch {
+          // ignore
+        }
+
+        webPlayerRef.current = null;
+      }
+
+      await getSpotifyWebToken();
+
+      const playerName = `Trackline ${roomCode}`;
+
+      const player = new Spotify.Player({
+        name: playerName,
+        getOAuthToken: async (callback) => {
+          try {
+            const token = await getSpotifyWebToken();
+            callback(token);
+          } catch (error) {
+            setStatus(error.message || "Spotify Web Token konnte nicht geladen werden.");
+          }
+        },
+        volume: 0.65,
+      });
+
+      player.addListener("ready", async ({ device_id }) => {
+        setWebPlayerDeviceId(device_id);
+        setWebPlayerDeviceName(playerName);
+        setWebPlayerReady(true);
+        setWebPlayerConnected(true);
+        setSelectedSpotifyDeviceId(device_id);
+        setSavedDeviceId(device_id);
+        setSavedDeviceName(playerName);
+        setStatus(`Browser-Player bereit: ${playerName}. Dieses Trackline-Fenster ist jetzt das Spotify-Zielgeraet.`);
+
+        try {
+          const response = await fetch(getRoomSpotifyUrl("/device"), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              deviceId: device_id,
+              deviceName: playerName,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(await response.text());
+          }
+        } catch (error) {
+          setStatus(`Browser-Player bereit, aber Zielgeraet konnte nicht gespeichert werden: ${error.message || "Fehler"}`);
+        }
+      });
+
+      player.addListener("not_ready", ({ device_id }) => {
+        setWebPlayerConnected(false);
+        setStatus(`Browser-Player ist nicht mehr bereit: ${device_id}`);
+      });
+
+      player.addListener("initialization_error", ({ message }) => {
+        setStatus(`Spotify Browser-Player Initialisierungsfehler: ${message}`);
+      });
+
+      player.addListener("authentication_error", ({ message }) => {
+        setStatus(`Spotify Browser-Player Auth-Fehler: ${message}. Bitte Spotify neu verbinden.`);
+      });
+
+      player.addListener("account_error", ({ message }) => {
+        setStatus(`Spotify Browser-Player Account-Fehler: ${message}. Spotify Premium ist erforderlich.`);
+      });
+
+      player.addListener("playback_error", ({ message }) => {
+        setStatus(`Spotify Browser-Player Playback-Fehler: ${message}`);
+      });
+
+      const connected = await player.connect();
+
+      if (!connected) {
+        throw new Error("Spotify Browser-Player konnte nicht verbunden werden. Prüfe Spotify Premium und Browser-Autoplay.");
+      }
+
+      webPlayerRef.current = player;
+      setStatus("Browser-Player verbindet... Wenn dein Browser fragt, Audio erlauben.");
+    } catch (error) {
+      setStatus(error.message || "Spotify Browser-Player konnte nicht gestartet werden.");
+    } finally {
+      setIsBusy(false);
+    }
   }
 
   function clearCountdown() {
@@ -5632,6 +5796,14 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
   useEffect(() => {
     return () => {
       clearCountdown();
+
+      if (webPlayerRef.current) {
+        try {
+          webPlayerRef.current.disconnect();
+        } catch {
+          // ignore
+        }
+      }
     };
   }, []);
 
@@ -5995,6 +6167,35 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
           </div>
         )}
 
+        {canManageSpotify && spotifyConnected && (
+          <div
+            style={{
+              border: `1px solid ${webPlayerReady ? colors.primary : colors.border}`,
+              borderRadius: 18,
+              padding: 14,
+              background: webPlayerReady ? "rgba(126,87,255,0.13)" : colors.bg,
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <strong>Direkt im Browser abspielen</strong>
+              <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>
+                {webPlayerReady
+                  ? `Browser-Player bereit: ${webPlayerDeviceName || "Trackline"}${webPlayerDeviceId ? ` · ${webPlayerDeviceId.slice(0, 6)}…` : ""}`
+                  : "Trackline kann dieses Browserfenster als Spotify-Player verwenden. Spotify Premium ist erforderlich."}
+              </p>
+            </div>
+
+            <Button onClick={startBrowserSpotifyPlayer} disabled={isBusy}>
+              {webPlayerReady ? "Browser-Player neu starten" : "Browser-Player starten"}
+            </Button>
+          </div>
+        )}
+
         {canManageSpotify && spotifyConnected && !savedDeviceName && (
           <div
             style={{
@@ -6016,9 +6217,14 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
               </p>
             </div>
 
-            <Button variant="secondary" onClick={refreshSpotifyDevices} disabled={isBusy}>
-              Geraete laden
-            </Button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Button variant="secondary" onClick={refreshSpotifyDevices} disabled={isBusy}>
+                Geraete laden
+              </Button>
+              <Button onClick={startBrowserSpotifyPlayer} disabled={isBusy}>
+                Browser-Player starten
+              </Button>
+            </div>
           </div>
         )}
 

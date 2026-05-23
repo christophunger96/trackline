@@ -497,6 +497,19 @@ async function roomStatus(roomCode: string) {
   }
 }
 
+async function webToken(roomCode: string) {
+  const admin = getSupabaseAdmin();
+  const room = await getRoomSpotify(admin, roomCode);
+  const accessToken = await refreshAccessTokenIfNeeded(admin, room);
+
+  return json({
+    connected: true,
+    accessToken,
+    expiresAt: room.expires_at || null,
+  });
+}
+
+
 async function devices(roomCode: string) {
   const admin = getSupabaseAdmin();
   const room = await getRoomSpotify(admin, roomCode);
@@ -631,6 +644,7 @@ Deno.serve(async (req) => {
       if (!roomCode) throw new Error("roomCode fehlt.");
 
       if (req.method === "GET" && actionPath === "/status") return await roomStatus(roomCode);
+      if (req.method === "GET" && actionPath === "/web-token") return await webToken(roomCode);
       if (req.method === "GET" && actionPath === "/devices") return await devices(roomCode);
       if (req.method === "POST" && actionPath === "/device") return await saveDevice(req, roomCode);
       if (req.method === "POST" && actionPath === "/play") return await play(req, roomCode);
