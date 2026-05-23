@@ -4234,7 +4234,136 @@ function createSupabaseSyncedState(state, action = {}) {
   };
 }
 
-async function upsertSupabaseGameState(config, roomCode, nextState, action = {}) {
+function createTrackCatalogById(tracks = []) {
+  const catalog = new Map();
+
+  for (const track of tracks) {
+    if (track?.id && !catalog.has(track.id)) {
+      catalog.set(track.id, track);
+    }
+  }
+
+  return catalog;
+}
+
+function compactTrackForSync(track, trackCatalogById) {
+  if (!track || typeof track !== "object") return track;
+  if (track.__trackRef) return track;
+  if (track.id && trackCatalogById?.has?.(track.id)) {
+    return {
+      __trackRef: track.id,
+    };
+  }
+
+  return track;
+}
+
+function expandTrackFromSync(track, trackCatalogById) {
+  if (!track || typeof track !== "object") return track;
+
+  if (track.__trackRef) {
+    return trackCatalogById?.get?.(track.__trackRef) || track;
+  }
+
+  return track;
+}
+
+function compactTrackArrayForSync(tracks = [], trackCatalogById) {
+  return Array.isArray(tracks) ? tracks.map((track) => compactTrackForSync(track, trackCatalogById)) : tracks;
+}
+
+function expandTrackArrayFromSync(tracks = [], trackCatalogById) {
+  return Array.isArray(tracks) ? tracks.map((track) => expandTrackFromSync(track, trackCatalogById)) : tracks;
+}
+
+function compactTimelineForSync(timeline = [], trackCatalogById) {
+  return Array.isArray(timeline) ? timeline.map((track) => compactTrackForSync(track, trackCatalogById)) : timeline;
+}
+
+function expandTimelineFromSync(timeline = [], trackCatalogById) {
+  return Array.isArray(timeline) ? timeline.map((track) => expandTrackFromSync(track, trackCatalogById)) : timeline;
+}
+
+function compactPlayedTrackEntryForSync(entry, trackCatalogById) {
+  if (!entry || typeof entry !== "object") return entry;
+
+  return {
+    ...entry,
+    track: compactTrackForSync(entry.track, trackCatalogById),
+  };
+}
+
+function expandPlayedTrackEntryFromSync(entry, trackCatalogById) {
+  if (!entry || typeof entry !== "object") return entry;
+
+  return {
+    ...entry,
+    track: expandTrackFromSync(entry.track, trackCatalogById),
+  };
+}
+
+function compactGameStateForSync(state, trackCatalogById) {
+  if (!state || typeof state !== "object") return state;
+
+  return {
+    ...state,
+    currentTrack: compactTrackForSync(state.currentTrack, trackCatalogById),
+    deck: compactTrackArrayForSync(state.deck, trackCatalogById),
+    discardedTracks: compactTrackArrayForSync(state.discardedTracks, trackCatalogById),
+    playedTrackHistory: Array.isArray(state.playedTrackHistory)
+      ? state.playedTrackHistory.map((entry) => compactPlayedTrackEntryForSync(entry, trackCatalogById))
+      : state.playedTrackHistory,
+    players: Array.isArray(state.players)
+      ? state.players.map((player) => ({
+          ...player,
+          timeline: compactTimelineForSync(player.timeline, trackCatalogById),
+        }))
+      : state.players,
+    lastResult: state.lastResult?.track
+      ? {
+          ...state.lastResult,
+          track: compactTrackForSync(state.lastResult.track, trackCatalogById),
+        }
+      : state.lastResult,
+    syncMeta: {
+      ...(state.syncMeta || {}),
+      compactTrackRefs: true,
+    },
+  };
+}
+
+function expandGameStateFromSync(state, trackCatalogById) {
+  if (!state || typeof state !== "object") return state;
+  if (!state.syncMeta?.compactTrackRefs) return state;
+
+  return {
+    ...state,
+    currentTrack: expandTrackFromSync(state.currentTrack, trackCatalogById),
+    deck: expandTrackArrayFromSync(state.deck, trackCatalogById),
+    discardedTracks: expandTrackArrayFromSync(state.discardedTracks, trackCatalogById),
+    playedTrackHistory: Array.isArray(state.playedTrackHistory)
+      ? state.playedTrackHistory.map((entry) => expandPlayedTrackEntryFromSync(entry, trackCatalogById))
+      : state.playedTrackHistory,
+    players: Array.isArray(state.players)
+      ? state.players.map((player) => ({
+          ...player,
+          timeline: expandTimelineFromSync(player.timeline, trackCatalogById),
+        }))
+      : state.players,
+    lastResult: state.lastResult?.track
+      ? {
+          ...state.lastResult,
+          track: expandTrackFromSync(state.lastResult.track, trackCatalogById),
+        }
+      : state.lastResult,
+  };
+}
+
+function getGameStateSyncVersion(state) {
+  return String(state?.syncMeta?.version || "");
+}
+
+async function upsertSupabaseGameState(config, roomCode, nextState, action = {}, trackCatalogById = null) {
   if (!isSupabaseConfigured(config)) {
     return {
       skipped: true,
@@ -4248,7 +4377,8 @@ async function upsertSupabaseGameState(config, roomCode, nextState, action = {})
     throw new Error("Raumcode fehlt.");
   }
 
-  const syncedState = createSupabaseSyncedState(nextState, action);
+  const syncedState = nextState?.syncMeta?.version ? nextState : createSupabaseSyncedState(nextState, action);
+  const stateForSync = compactGameStateForSync(syncedState, trackCatalogById);
 
   await supabaseRestRequest(config, "/game_states?on_conflict=room_code", {
     method: "POST",
@@ -4257,7 +4387,7 @@ async function upsertSupabaseGameState(config, roomCode, nextState, action = {})
     },
     body: JSON.stringify({
       room_code: normalizedRoomCode,
-      state: syncedState,
+      state: stateForSync,
       updated_at: new Date().toISOString(),
     }),
   });
@@ -4281,7 +4411,7 @@ async function upsertSupabaseGameState(config, roomCode, nextState, action = {})
   };
 }
 
-async function fetchSupabaseGameState(config, roomCode) {
+async function fetchSupabaseGameState(config, roomCode, trackCatalogById = null) {
   if (!isSupabaseConfigured(config)) return null;
 
   const normalizedRoomCode = String(roomCode || "").trim().toUpperCase();
@@ -4298,7 +4428,7 @@ async function fetchSupabaseGameState(config, roomCode) {
 
   const row = Array.isArray(data) ? data[0] : null;
 
-  return row?.state || null;
+  return row?.state ? expandGameStateFromSync(row.state, trackCatalogById) : null;
 }
 
 async function clearSupabaseGameState(config, roomCode) {
@@ -4387,6 +4517,7 @@ export default function App() {
   const fullDeck = useMemo(() => dedupeTrackDeck([...BASE_TRACK_DECK, ...THEME_TRACK_DECK, ...CATEGORY_EXPANSION_TRACKS, ...VINTAGE_EXPANSION_TRACKS, ...ERA_BALANCE_EXPANSION_TRACKS, ...SONGPOOL_1000_EXPANSION_TRACKS, ...customTracks]), [customTracks]);
   const presetDeck = useMemo(() => dedupeTrackDeck(filterDeckByPreset(fullDeck, selectedPreset)), [fullDeck, selectedPreset]);
   const availableDeck = useMemo(() => dedupeTrackDeck(filterDeckByDifficulty(presetDeck, selectedDifficulty)), [presetDeck, selectedDifficulty]);
+  const trackCatalogById = useMemo(() => createTrackCatalogById(fullDeck), [fullDeck]);
 
   const activePlayer = gameState.players[gameState.activePlayerIndex];
   const activeTimeline = activePlayer ? sortTimeline(activePlayer.timeline) : [];
@@ -4586,23 +4717,37 @@ export default function App() {
       if (!activeCode) return;
 
       try {
-        const remoteState = await fetchSupabaseGameState(supabaseConfig, activeCode);
+        const remoteState = await fetchSupabaseGameState(supabaseConfig, activeCode, trackCatalogById);
 
         if (cancelled || !remoteState) {
           if (!quiet && !cancelled) setSyncStatus(`Supabase Sync bereit: Raum ${activeCode}`);
           return;
         }
 
-        const serializedRemoteState = JSON.stringify(remoteState);
-        const serializedLocalState = JSON.stringify(currentGameStateRef.current);
+        const remoteVersion = getGameStateSyncVersion(remoteState);
+        const localVersion = getGameStateSyncVersion(currentGameStateRef.current);
 
-        if (serializedRemoteState !== serializedLocalState && serializedRemoteState !== lastRemoteStateRef.current) {
-          lastRemoteStateRef.current = serializedRemoteState;
-          lastEmittedStateRef.current = serializedRemoteState;
+        if (remoteVersion && remoteVersion !== localVersion && remoteVersion !== lastRemoteStateRef.current) {
+          lastRemoteStateRef.current = remoteVersion;
+          lastEmittedStateRef.current = remoteVersion;
           dispatch({ type: "SERVER_STATE_RECEIVED", gameState: remoteState });
 
           if (!quiet) setSyncStatus(`Supabase Sync aktualisiert: ${activeCode}`);
           return;
+        }
+
+        if (!remoteVersion) {
+          const serializedRemoteState = JSON.stringify(remoteState);
+          const serializedLocalState = JSON.stringify(currentGameStateRef.current);
+
+          if (serializedRemoteState !== serializedLocalState && serializedRemoteState !== lastRemoteStateRef.current) {
+            lastRemoteStateRef.current = serializedRemoteState;
+            lastEmittedStateRef.current = serializedRemoteState;
+            dispatch({ type: "SERVER_STATE_RECEIVED", gameState: remoteState });
+
+            if (!quiet) setSyncStatus(`Supabase Sync aktualisiert: ${activeCode}`);
+            return;
+          }
         }
 
         if (!quiet) setSyncStatus(`Supabase Sync verbunden: ${activeCode}`);
@@ -4630,6 +4775,7 @@ export default function App() {
     supabaseConfig.anonKey,
     roomCode,
     gameState.room?.code,
+    trackCatalogById,
   ]);
 
   useEffect(() => {
@@ -4859,10 +5005,10 @@ export default function App() {
 
     const nextState = gameReducer(gameState, actionWithActor);
     const syncedState = createSupabaseSyncedState(nextState, actionWithActor);
-    const serializedNextState = JSON.stringify(syncedState);
+    const nextStateVersion = getGameStateSyncVersion(syncedState) || String(Date.now());
 
-    lastRemoteStateRef.current = serializedNextState;
-    lastEmittedStateRef.current = serializedNextState;
+    lastRemoteStateRef.current = nextStateVersion;
+    lastEmittedStateRef.current = nextStateVersion;
     dispatch({ type: "SERVER_STATE_RECEIVED", gameState: syncedState });
 
     if (!syncEnabled || !isSupabaseConfigured(supabaseConfig)) {
@@ -4871,7 +5017,7 @@ export default function App() {
     }
 
     try {
-      await upsertSupabaseGameState(supabaseConfig, activeRoomCode, nextState, actionWithActor);
+      await upsertSupabaseGameState(supabaseConfig, activeRoomCode, syncedState, actionWithActor, trackCatalogById);
       setSyncStatus(`Supabase Sync gespeichert: ${action.type}`);
     } catch (error) {
       setSyncStatus(`Supabase Sync speichern fehlgeschlagen: ${error.message || "Fehler"}`);
