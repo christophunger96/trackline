@@ -3988,6 +3988,7 @@ export default function App() {
   const lastRemoteStateRef = useRef("");
   const lastEmittedStateRef = useRef("");
   const currentGameStateRef = useRef(gameState);
+  const roomSpotifyAutoPauseTimeoutRef = useRef(null);
 
   const fullDeck = useMemo(() => dedupeTrackDeck([...BASE_TRACK_DECK, ...THEME_TRACK_DECK, ...CATEGORY_EXPANSION_TRACKS, ...VINTAGE_EXPANSION_TRACKS, ...ERA_BALANCE_EXPANSION_TRACKS, ...customTracks]), [customTracks]);
   const presetDeck = useMemo(() => dedupeTrackDeck(filterDeckByPreset(fullDeck, selectedPreset)), [fullDeck, selectedPreset]);
@@ -4034,6 +4035,14 @@ export default function App() {
   useEffect(() => {
     currentGameStateRef.current = gameState;
   }, [gameState]);
+
+  useEffect(() => {
+    return () => {
+      if (roomSpotifyAutoPauseTimeoutRef.current) {
+        window.clearTimeout(roomSpotifyAutoPauseTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(CUSTOM_TRACKS_STORAGE_KEY, JSON.stringify(customTracks));
@@ -4381,6 +4390,31 @@ export default function App() {
     sendGameAction({ type: "NEXT_PLAYER" });
   }
 
+  function scheduleRoomSpotifyAutoPause(playLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS) {
+    const activeRoomCode = gameState.room?.code || roomCode;
+    const serverBaseUrl = String(spotifyHelperUrl || "").trim().replace(/\/+$/, "");
+    const limitedSeconds = Math.max(1, Math.min(120, Math.round(Number(playLimitSeconds) || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS)));
+
+    if (roomSpotifyAutoPauseTimeoutRef.current) {
+      window.clearTimeout(roomSpotifyAutoPauseTimeoutRef.current);
+      roomSpotifyAutoPauseTimeoutRef.current = null;
+    }
+
+    if (!serverBaseUrl || !activeRoomCode) return;
+
+    roomSpotifyAutoPauseTimeoutRef.current = window.setTimeout(async () => {
+      try {
+        await fetch(`${serverBaseUrl}/room/${encodeURIComponent(activeRoomCode)}/spotify/pause`, {
+          method: "POST",
+        });
+      } catch {
+        // The visible countdown/game flow should continue even if Spotify pause fails.
+      } finally {
+        roomSpotifyAutoPauseTimeoutRef.current = null;
+      }
+    }, limitedSeconds * 1000 + 250);
+  }
+
   async function requestRoomSpotifyPlayback(playLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS) {
     const activeRoomCode = gameState.room?.code || roomCode;
     const serverBaseUrl = String(spotifyHelperUrl || "").trim().replace(/\/+$/, "");
@@ -4410,6 +4444,8 @@ export default function App() {
       if (!response.ok) {
         throw new Error(await response.text());
       }
+
+      scheduleRoomSpotifyAutoPause(playLimitSeconds);
 
       return true;
     } catch (error) {
@@ -5950,6 +5986,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
   const [spotifyDetailsOpen, setSpotifyDetailsOpen] = useState(false);
 
   const countdownIntervalRef = useRef(null);
+  const autoPauseTimeoutRef = useRef(null);
 
   function getSpotifyAuthServerBaseUrl() {
     return String(spotifyAuthServerUrl || "").trim().replace(/\/+$/, "");
@@ -5979,7 +6016,39 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
       countdownIntervalRef.current = null;
     }
 
+    if (autoPauseTimeoutRef.current) {
+      window.clearTimeout(autoPauseTimeoutRef.current);
+      autoPauseTimeoutRef.current = null;
+    }
+
     setRemainingSeconds(0);
+  }
+
+  function scheduleSpotifyAutoPause(seconds) {
+    const limitedSeconds = Math.max(1, Math.min(120, Math.round(Number(seconds) || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS)));
+
+    if (autoPauseTimeoutRef.current) {
+      window.clearTimeout(autoPauseTimeoutRef.current);
+      autoPauseTimeoutRef.current = null;
+    }
+
+    autoPauseTimeoutRef.current = window.setTimeout(async () => {
+      try {
+        const response = await fetch(getRoomSpotifyUrl("/pause"), {
+          method: "POST",
+        });
+
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
+
+        setStatus(`Spotify nach ${limitedSeconds} Sekunden automatisch pausiert.`);
+      } catch (error) {
+        setStatus(error.message || "Automatische Spotify-Pause fehlgeschlagen.");
+      } finally {
+        autoPauseTimeoutRef.current = null;
+      }
+    }, limitedSeconds * 1000 + 250);
   }
 
   function startLocalCountdown(seconds) {
@@ -5997,7 +6066,11 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
       setRemainingSeconds(next);
 
       if (next <= 0) {
-        clearCountdown();
+        if (countdownIntervalRef.current) {
+          window.clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+        }
+        setRemainingSeconds(0);
       }
     }, 250);
   }
@@ -6300,6 +6373,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
       setSavedDeviceId(data.deviceId || savedDeviceId);
       setSavedDeviceName(data.deviceName || savedDeviceName);
       startLocalCountdown(playLimitSeconds);
+      scheduleSpotifyAutoPause(playLimitSeconds);
       setStatus(`Verdeckter Song laeuft auf ${data.deviceName || "Spotify"}. TimeLimit: ${playLimitSeconds} Sekunden.`);
       onPlaybackRequested?.();
     } catch (error) {
