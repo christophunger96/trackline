@@ -19,6 +19,116 @@ const STARTING_TRACKS = [
   { id: "s6", title: "Smells Like Teen Spirit", artist: "Nirvana", year: 1991, genre: "Grunge" },
 ];
 
+
+function createInitialJokerDuelState() {
+  return {
+    active: false,
+    playerIds: [],
+    choices: {},
+    round: 0,
+    lastResult: null,
+  };
+}
+
+const RPS_OPTIONS = [
+  { id: "rock", label: "Stein", icon: "🪨" },
+  { id: "scissors", label: "Schere", icon: "✂️" },
+  { id: "paper", label: "Papier", icon: "📄" },
+];
+
+function getRpsOption(choice) {
+  return RPS_OPTIONS.find((option) => option.id === choice) || null;
+}
+
+function getRpsChoiceLabel(choice) {
+  const option = getRpsOption(choice);
+  return option ? `${option.icon} ${option.label}` : "-";
+}
+
+function getRpsWinningChoice(choiceA, choiceB) {
+  const pair = new Set([choiceA, choiceB]);
+
+  if (pair.has("rock") && pair.has("scissors")) return "rock";
+  if (pair.has("scissors") && pair.has("paper")) return "scissors";
+  if (pair.has("paper") && pair.has("rock")) return "paper";
+
+  return null;
+}
+
+function evaluateJokerDuelRound(players, playerIds, choices) {
+  const contenders = playerIds.filter((playerId) => getPlayerById(players, playerId));
+  const revealedChoices = contenders.map((playerId) => {
+    const player = getPlayerById(players, playerId);
+
+    return {
+      playerId,
+      playerName: player?.name || "-",
+      choice: choices[playerId],
+      label: getRpsChoiceLabel(choices[playerId]),
+    };
+  });
+
+  const uniqueChoices = Array.from(new Set(revealedChoices.map((item) => item.choice).filter(Boolean)));
+
+  if (contenders.length <= 1) {
+    return {
+      status: "winner",
+      winnerId: contenders[0] || null,
+      nextPlayerIds: contenders,
+      eliminatedIds: [],
+      revealedChoices,
+      reason: "Nur noch ein Challenger steht.",
+    };
+  }
+
+  if (uniqueChoices.length <= 1) {
+    return {
+      status: "continue",
+      winnerId: null,
+      nextPlayerIds: contenders,
+      eliminatedIds: [],
+      revealedChoices,
+      reason: "Alle haben dasselbe gewählt. Die Runde wird wiederholt.",
+    };
+  }
+
+  if (uniqueChoices.length >= 3) {
+    return {
+      status: "continue",
+      winnerId: null,
+      nextPlayerIds: contenders,
+      eliminatedIds: [],
+      revealedChoices,
+      reason: "Alle drei Zeichen sind im Spiel. Niemand scheidet aus.",
+    };
+  }
+
+  const winningChoice = getRpsWinningChoice(uniqueChoices[0], uniqueChoices[1]);
+  const nextPlayerIds = contenders.filter((playerId) => choices[playerId] === winningChoice);
+  const eliminatedIds = contenders.filter((playerId) => choices[playerId] !== winningChoice);
+
+  if (nextPlayerIds.length === 1) {
+    return {
+      status: "winner",
+      winnerId: nextPlayerIds[0],
+      nextPlayerIds,
+      eliminatedIds,
+      revealedChoices,
+      reason: `${getRpsChoiceLabel(winningChoice)} gewinnt diese Runde.`,
+    };
+  }
+
+  return {
+    status: "continue",
+    winnerId: null,
+    nextPlayerIds,
+    eliminatedIds,
+    revealedChoices,
+    reason: `${getRpsChoiceLabel(winningChoice)} gewinnt. Die verbleibenden Challenger spielen weiter.`,
+  };
+}
+
+
 const initialGameState = {
   phase: "lobby",
   room: null,
@@ -28,8 +138,10 @@ const initialGameState = {
   currentTrack: null,
   selectedInsertIndex: null,
   currentTrackJokerAwarded: false,
+  currentTrackJokerGuessReviewed: false,
   jokerClaims: [],
   selectedJokerPlayerId: null,
+  jokerDuel: createInitialJokerDuelState(),
   lastResult: null,
   targetScore: 10,
   maxTurns: 0,
@@ -594,13 +706,122 @@ function gameReducer(state, action) {
           usedTrackKeys: Array.from(new Set([...(state.usedTrackKeys || []), getTrackDedupeKey(nextTrack)])),
           selectedInsertIndex: null,
           currentTrackJokerAwarded: false,
+          currentTrackJokerGuessReviewed: false,
           jokerClaims: [],
           selectedJokerPlayerId: null,
+          jokerDuel: createInitialJokerDuelState(),
           lastResult: null,
           showDebugSong: false,
         },
         "TRACK_DRAWN",
         "Verdeckter Song gezogen"
+      );
+    }
+
+    case "TRACK_SWAP_JOKER": {
+      if (state.phase !== "placing" || !state.currentTrack || state.deck.length === 0) return state;
+
+      const activePlayer = state.players[state.activePlayerIndex];
+      if (!activePlayer || getPlayerJokers(activePlayer) < 1) return state;
+
+      const blockedTrackKeys = getBlockedTrackKeySet(state);
+      const nextTrackIndex = state.deck.findIndex((track) => !blockedTrackKeys.has(getTrackDedupeKey(track)));
+
+      if (nextTrackIndex < 0) return state;
+
+      const nextTrack = state.deck[nextTrackIndex];
+      const remainingDeck = state.deck.filter((_, index) => index !== nextTrackIndex);
+
+      const players = state.players.map((player, index) =>
+        index === state.activePlayerIndex
+          ? {
+              ...player,
+              jokers: Math.max(0, getPlayerJokers(player) - 1),
+            }
+          : player
+      );
+
+      return addEvent(
+        {
+          ...state,
+          players,
+          currentTrack: nextTrack,
+          deck: remainingDeck,
+          usedTrackIds: Array.from(new Set([...(state.usedTrackIds || []), nextTrack.id])),
+          usedTrackKeys: Array.from(new Set([...(state.usedTrackKeys || []), getTrackDedupeKey(nextTrack)])),
+          selectedInsertIndex: null,
+          currentTrackJokerAwarded: false,
+          currentTrackJokerGuessReviewed: false,
+          jokerClaims: [],
+          selectedJokerPlayerId: null,
+          jokerDuel: createInitialJokerDuelState(),
+          lastResult: null,
+          showDebugSong: false,
+          discardedTracks: [state.currentTrack, ...state.discardedTracks],
+          gameLog: [
+            {
+              id: createId("log"),
+              text: `${getPlayerTurnLabel(activePlayer)} nutzt den Tauschen-Joker und zieht einen neuen Song.`,
+            },
+            ...state.gameLog,
+          ].slice(0, 12),
+        },
+        "TRACK_SWAPPED",
+        `${getPlayerTurnLabel(activePlayer)} tauscht den Song`
+      );
+    }
+
+    case "TRACK_AUTO_CARD_JOKER": {
+      if (state.phase !== "placing" || !state.currentTrack) return state;
+
+      const activePlayer = state.players[state.activePlayerIndex];
+      if (!activePlayer || getPlayerJokers(activePlayer) < 3) return state;
+
+      const players = state.players.map((player, index) => {
+        if (index !== state.activePlayerIndex) return player;
+
+        return {
+          ...player,
+          jokers: Math.max(0, getPlayerJokers(player) - 3),
+          timeline: sortedWithInsert(player.timeline, state.currentTrack),
+          score: player.score + 1,
+          correct: player.correct + 1,
+        };
+      });
+
+      const playedEntry = createPlayedTrackEntry(state, activePlayer, { correct: true, autoJoker: true });
+
+      return addEvent(
+        {
+          ...state,
+          players,
+          phase: "reveal",
+          selectedInsertIndex: null,
+          currentTrackJokerAwarded: false,
+          currentTrackJokerGuessReviewed: true,
+          jokerClaims: [],
+          selectedJokerPlayerId: null,
+          jokerDuel: createInitialJokerDuelState(),
+          playedTrackHistory: [playedEntry, ...(state.playedTrackHistory || [])].slice(0, 80),
+          lastResult: {
+            correct: true,
+            autoJoker: true,
+            placementLabel: "Sicherer Karten-Joker",
+            playerName: getPlayerTurnLabel(activePlayer),
+            teamName: activePlayer.name,
+            activeMemberName: getActiveTeamMemberName(activePlayer),
+            track: state.currentTrack,
+          },
+          gameLog: [
+            {
+              id: createId("log"),
+              text: `${getPlayerTurnLabel(activePlayer)} nutzt den Sicheren-Karten-Joker und erhaelt ${state.currentTrack.title} automatisch.`,
+            },
+            ...state.gameLog,
+          ].slice(0, 12),
+        },
+        "TRACK_AUTO_CARD_JOKER",
+        `${getPlayerTurnLabel(activePlayer)} kauft die Karte`
       );
     }
 
@@ -631,6 +852,7 @@ function gameReducer(state, action) {
           phase: "challenge",
           jokerClaims: [],
           selectedJokerPlayerId: null,
+          jokerDuel: createInitialJokerDuelState(),
         },
         "PLACEMENT_CONFIRMED",
         `${getPlayerTurnLabel(activePlayer)} hat die Position bestaetigt`
@@ -638,7 +860,7 @@ function gameReducer(state, action) {
     }
 
     case "AWARD_SONG_GUESS_JOKER": {
-      if (!["placing", "challenge"].includes(state.phase) || !state.currentTrack || state.currentTrackJokerAwarded) return state;
+      if (state.phase !== "reveal" || !state.lastResult?.track || state.currentTrackJokerGuessReviewed || state.currentTrackJokerAwarded) return state;
 
       const activePlayer = state.players[state.activePlayerIndex];
       if (!activePlayer) return state;
@@ -657,15 +879,38 @@ function gameReducer(state, action) {
           ...state,
           players,
           currentTrackJokerAwarded: true,
+          currentTrackJokerGuessReviewed: true,
           gameLog: [
             {
               id: createId("log"),
-              text: `${getPlayerTurnLabel(activePlayer)} hat Song und Interpret korrekt genannt und erhaelt +1 Joker.`,
+              text: `${getPlayerTurnLabel(activePlayer)} erhaelt +1 Joker fuer Song und Interpret.`,
             },
             ...state.gameLog,
           ].slice(0, 12),
         },
         "JOKER_EARNED",
+        getPlayerTurnLabel(activePlayer)
+      );
+    }
+
+    case "CLEAR_SONG_GUESS_CLAIM": {
+      if (state.phase !== "reveal" || state.currentTrackJokerGuessReviewed || state.currentTrackJokerAwarded) return state;
+
+      const activePlayer = state.players[state.activePlayerIndex];
+
+      return addEvent(
+        {
+          ...state,
+          currentTrackJokerGuessReviewed: true,
+          gameLog: [
+            {
+              id: createId("log"),
+              text: `Kein Zusatz-Joker fuer ${getPlayerTurnLabel(activePlayer)} vergeben.`,
+            },
+            ...state.gameLog,
+          ].slice(0, 12),
+        },
+        "JOKER_GUESS_DENIED",
         getPlayerTurnLabel(activePlayer)
       );
     }
@@ -689,6 +934,7 @@ function gameReducer(state, action) {
           ...state,
           jokerClaims: nextClaims,
           selectedJokerPlayerId: nextClaims.length === 1 ? claimant.id : null,
+          jokerDuel: createInitialJokerDuelState(),
           gameLog: [
             {
               id: createId("log"),
@@ -702,29 +948,117 @@ function gameReducer(state, action) {
       );
     }
 
-    case "RESOLVE_JOKER_TIE": {
-      if (state.phase !== "challenge" || (state.jokerClaims || []).length <= 1) return state;
+    case "START_JOKER_DUEL": {
+      if (state.phase !== "challenge" || (state.jokerClaims || []).length <= 1 || state.selectedJokerPlayerId) return state;
 
-      const claims = state.jokerClaims || [];
-      const selectedClaim = shuffle(claims)[0];
-      const selectedPlayer = getPlayerById(state.players, selectedClaim?.playerId);
+      const playerIds = Array.from(new Set((state.jokerClaims || []).map((claim) => claim.playerId))).filter((playerId) =>
+        getPlayerById(state.players, playerId)
+      );
 
-      if (!selectedPlayer) return state;
+      if (playerIds.length <= 1) return state;
 
       return addEvent(
         {
           ...state,
-          selectedJokerPlayerId: selectedPlayer.id,
+          jokerDuel: {
+            active: true,
+            playerIds,
+            choices: {},
+            round: Number(state.jokerDuel?.round || 0) + 1,
+            lastResult: null,
+          },
           gameLog: [
             {
               id: createId("log"),
-              text: `Joker-Stechen: ${selectedPlayer.name} darf den Joker werfen.`,
+              text: `Joker-Duell gestartet: ${playerIds.map((playerId) => getPlayerById(state.players, playerId)?.name).filter(Boolean).join(", ")}.`,
             },
             ...state.gameLog,
           ].slice(0, 12),
         },
-        "JOKER_TIE_RESOLVED",
-        selectedPlayer.name
+        "JOKER_DUEL_STARTED",
+        `${playerIds.length} Challenger`
+      );
+    }
+
+    case "JOKER_DUEL_CHOICE": {
+      if (state.phase !== "challenge" || !state.jokerDuel?.active || state.selectedJokerPlayerId) return state;
+
+      const playerId = action.playerId || action.actorPlayerId;
+      const choice = action.choice;
+      const playerIds = state.jokerDuel.playerIds || [];
+
+      if (!playerIds.includes(playerId)) return state;
+      if (!RPS_OPTIONS.some((option) => option.id === choice)) return state;
+
+      const nextChoices = {
+        ...(state.jokerDuel.choices || {}),
+        [playerId]: choice,
+      };
+      const allChosen = playerIds.every((id) => nextChoices[id]);
+
+      if (!allChosen) {
+        return addEvent(
+          {
+            ...state,
+            jokerDuel: {
+              ...state.jokerDuel,
+              choices: nextChoices,
+            },
+          },
+          "JOKER_DUEL_CHOICE",
+          `${getPlayerById(state.players, playerId)?.name || "Spieler"} hat gewählt`
+        );
+      }
+
+      const result = evaluateJokerDuelRound(state.players, playerIds, nextChoices);
+
+      if (result.status === "winner" && result.winnerId) {
+        const winner = getPlayerById(state.players, result.winnerId);
+
+        return addEvent(
+          {
+            ...state,
+            selectedJokerPlayerId: result.winnerId,
+            jokerDuel: {
+              active: false,
+              playerIds: result.nextPlayerIds,
+              choices: {},
+              round: state.jokerDuel.round,
+              lastResult: result,
+            },
+            gameLog: [
+              {
+                id: createId("log"),
+                text: `Joker-Duell: ${winner?.name || "Ein Spieler"} gewinnt und darf den Joker setzen.`,
+              },
+              ...state.gameLog,
+            ].slice(0, 12),
+          },
+          "JOKER_DUEL_WINNER",
+          winner?.name || "Gewinner"
+        );
+      }
+
+      return addEvent(
+        {
+          ...state,
+          jokerDuel: {
+            active: true,
+            playerIds: result.nextPlayerIds,
+            choices: {},
+            round: Number(state.jokerDuel.round || 0) + 1,
+            lastResult: result,
+          },
+          gameLog: [
+            {
+              id: createId("log"),
+              text: `Joker-Duell: ${result.reason}`,
+            },
+            ...state.gameLog,
+          ].slice(0, 12),
+        },
+        "JOKER_DUEL_CONTINUES",
+        result.reason
       );
     }
 
@@ -767,6 +1101,7 @@ function gameReducer(state, action) {
       if (!activePlayer) return state;
 
       if (state.phase === "challenge" && (state.jokerClaims || []).length > 1 && !state.selectedJokerPlayerId) return state;
+      if (state.phase === "challenge" && state.jokerDuel?.active) return state;
 
       const correct = isCorrectPlacement(activePlayer.timeline, state.currentTrack, state.selectedInsertIndex);
       const placementLabel = getPlacementLabel(activePlayer.timeline, state.selectedInsertIndex);
@@ -829,6 +1164,7 @@ function gameReducer(state, action) {
           },
           jokerClaims: [],
           selectedJokerPlayerId: null,
+          jokerDuel: createInitialJokerDuelState(),
           discardedTracks: !correct && !challengerWins ? [state.currentTrack, ...state.discardedTracks] : state.discardedTracks,
           gameLog: [{ id: createId("log"), text: logText }, ...state.gameLog].slice(0, 12),
         },
@@ -894,6 +1230,7 @@ function gameReducer(state, action) {
             currentTrackJokerAwarded: false,
             jokerClaims: [],
             selectedJokerPlayerId: null,
+            jokerDuel: createInitialJokerDuelState(),
           },
           "GAME_FINISHED",
           finalWinner ? `Gewinner: ${finalWinner.name}` : "Limit erreicht"
@@ -926,6 +1263,7 @@ function gameReducer(state, action) {
               currentTrackJokerAwarded: false,
               jokerClaims: [],
               selectedJokerPlayerId: null,
+              jokerDuel: createInitialJokerDuelState(),
               overtime: true,
               overtimePlayerIds: currentOvertimePlayerIds,
               overtimePendingPlayerIds: pendingAfterCurrent,
@@ -993,6 +1331,7 @@ function gameReducer(state, action) {
             currentTrackJokerAwarded: false,
             jokerClaims: [],
             selectedJokerPlayerId: null,
+            jokerDuel: createInitialJokerDuelState(),
           },
           "GAME_FINISHED",
           `Gewinner: ${finalWinner.name}`
@@ -1513,10 +1852,18 @@ function authorizeAction(state, action) {
     return actor.isHost ? { ok: true } : { ok: false, message: "Nur der Host darf eine neue Runde starten." };
   }
 
-  if (["TRACK_REVEALED", "NEXT_PLAYER", "PLACEMENT_CONFIRMED", "RESOLVE_JOKER_TIE", "AWARD_SONG_GUESS_JOKER"].includes(type)) {
+  if (["TRACK_REVEALED", "NEXT_PLAYER", "PLACEMENT_CONFIRMED", "START_JOKER_DUEL", "AWARD_SONG_GUESS_JOKER", "CLEAR_SONG_GUESS_CLAIM"].includes(type)) {
     return actor.isHost || actor.isActivePlayer
       ? { ok: true }
       : { ok: false, message: "Nur Host/DJ oder der aktive Spieler darf diese Aktion ausfuehren." };
+  }
+
+  if (type === "JOKER_DUEL_CHOICE") {
+    const duelPlayerIds = state.jokerDuel?.playerIds || [];
+
+    return actor.actor && duelPlayerIds.includes(actor.actor.id)
+      ? { ok: true }
+      : { ok: false, message: "Nur aktive Challenger im Joker-Duell duerfen waehlen." };
   }
 
   if (type === "JOKER_CLAIM") {
@@ -1529,7 +1876,7 @@ function authorizeAction(state, action) {
     return actor.isHost ? { ok: true } : { ok: false, message: "Nur der Host/DJ darf diese Aktion ausfuehren." };
   }
 
-  if (["TRACK_DRAWN", "TRACK_PLAY_REQUESTED", "PLACEMENT_SELECTED"].includes(type)) {
+  if (["TRACK_DRAWN", "TRACK_PLAY_REQUESTED", "PLACEMENT_SELECTED", "TRACK_SWAP_JOKER", "TRACK_AUTO_CARD_JOKER"].includes(type)) {
     return actor.isHost || actor.isActivePlayer
       ? { ok: true }
       : { ok: false, message: "Nur Host/DJ oder der aktive Spieler darf diese Aktion ausfuehren." };

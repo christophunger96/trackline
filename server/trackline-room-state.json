@@ -1,0 +1,5556 @@
+{
+  "version": 1,
+  "savedAt": 1779536497680,
+  "rooms": [
+    [
+      "NQ1NCA",
+      {
+        "gameState": {
+          "phase": "lobby",
+          "room": null,
+          "players": [],
+          "deck": [],
+          "activePlayerIndex": 0,
+          "currentTrack": null,
+          "selectedInsertIndex": null,
+          "lastResult": null,
+          "targetScore": 10,
+          "maxTurns": 0,
+          "playLimitSeconds": 20,
+          "difficulty": "normal",
+          "gameMode": "solo",
+          "turnNumber": 1,
+          "showDebugSong": false,
+          "discardedTracks": [],
+          "playedTrackHistory": [],
+          "songReports": [],
+          "blockedTrackKeys": [],
+          "usedTrackIds": [],
+          "usedTrackKeys": [],
+          "overtime": false,
+          "overtimePlayerIds": [],
+          "overtimePendingPlayerIds": [],
+          "gameLog": [],
+          "eventHistory": [],
+          "playbackRequests": []
+        },
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779529631413
+      }
+    ],
+    [
+      "5JX7MD",
+      {
+        "gameState": {
+          "phase": "lobby",
+          "room": null,
+          "players": [],
+          "deck": [],
+          "activePlayerIndex": 0,
+          "currentTrack": null,
+          "selectedInsertIndex": null,
+          "lastResult": null,
+          "targetScore": 10,
+          "maxTurns": 0,
+          "playLimitSeconds": 20,
+          "difficulty": "normal",
+          "gameMode": "solo",
+          "turnNumber": 1,
+          "showDebugSong": false,
+          "discardedTracks": [],
+          "playedTrackHistory": [],
+          "songReports": [],
+          "blockedTrackKeys": [],
+          "usedTrackIds": [],
+          "usedTrackKeys": [],
+          "overtime": false,
+          "overtimePlayerIds": [],
+          "overtimePendingPlayerIds": [],
+          "gameLog": [],
+          "eventHistory": [],
+          "playbackRequests": []
+        },
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779529653418
+      }
+    ],
+    [
+      "CLVPGK",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779529754687
+      }
+    ],
+    [
+      "3RBZTU",
+      {
+        "gameState": {
+          "phase": "lobby",
+          "room": null,
+          "players": [],
+          "deck": [],
+          "activePlayerIndex": 0,
+          "currentTrack": null,
+          "selectedInsertIndex": null,
+          "lastResult": null,
+          "targetScore": 10,
+          "maxTurns": 0,
+          "playLimitSeconds": 20,
+          "difficulty": "normal",
+          "gameMode": "solo",
+          "turnNumber": 1,
+          "showDebugSong": false,
+          "discardedTracks": [],
+          "playedTrackHistory": [],
+          "songReports": [],
+          "blockedTrackKeys": [],
+          "usedTrackIds": [],
+          "usedTrackKeys": [],
+          "overtime": false,
+          "overtimePlayerIds": [],
+          "overtimePendingPlayerIds": [],
+          "gameLog": [],
+          "eventHistory": [],
+          "playbackRequests": []
+        },
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779529820946
+      }
+    ],
+    [
+      "9MZ9IH",
+      {
+        "gameState": {
+          "phase": "lobby",
+          "room": null,
+          "players": [],
+          "deck": [],
+          "activePlayerIndex": 0,
+          "currentTrack": null,
+          "selectedInsertIndex": null,
+          "currentTrackJokerAwarded": false,
+          "currentTrackJokerGuessReviewed": false,
+          "jokerClaims": [],
+          "selectedJokerPlayerId": null,
+          "lastResult": null,
+          "targetScore": 10,
+          "maxTurns": 0,
+          "playLimitSeconds": 20,
+          "difficulty": "normal",
+          "gameMode": "solo",
+          "turnNumber": 1,
+          "showDebugSong": false,
+          "discardedTracks": [],
+          "playedTrackHistory": [],
+          "songReports": [],
+          "blockedTrackKeys": [],
+          "usedTrackIds": [],
+          "usedTrackKeys": [],
+          "overtime": false,
+          "overtimePlayerIds": [],
+          "overtimePendingPlayerIds": [],
+          "gameLog": [],
+          "eventHistory": [],
+          "playbackRequests": []
+        },
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "3dafae7887404902dbe43f211c2f3c0935d33d6a",
+          "deviceName": "DESKTOP-DRHSEO2"
+        },
+        "updatedAt": 1779530751876
+      }
+    ],
+    [
+      "ELLHUS",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779529964243
+      }
+    ],
+    [
+      "CWV0IK",
+      {
+        "gameState": {
+          "phase": "lobby",
+          "room": null,
+          "players": [],
+          "deck": [],
+          "activePlayerIndex": 0,
+          "currentTrack": null,
+          "selectedInsertIndex": null,
+          "currentTrackJokerAwarded": false,
+          "jokerClaims": [],
+          "selectedJokerPlayerId": null,
+          "lastResult": null,
+          "targetScore": 10,
+          "maxTurns": 0,
+          "playLimitSeconds": 20,
+          "difficulty": "normal",
+          "gameMode": "solo",
+          "turnNumber": 1,
+          "showDebugSong": false,
+          "discardedTracks": [],
+          "playedTrackHistory": [],
+          "songReports": [],
+          "blockedTrackKeys": [],
+          "usedTrackIds": [],
+          "usedTrackKeys": [],
+          "overtime": false,
+          "overtimePlayerIds": [],
+          "overtimePendingPlayerIds": [],
+          "gameLog": [],
+          "eventHistory": [],
+          "playbackRequests": []
+        },
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "3dafae7887404902dbe43f211c2f3c0935d33d6a",
+          "deviceName": "DESKTOP-DRHSEO2"
+        },
+        "updatedAt": 1779530412916
+      }
+    ],
+    [
+      "NB7K42",
+      {
+        "gameState": {
+          "phase": "lobby",
+          "room": null,
+          "players": [],
+          "deck": [],
+          "activePlayerIndex": 0,
+          "currentTrack": null,
+          "selectedInsertIndex": null,
+          "currentTrackJokerAwarded": false,
+          "currentTrackJokerGuessReviewed": false,
+          "jokerClaims": [],
+          "selectedJokerPlayerId": null,
+          "jokerDuel": {
+            "active": false,
+            "playerIds": [],
+            "choices": {},
+            "round": 0,
+            "lastResult": null
+          },
+          "lastResult": null,
+          "targetScore": 10,
+          "maxTurns": 0,
+          "playLimitSeconds": 20,
+          "difficulty": "normal",
+          "gameMode": "solo",
+          "turnNumber": 1,
+          "showDebugSong": false,
+          "discardedTracks": [],
+          "playedTrackHistory": [],
+          "songReports": [],
+          "blockedTrackKeys": [],
+          "usedTrackIds": [],
+          "usedTrackKeys": [],
+          "overtime": false,
+          "overtimePlayerIds": [],
+          "overtimePendingPlayerIds": [],
+          "gameLog": [],
+          "eventHistory": [],
+          "playbackRequests": []
+        },
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "3dafae7887404902dbe43f211c2f3c0935d33d6a",
+          "deviceName": "DESKTOP-DRHSEO2"
+        },
+        "updatedAt": 1779532103694
+      }
+    ],
+    [
+      "66KUYK",
+      {
+        "gameState": {
+          "phase": "lobby",
+          "room": null,
+          "players": [],
+          "deck": [],
+          "activePlayerIndex": 0,
+          "currentTrack": null,
+          "selectedInsertIndex": null,
+          "currentTrackJokerAwarded": false,
+          "currentTrackJokerGuessReviewed": false,
+          "jokerClaims": [],
+          "selectedJokerPlayerId": null,
+          "jokerDuel": {
+            "active": false,
+            "playerIds": [],
+            "choices": {},
+            "round": 0,
+            "lastResult": null
+          },
+          "lastResult": null,
+          "targetScore": 10,
+          "maxTurns": 0,
+          "playLimitSeconds": 20,
+          "difficulty": "normal",
+          "gameMode": "solo",
+          "turnNumber": 1,
+          "showDebugSong": false,
+          "discardedTracks": [],
+          "playedTrackHistory": [],
+          "songReports": [],
+          "blockedTrackKeys": [],
+          "usedTrackIds": [],
+          "usedTrackKeys": [],
+          "overtime": false,
+          "overtimePlayerIds": [],
+          "overtimePendingPlayerIds": [],
+          "gameLog": [],
+          "eventHistory": [],
+          "playbackRequests": []
+        },
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "3dafae7887404902dbe43f211c2f3c0935d33d6a",
+          "deviceName": "DESKTOP-DRHSEO2"
+        },
+        "updatedAt": 1779532666128
+      }
+    ],
+    [
+      "3C6I2H",
+      {
+        "gameState": {
+          "phase": "ready",
+          "room": {
+            "code": "3C6I2H",
+            "hostPlayerId": "player-1779532152173-8704f15b5dbe6",
+            "hostName": "Christoph",
+            "visibility": "private"
+          },
+          "players": [
+            {
+              "id": "player-1779532152173-8704f15b5dbe6",
+              "name": "Christoph",
+              "role": "host",
+              "teamMembers": [],
+              "activeMemberIndex": 0,
+              "timeline": [
+                {
+                  "id": "s2",
+                  "title": "Wonderwall",
+                  "artist": "Oasis",
+                  "year": 1995,
+                  "genre": "Britpop"
+                },
+                {
+                  "id": "t168",
+                  "title": "Paper Planes",
+                  "artist": "M.I.A.",
+                  "year": 2007,
+                  "genre": "Alternative"
+                }
+              ],
+              "score": 2,
+              "correct": 1,
+              "wrong": 0,
+              "jokers": 1
+            },
+            {
+              "id": "player-1779532152173-2428d100917178",
+              "name": "Alex",
+              "role": "player",
+              "teamMembers": [],
+              "activeMemberIndex": 0,
+              "timeline": [
+                {
+                  "id": "s5",
+                  "title": "Rolling in the Deep",
+                  "artist": "Adele",
+                  "year": 2010,
+                  "genre": "Soul Pop"
+                },
+                {
+                  "id": "t202",
+                  "title": "Thinking Out Loud",
+                  "artist": "Ed Sheeran",
+                  "year": 2014,
+                  "genre": "Pop"
+                }
+              ],
+              "score": 2,
+              "correct": 1,
+              "wrong": 1,
+              "jokers": 2
+            },
+            {
+              "id": "player-1779532152173-09bf7d5526192",
+              "name": "123",
+              "role": "player",
+              "teamMembers": [],
+              "activeMemberIndex": 0,
+              "timeline": [
+                {
+                  "id": "v705",
+                  "title": "Beds Are Burning",
+                  "artist": "Midnight Oil",
+                  "year": 1987,
+                  "genre": "Rock"
+                },
+                {
+                  "id": "s6",
+                  "title": "Smells Like Teen Spirit",
+                  "artist": "Nirvana",
+                  "year": 1991,
+                  "genre": "Grunge"
+                },
+                {
+                  "id": "c605",
+                  "title": "A Whole New World",
+                  "artist": "Peabo Bryson & Regina Belle",
+                  "year": 1992,
+                  "genre": "Movie Pop"
+                }
+              ],
+              "score": 3,
+              "correct": 2,
+              "wrong": 0,
+              "jokers": 0
+            },
+            {
+              "id": "player-1779532152173-21d40618877908",
+              "name": "456",
+              "role": "player",
+              "teamMembers": [],
+              "activeMemberIndex": 0,
+              "timeline": [
+                {
+                  "id": "s3",
+                  "title": "Dancing Queen",
+                  "artist": "ABBA",
+                  "year": 1976,
+                  "genre": "Disco"
+                },
+                {
+                  "id": "c601",
+                  "title": "Cha Cha Cha",
+                  "artist": "Käärijä",
+                  "year": 2023,
+                  "genre": "Eurovision Electronic"
+                }
+              ],
+              "score": 2,
+              "correct": 1,
+              "wrong": 0,
+              "jokers": 3
+            }
+          ],
+          "deck": [
+            {
+              "id": "t133",
+              "title": "Around the World",
+              "artist": "Daft Punk",
+              "year": 1997,
+              "genre": "Dance"
+            },
+            {
+              "id": "t231",
+              "title": "Montero (Call Me By Your Name)",
+              "artist": "Lil Nas X",
+              "year": 2021,
+              "genre": "Pop Rap"
+            },
+            {
+              "id": "v682",
+              "title": "Message in a Bottle",
+              "artist": "The Police",
+              "year": 1979,
+              "genre": "New Wave Rock"
+            },
+            {
+              "id": "t99",
+              "title": "Anti-Hero",
+              "artist": "Taylor Swift",
+              "year": 2022,
+              "genre": "Pop"
+            },
+            {
+              "id": "x324",
+              "title": "Another Brick in the Wall",
+              "artist": "Pink Floyd",
+              "year": 1979,
+              "genre": "Rock"
+            },
+            {
+              "id": "c551",
+              "title": "U Can't Touch This",
+              "artist": "MC Hammer",
+              "year": 1990,
+              "genre": "Hip Hop"
+            },
+            {
+              "id": "t90",
+              "title": "Shallow",
+              "artist": "Lady Gaga & Bradley Cooper",
+              "year": 2018,
+              "genre": "Pop"
+            },
+            {
+              "id": "t201",
+              "title": "Take Me to Church",
+              "artist": "Hozier",
+              "year": 2013,
+              "genre": "Soul"
+            },
+            {
+              "id": "v692",
+              "title": "Maneater",
+              "artist": "Daryl Hall & John Oates",
+              "year": 1982,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "x307",
+              "title": "Good Vibrations",
+              "artist": "The Beach Boys",
+              "year": 1966,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "v702",
+              "title": "You Give Love a Bad Name",
+              "artist": "Bon Jovi",
+              "year": 1986,
+              "genre": "Rock"
+            },
+            {
+              "id": "t279",
+              "title": "Wildberry Lillet",
+              "artist": "Nina Chuba",
+              "year": 2022,
+              "genre": "Pop Rap"
+            },
+            {
+              "id": "x371",
+              "title": "Waka Waka",
+              "artist": "Shakira",
+              "year": 2010,
+              "genre": "Latin Pop"
+            },
+            {
+              "id": "t220",
+              "title": "This Is America",
+              "artist": "Childish Gambino",
+              "year": 2018,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "c527",
+              "title": "The Kids Aren't Alright",
+              "artist": "The Offspring",
+              "year": 1998,
+              "genre": "Punk Rock"
+            },
+            {
+              "id": "t284",
+              "title": "Insomnia",
+              "artist": "Faithless",
+              "year": 1995,
+              "genre": "Electronic"
+            },
+            {
+              "id": "t74",
+              "title": "I Gotta Feeling",
+              "artist": "The Black Eyed Peas",
+              "year": 2009,
+              "genre": "Pop"
+            },
+            {
+              "id": "v625",
+              "title": "Great Balls of Fire",
+              "artist": "Jerry Lee Lewis",
+              "year": 1957,
+              "genre": "Rock and Roll"
+            },
+            {
+              "id": "c595",
+              "title": "Satellite",
+              "artist": "Lena",
+              "year": 2010,
+              "genre": "Eurovision Pop"
+            },
+            {
+              "id": "t78",
+              "title": "Somebody That I Used to Know",
+              "artist": "Gotye feat. Kimbra",
+              "year": 2011,
+              "genre": "Indie Pop"
+            },
+            {
+              "id": "c525",
+              "title": "Come As You Are",
+              "artist": "Nirvana",
+              "year": 1991,
+              "genre": "Grunge"
+            },
+            {
+              "id": "x321",
+              "title": "We Will Rock You",
+              "artist": "Queen",
+              "year": 1977,
+              "genre": "Rock"
+            },
+            {
+              "id": "t266",
+              "title": "Ein Kompliment",
+              "artist": "Sportfreunde Stiller",
+              "year": 2002,
+              "genre": "Indie Rock"
+            },
+            {
+              "id": "v627",
+              "title": "What'd I Say",
+              "artist": "Ray Charles",
+              "year": 1959,
+              "genre": "Soul"
+            },
+            {
+              "id": "t4",
+              "title": "Take On Me",
+              "artist": "a-ha",
+              "year": 1985,
+              "genre": "Synthpop",
+              "spotifyUri": "spotify:track:2WfaOiMkCvy7F5fcp2zZ8L"
+            },
+            {
+              "id": "c492",
+              "title": "Nothing's Gonna Stop Us Now",
+              "artist": "Starship",
+              "year": 1987,
+              "genre": "Movie Pop Ballad"
+            },
+            {
+              "id": "c458",
+              "title": "Wake Me Up Before You Go-Go",
+              "artist": "Wham!",
+              "year": 1984,
+              "genre": "Party Pop"
+            },
+            {
+              "id": "t127",
+              "title": "Basket Case",
+              "artist": "Green Day",
+              "year": 1994,
+              "genre": "Punk Rock"
+            },
+            {
+              "id": "t180",
+              "title": "Dynamite",
+              "artist": "Taio Cruz",
+              "year": 2010,
+              "genre": "Dance Pop"
+            },
+            {
+              "id": "t142",
+              "title": "Stan",
+              "artist": "Eminem feat. Dido",
+              "year": 2000,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "t134",
+              "title": "Ray of Light",
+              "artist": "Madonna",
+              "year": 1998,
+              "genre": "Pop"
+            },
+            {
+              "id": "t280",
+              "title": "Zukunft Pink",
+              "artist": "Peter Fox feat. Inéz",
+              "year": 2022,
+              "genre": "Pop"
+            },
+            {
+              "id": "c543",
+              "title": "Ho Hey",
+              "artist": "The Lumineers",
+              "year": 2012,
+              "genre": "Indie Folk"
+            },
+            {
+              "id": "b755",
+              "title": "Night Fever",
+              "artist": "Bee Gees",
+              "year": 1977,
+              "genre": "Disco"
+            },
+            {
+              "id": "x436",
+              "title": "Livin' la Vida Loca",
+              "artist": "Ricky Martin",
+              "year": 1999,
+              "genre": "Latin Pop"
+            },
+            {
+              "id": "t221",
+              "title": "High Hopes",
+              "artist": "Panic! At The Disco",
+              "year": 2018,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "c517",
+              "title": "Should I Stay or Should I Go",
+              "artist": "The Clash",
+              "year": 1982,
+              "genre": "Punk Rock"
+            },
+            {
+              "id": "t194",
+              "title": "Radioactive",
+              "artist": "Imagine Dragons",
+              "year": 2012,
+              "genre": "Alternative"
+            },
+            {
+              "id": "t122",
+              "title": "November Rain",
+              "artist": "Guns N' Roses",
+              "year": 1991,
+              "genre": "Rock"
+            },
+            {
+              "id": "x419",
+              "title": "Ein bisschen Frieden",
+              "artist": "Nicole",
+              "year": 1982,
+              "genre": "Eurovision Schlager"
+            },
+            {
+              "id": "b724",
+              "title": "Surfin' U.S.A.",
+              "artist": "The Beach Boys",
+              "year": 1963,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t229",
+              "title": "Mood",
+              "artist": "24kGoldn feat. Iann Dior",
+              "year": 2020,
+              "genre": "Pop Rap"
+            },
+            {
+              "id": "c494",
+              "title": "Alone",
+              "artist": "Heart",
+              "year": 1987,
+              "genre": "Rock Ballad"
+            },
+            {
+              "id": "v691",
+              "title": "Come On Eileen",
+              "artist": "Dexys Midnight Runners",
+              "year": 1982,
+              "genre": "Pop"
+            },
+            {
+              "id": "v665",
+              "title": "Sweet Home Alabama",
+              "artist": "Lynyrd Skynyrd",
+              "year": 1974,
+              "genre": "Southern Rock"
+            },
+            {
+              "id": "t260",
+              "title": "1000 und 1 Nacht",
+              "artist": "Klaus Lage",
+              "year": 1984,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "x306",
+              "title": "California Dreamin'",
+              "artist": "The Mamas & The Papas",
+              "year": 1965,
+              "genre": "Folk Pop"
+            },
+            {
+              "id": "c606",
+              "title": "You're the One That I Want",
+              "artist": "John Travolta & Olivia Newton-John",
+              "year": 1978,
+              "genre": "Movie Pop"
+            },
+            {
+              "id": "c493",
+              "title": "Total Eclipse of the Heart",
+              "artist": "Bonnie Tyler",
+              "year": 1983,
+              "genre": "Power Ballad"
+            },
+            {
+              "id": "v642",
+              "title": "I'm a Believer",
+              "artist": "The Monkees",
+              "year": 1966,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t113",
+              "title": "Thriller",
+              "artist": "Michael Jackson",
+              "year": 1982,
+              "genre": "Pop"
+            },
+            {
+              "id": "x433",
+              "title": "Let It Go",
+              "artist": "Idina Menzel",
+              "year": 2013,
+              "genre": "Movie Pop"
+            },
+            {
+              "id": "c503",
+              "title": "The Scientist",
+              "artist": "Coldplay",
+              "year": 2002,
+              "genre": "Alternative Ballad"
+            },
+            {
+              "id": "t84",
+              "title": "Shake It Off",
+              "artist": "Taylor Swift",
+              "year": 2014,
+              "genre": "Pop"
+            },
+            {
+              "id": "x429",
+              "title": "Take My Breath Away",
+              "artist": "Berlin",
+              "year": 1986,
+              "genre": "Movie Pop"
+            },
+            {
+              "id": "t181",
+              "title": "Firework",
+              "artist": "Katy Perry",
+              "year": 2010,
+              "genre": "Pop"
+            },
+            {
+              "id": "t89",
+              "title": "HUMBLE.",
+              "artist": "Kendrick Lamar",
+              "year": 2017,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "c526",
+              "title": "Everlong",
+              "artist": "Foo Fighters",
+              "year": 1997,
+              "genre": "Alternative Rock"
+            },
+            {
+              "id": "v649",
+              "title": "Bad Moon Rising",
+              "artist": "Creedence Clearwater Revival",
+              "year": 1969,
+              "genre": "Rock"
+            },
+            {
+              "id": "t166",
+              "title": "Apologize",
+              "artist": "Timbaland feat. OneRepublic",
+              "year": 2007,
+              "genre": "Pop"
+            },
+            {
+              "id": "t118",
+              "title": "Man in the Mirror",
+              "artist": "Michael Jackson",
+              "year": 1988,
+              "genre": "Pop"
+            },
+            {
+              "id": "t192",
+              "title": "Locked Out of Heaven",
+              "artist": "Bruno Mars",
+              "year": 2012,
+              "genre": "Pop"
+            },
+            {
+              "id": "c612",
+              "title": "Unchained Melody",
+              "artist": "The Righteous Brothers",
+              "year": 1965,
+              "genre": "Movie Ballad"
+            },
+            {
+              "id": "t190",
+              "title": "We Are Young",
+              "artist": "fun. feat. Janelle Monae",
+              "year": 2011,
+              "genre": "Pop"
+            },
+            {
+              "id": "b769",
+              "title": "The Way You Make Me Feel",
+              "artist": "Michael Jackson",
+              "year": 1987,
+              "genre": "Pop"
+            },
+            {
+              "id": "t101",
+              "title": "Sweet Caroline",
+              "artist": "Neil Diamond",
+              "year": 1969,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t263",
+              "title": "An Tagen wie diesen",
+              "artist": "Die Toten Hosen",
+              "year": 2012,
+              "genre": "Rock"
+            },
+            {
+              "id": "t94",
+              "title": "Watermelon Sugar",
+              "artist": "Harry Styles",
+              "year": 2019,
+              "genre": "Pop"
+            },
+            {
+              "id": "x335",
+              "title": "Nothing Compares 2 U",
+              "artist": "Sinead O'Connor",
+              "year": 1990,
+              "genre": "Pop"
+            },
+            {
+              "id": "t44",
+              "title": "Everybody Wants to Rule the World",
+              "artist": "Tears for Fears",
+              "year": 1985,
+              "genre": "Synthpop"
+            },
+            {
+              "id": "b760",
+              "title": "Don't Bring Me Down",
+              "artist": "Electric Light Orchestra",
+              "year": 1979,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "c576",
+              "title": "Joana",
+              "artist": "Roland Kaiser",
+              "year": 1984,
+              "genre": "Schlager"
+            },
+            {
+              "id": "b715",
+              "title": "Wake Up Little Susie",
+              "artist": "The Everly Brothers",
+              "year": 1957,
+              "genre": "Rock and Roll"
+            },
+            {
+              "id": "c563",
+              "title": "Can't Hold Us",
+              "artist": "Macklemore & Ryan Lewis",
+              "year": 2011,
+              "genre": "Hip Hop"
+            },
+            {
+              "id": "t138",
+              "title": "All Star",
+              "artist": "Smash Mouth",
+              "year": 1999,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t146",
+              "title": "Whenever, Wherever",
+              "artist": "Shakira",
+              "year": 2001,
+              "genre": "Pop"
+            },
+            {
+              "id": "t58",
+              "title": "My Heart Will Go On",
+              "artist": "Celine Dion",
+              "year": 1997,
+              "genre": "Pop"
+            },
+            {
+              "id": "b742",
+              "title": "War",
+              "artist": "Edwin Starr",
+              "year": 1970,
+              "genre": "Soul Funk"
+            },
+            {
+              "id": "t175",
+              "title": "Paparazzi",
+              "artist": "Lady Gaga",
+              "year": 2009,
+              "genre": "Pop"
+            },
+            {
+              "id": "v690",
+              "title": "Centerfold",
+              "artist": "The J. Geils Band",
+              "year": 1981,
+              "genre": "Rock"
+            },
+            {
+              "id": "c467",
+              "title": "Gonna Make You Sweat",
+              "artist": "C+C Music Factory",
+              "year": 1990,
+              "genre": "Dance"
+            },
+            {
+              "id": "t130",
+              "title": "Firestarter",
+              "artist": "The Prodigy",
+              "year": 1996,
+              "genre": "Electronic"
+            },
+            {
+              "id": "t129",
+              "title": "Don't Speak",
+              "artist": "No Doubt",
+              "year": 1996,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t218",
+              "title": "Rockstar",
+              "artist": "Post Malone feat. 21 Savage",
+              "year": 2017,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "x427",
+              "title": "Don't You (Forget About Me)",
+              "artist": "Simple Minds",
+              "year": 1985,
+              "genre": "Movie Pop"
+            },
+            {
+              "id": "t21",
+              "title": "Stand by Me",
+              "artist": "Ben E. King",
+              "year": 1961,
+              "genre": "Soul"
+            },
+            {
+              "id": "c461",
+              "title": "You Spin Me Round",
+              "artist": "Dead or Alive",
+              "year": 1984,
+              "genre": "Dance Pop"
+            },
+            {
+              "id": "t45",
+              "title": "Livin' on a Prayer",
+              "artist": "Bon Jovi",
+              "year": 1986,
+              "genre": "Rock"
+            },
+            {
+              "id": "b757",
+              "title": "Rich Girl",
+              "artist": "Daryl Hall & John Oates",
+              "year": 1977,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "b740",
+              "title": "Fortunate Son",
+              "artist": "Creedence Clearwater Revival",
+              "year": 1969,
+              "genre": "Rock"
+            },
+            {
+              "id": "t281",
+              "title": "Barbie Girl",
+              "artist": "Aqua",
+              "year": 1997,
+              "genre": "Eurodance"
+            },
+            {
+              "id": "t10",
+              "title": "Mr. Brightside",
+              "artist": "The Killers",
+              "year": 2003,
+              "genre": "Indie Rock"
+            },
+            {
+              "id": "c540",
+              "title": "Dog Days Are Over",
+              "artist": "Florence + The Machine",
+              "year": 2008,
+              "genre": "Indie Pop"
+            },
+            {
+              "id": "c518",
+              "title": "Rock You Like a Hurricane",
+              "artist": "Scorpions",
+              "year": 1984,
+              "genre": "Hard Rock"
+            },
+            {
+              "id": "t61",
+              "title": "Californication",
+              "artist": "Red Hot Chili Peppers",
+              "year": 1999,
+              "genre": "Alternative"
+            },
+            {
+              "id": "t62",
+              "title": "One More Time",
+              "artist": "Daft Punk",
+              "year": 2000,
+              "genre": "Dance"
+            },
+            {
+              "id": "t17",
+              "title": "As It Was",
+              "artist": "Harry Styles",
+              "year": 2022,
+              "genre": "Pop"
+            },
+            {
+              "id": "b735",
+              "title": "Piece of My Heart",
+              "artist": "Big Brother and the Holding Company",
+              "year": 1968,
+              "genre": "Rock"
+            },
+            {
+              "id": "c580",
+              "title": "Sie liebt den DJ",
+              "artist": "Michael Wendler",
+              "year": 2007,
+              "genre": "Schlager"
+            },
+            {
+              "id": "t29",
+              "title": "Imagine",
+              "artist": "John Lennon",
+              "year": 1971,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t226",
+              "title": "Circles",
+              "artist": "Post Malone",
+              "year": 2019,
+              "genre": "Pop"
+            },
+            {
+              "id": "b733",
+              "title": "Gimme Some Lovin'",
+              "artist": "The Spencer Davis Group",
+              "year": 1966,
+              "genre": "Rock Soul"
+            },
+            {
+              "id": "t233",
+              "title": "Bad Habits",
+              "artist": "Ed Sheeran",
+              "year": 2021,
+              "genre": "Pop"
+            },
+            {
+              "id": "t38",
+              "title": "Don't Stop Believin'",
+              "artist": "Journey",
+              "year": 1981,
+              "genre": "Rock"
+            },
+            {
+              "id": "v647",
+              "title": "Born to Be Wild",
+              "artist": "Steppenwolf",
+              "year": 1968,
+              "genre": "Rock"
+            },
+            {
+              "id": "c588",
+              "title": "Layla",
+              "artist": "DJ Robin & Schürze",
+              "year": 2022,
+              "genre": "Schlager Party"
+            },
+            {
+              "id": "b722",
+              "title": "Please Mr. Postman",
+              "artist": "The Marvelettes",
+              "year": 1961,
+              "genre": "Motown Pop"
+            },
+            {
+              "id": "c531",
+              "title": "The Middle",
+              "artist": "Jimmy Eat World",
+              "year": 2001,
+              "genre": "Pop Punk"
+            },
+            {
+              "id": "t126",
+              "title": "The Sign",
+              "artist": "Ace of Base",
+              "year": 1993,
+              "genre": "Pop"
+            },
+            {
+              "id": "t140",
+              "title": "Ms. Jackson",
+              "artist": "Outkast",
+              "year": 2000,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "v622",
+              "title": "Tutti Frutti",
+              "artist": "Little Richard",
+              "year": 1955,
+              "genre": "Rock and Roll"
+            },
+            {
+              "id": "t174",
+              "title": "Fireflies",
+              "artist": "Owl City",
+              "year": 2009,
+              "genre": "Synthpop"
+            },
+            {
+              "id": "c584",
+              "title": "Warum hast du nicht nein gesagt",
+              "artist": "Roland Kaiser & Maite Kelly",
+              "year": 2014,
+              "genre": "Schlager"
+            },
+            {
+              "id": "t247",
+              "title": "Beautiful Things",
+              "artist": "Benson Boone",
+              "year": 2024,
+              "genre": "Pop"
+            },
+            {
+              "id": "t215",
+              "title": "Thunder",
+              "artist": "Imagine Dragons",
+              "year": 2017,
+              "genre": "Alternative"
+            },
+            {
+              "id": "t107",
+              "title": "Boogie Wonderland",
+              "artist": "Earth, Wind & Fire",
+              "year": 1979,
+              "genre": "Disco"
+            },
+            {
+              "id": "c569",
+              "title": "Astronaut in the Ocean",
+              "artist": "Masked Wolf",
+              "year": 2019,
+              "genre": "Hip Hop"
+            },
+            {
+              "id": "t109",
+              "title": "Video Killed the Radio Star",
+              "artist": "The Buggles",
+              "year": 1979,
+              "genre": "New Wave"
+            },
+            {
+              "id": "v653",
+              "title": "Ain't No Sunshine",
+              "artist": "Bill Withers",
+              "year": 1971,
+              "genre": "Soul"
+            },
+            {
+              "id": "b718",
+              "title": "Dream Lover",
+              "artist": "Bobby Darin",
+              "year": 1959,
+              "genre": "Pop"
+            },
+            {
+              "id": "t228",
+              "title": "WAP",
+              "artist": "Cardi B feat. Megan Thee Stallion",
+              "year": 2020,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "v700",
+              "title": "Money for Nothing",
+              "artist": "Dire Straits",
+              "year": 1985,
+              "genre": "Rock"
+            },
+            {
+              "id": "t149",
+              "title": "Hot in Herre",
+              "artist": "Nelly",
+              "year": 2002,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "t204",
+              "title": "Hello",
+              "artist": "Adele",
+              "year": 2015,
+              "genre": "Soul Pop"
+            },
+            {
+              "id": "v637",
+              "title": "I Got You (I Feel Good)",
+              "artist": "James Brown",
+              "year": 1965,
+              "genre": "Funk Soul"
+            },
+            {
+              "id": "t77",
+              "title": "Rolling in the Deep",
+              "artist": "Adele",
+              "year": 2010,
+              "genre": "Soul Pop"
+            },
+            {
+              "id": "t68",
+              "title": "Yeah!",
+              "artist": "Usher feat. Lil Jon and Ludacris",
+              "year": 2004,
+              "genre": "R&B"
+            },
+            {
+              "id": "x304",
+              "title": "House of the Rising Sun",
+              "artist": "The Animals",
+              "year": 1964,
+              "genre": "Rock"
+            },
+            {
+              "id": "t66",
+              "title": "Seven Nation Army",
+              "artist": "The White Stripes",
+              "year": 2003,
+              "genre": "Rock"
+            },
+            {
+              "id": "t161",
+              "title": "Dani California",
+              "artist": "Red Hot Chili Peppers",
+              "year": 2006,
+              "genre": "Alternative"
+            },
+            {
+              "id": "t210",
+              "title": "One Dance",
+              "artist": "Drake feat. Wizkid and Kyla",
+              "year": 2016,
+              "genre": "Dancehall"
+            },
+            {
+              "id": "t283",
+              "title": "Freed from Desire",
+              "artist": "Gala",
+              "year": 1996,
+              "genre": "Dance"
+            },
+            {
+              "id": "t13",
+              "title": "Bad Romance",
+              "artist": "Lady Gaga",
+              "year": 2009,
+              "genre": "Pop"
+            },
+            {
+              "id": "t236",
+              "title": "About Damn Time",
+              "artist": "Lizzo",
+              "year": 2022,
+              "genre": "Pop"
+            },
+            {
+              "id": "b726",
+              "title": "You Really Got a Hold on Me",
+              "artist": "The Miracles",
+              "year": 1962,
+              "genre": "Motown Soul"
+            },
+            {
+              "id": "v634",
+              "title": "I Get Around",
+              "artist": "The Beach Boys",
+              "year": 1964,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t253",
+              "title": "Fortnight",
+              "artist": "Taylor Swift feat. Post Malone",
+              "year": 2024,
+              "genre": "Pop"
+            },
+            {
+              "id": "v633",
+              "title": "You've Really Got Me",
+              "artist": "The Kinks",
+              "year": 1964,
+              "genre": "Rock"
+            },
+            {
+              "id": "b741",
+              "title": "Signed, Sealed, Delivered I'm Yours",
+              "artist": "Stevie Wonder",
+              "year": 1970,
+              "genre": "Soul Funk"
+            },
+            {
+              "id": "t298",
+              "title": "Mi Gente",
+              "artist": "J Balvin & Willy William",
+              "year": 2017,
+              "genre": "Reggaeton"
+            },
+            {
+              "id": "c459",
+              "title": "Footloose",
+              "artist": "Kenny Loggins",
+              "year": 1984,
+              "genre": "Movie Party Pop"
+            },
+            {
+              "id": "c524",
+              "title": "Black Hole Sun",
+              "artist": "Soundgarden",
+              "year": 1994,
+              "genre": "Grunge"
+            },
+            {
+              "id": "t119",
+              "title": "Wind of Change",
+              "artist": "Scorpions",
+              "year": 1990,
+              "genre": "Rock"
+            },
+            {
+              "id": "t69",
+              "title": "Numb",
+              "artist": "Linkin Park",
+              "year": 2003,
+              "genre": "Nu Metal"
+            },
+            {
+              "id": "x404",
+              "title": "Mensch",
+              "artist": "Herbert Grönemeyer",
+              "year": 2002,
+              "genre": "Deutsch Pop"
+            },
+            {
+              "id": "v652",
+              "title": "Lola",
+              "artist": "The Kinks",
+              "year": 1970,
+              "genre": "Rock"
+            },
+            {
+              "id": "t289",
+              "title": "Mr. Saxobeat",
+              "artist": "Alexandra Stan",
+              "year": 2011,
+              "genre": "Dance"
+            },
+            {
+              "id": "t292",
+              "title": "Dernière danse",
+              "artist": "Indila",
+              "year": 2013,
+              "genre": "Pop"
+            },
+            {
+              "id": "b732",
+              "title": "Wild Thing",
+              "artist": "The Troggs",
+              "year": 1966,
+              "genre": "Rock"
+            },
+            {
+              "id": "c571",
+              "title": "Griechischer Wein",
+              "artist": "Udo Jürgens",
+              "year": 1974,
+              "genre": "Schlager"
+            },
+            {
+              "id": "c560",
+              "title": "Run This Town",
+              "artist": "Jay-Z feat. Rihanna & Kanye West",
+              "year": 2009,
+              "genre": "Hip Hop"
+            },
+            {
+              "id": "v660",
+              "title": "Live and Let Die",
+              "artist": "Wings",
+              "year": 1973,
+              "genre": "Movie Rock"
+            },
+            {
+              "id": "t252",
+              "title": "Not Like Us",
+              "artist": "Kendrick Lamar",
+              "year": 2024,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "x348",
+              "title": "I Don't Want to Miss a Thing",
+              "artist": "Aerosmith",
+              "year": 1998,
+              "genre": "Movie Rock"
+            },
+            {
+              "id": "v658",
+              "title": "Lean on Me",
+              "artist": "Bill Withers",
+              "year": 1972,
+              "genre": "Soul"
+            },
+            {
+              "id": "t189",
+              "title": "Levels",
+              "artist": "Avicii",
+              "year": 2011,
+              "genre": "Dance"
+            },
+            {
+              "id": "b730",
+              "title": "Dancing in the Street",
+              "artist": "Martha and the Vandellas",
+              "year": 1964,
+              "genre": "Motown Soul"
+            },
+            {
+              "id": "c535",
+              "title": "Take Me Out",
+              "artist": "Franz Ferdinand",
+              "year": 2004,
+              "genre": "Indie Rock"
+            },
+            {
+              "id": "t286",
+              "title": "The Rhythm of the Night",
+              "artist": "Corona",
+              "year": 1993,
+              "genre": "Eurodance"
+            },
+            {
+              "id": "t238",
+              "title": "Calm Down",
+              "artist": "Rema & Selena Gomez",
+              "year": 2022,
+              "genre": "Afrobeats"
+            },
+            {
+              "id": "v638",
+              "title": "Like a Rolling Stone",
+              "artist": "Bob Dylan",
+              "year": 1965,
+              "genre": "Folk Rock"
+            },
+            {
+              "id": "t153",
+              "title": "This Love",
+              "artist": "Maroon 5",
+              "year": 2004,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t147",
+              "title": "Sk8er Boi",
+              "artist": "Avril Lavigne",
+              "year": 2002,
+              "genre": "Pop Punk"
+            },
+            {
+              "id": "c619",
+              "title": "Remember Me",
+              "artist": "Miguel feat. Natalia Lafourcade",
+              "year": 2017,
+              "genre": "Movie Pop"
+            },
+            {
+              "id": "v630",
+              "title": "Hit the Road Jack",
+              "artist": "Ray Charles",
+              "year": 1961,
+              "genre": "Soul"
+            },
+            {
+              "id": "c578",
+              "title": "Wahnsinn",
+              "artist": "Wolfgang Petry",
+              "year": 1983,
+              "genre": "Schlager"
+            },
+            {
+              "id": "c528",
+              "title": "All the Small Things",
+              "artist": "Blink-182",
+              "year": 1999,
+              "genre": "Punk Pop"
+            },
+            {
+              "id": "b714",
+              "title": "Peggy Sue",
+              "artist": "Buddy Holly",
+              "year": 1957,
+              "genre": "Rock and Roll"
+            },
+            {
+              "id": "t73",
+              "title": "Poker Face",
+              "artist": "Lady Gaga",
+              "year": 2008,
+              "genre": "Pop"
+            },
+            {
+              "id": "t36",
+              "title": "Another Brick in the Wall, Pt. 2",
+              "artist": "Pink Floyd",
+              "year": 1979,
+              "genre": "Rock"
+            },
+            {
+              "id": "t222",
+              "title": "Sunflower",
+              "artist": "Post Malone & Swae Lee",
+              "year": 2018,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "v643",
+              "title": "A Whiter Shade of Pale",
+              "artist": "Procol Harum",
+              "year": 1967,
+              "genre": "Rock Ballad"
+            },
+            {
+              "id": "t287",
+              "title": "Rhythm Is a Dancer",
+              "artist": "Snap!",
+              "year": 1992,
+              "genre": "Eurodance"
+            },
+            {
+              "id": "c466",
+              "title": "Vogue",
+              "artist": "Madonna",
+              "year": 1990,
+              "genre": "Dance Pop"
+            },
+            {
+              "id": "b719",
+              "title": "Mack the Knife",
+              "artist": "Bobby Darin",
+              "year": 1959,
+              "genre": "Pop Jazz"
+            },
+            {
+              "id": "t150",
+              "title": "Bring Me to Life",
+              "artist": "Evanescence",
+              "year": 2003,
+              "genre": "Rock"
+            },
+            {
+              "id": "c579",
+              "title": "Weiß der Geier",
+              "artist": "Wolfgang Petry",
+              "year": 1997,
+              "genre": "Schlager"
+            },
+            {
+              "id": "t57",
+              "title": "Bittersweet Symphony",
+              "artist": "The Verve",
+              "year": 1997,
+              "genre": "Britpop"
+            },
+            {
+              "id": "c567",
+              "title": "Savage",
+              "artist": "Megan Thee Stallion",
+              "year": 2020,
+              "genre": "Hip Hop"
+            },
+            {
+              "id": "t237",
+              "title": "Unholy",
+              "artist": "Sam Smith & Kim Petras",
+              "year": 2022,
+              "genre": "Pop"
+            },
+            {
+              "id": "b716",
+              "title": "Summertime Blues",
+              "artist": "Eddie Cochran",
+              "year": 1958,
+              "genre": "Rock and Roll"
+            },
+            {
+              "id": "t205",
+              "title": "Sorry",
+              "artist": "Justin Bieber",
+              "year": 2015,
+              "genre": "Pop"
+            },
+            {
+              "id": "t111",
+              "title": "Eye of the Tiger",
+              "artist": "Survivor",
+              "year": 1982,
+              "genre": "Rock"
+            },
+            {
+              "id": "x422",
+              "title": "Rise Like a Phoenix",
+              "artist": "Conchita Wurst",
+              "year": 2014,
+              "genre": "Eurovision Pop"
+            },
+            {
+              "id": "t47",
+              "title": "Sweet Child O' Mine",
+              "artist": "Guns N' Roses",
+              "year": 1987,
+              "genre": "Hard Rock"
+            },
+            {
+              "id": "b713",
+              "title": "That'll Be the Day",
+              "artist": "Buddy Holly",
+              "year": 1957,
+              "genre": "Rock and Roll"
+            },
+            {
+              "id": "b738",
+              "title": "Build Me Up Buttercup",
+              "artist": "The Foundations",
+              "year": 1968,
+              "genre": "Soul Pop"
+            },
+            {
+              "id": "t157",
+              "title": "Feel Good Inc.",
+              "artist": "Gorillaz",
+              "year": 2005,
+              "genre": "Alternative"
+            },
+            {
+              "id": "t293",
+              "title": "Ai Se Eu Te Pego",
+              "artist": "Michel Teló",
+              "year": 2011,
+              "genre": "Latin Pop"
+            },
+            {
+              "id": "v687",
+              "title": "Just the Two of Us",
+              "artist": "Grover Washington Jr. feat. Bill Withers",
+              "year": 1980,
+              "genre": "Soul"
+            },
+            {
+              "id": "v688",
+              "title": "Start Me Up",
+              "artist": "The Rolling Stones",
+              "year": 1981,
+              "genre": "Rock"
+            },
+            {
+              "id": "v681",
+              "title": "Don't Stop Me Now",
+              "artist": "Queen",
+              "year": 1978,
+              "genre": "Rock"
+            },
+            {
+              "id": "t20",
+              "title": "Johnny B. Goode",
+              "artist": "Chuck Berry",
+              "year": 1958,
+              "genre": "Rock and Roll"
+            },
+            {
+              "id": "x361",
+              "title": "Dragostea Din Tei",
+              "artist": "O-Zone",
+              "year": 2004,
+              "genre": "Eurodance"
+            },
+            {
+              "id": "t52",
+              "title": "Creep",
+              "artist": "Radiohead",
+              "year": 1992,
+              "genre": "Alternative"
+            },
+            {
+              "id": "t139",
+              "title": "It Wasn't Me",
+              "artist": "Shaggy feat. Rikrok",
+              "year": 2000,
+              "genre": "Reggae Pop"
+            },
+            {
+              "id": "t92",
+              "title": "Dance Monkey",
+              "artist": "Tones and I",
+              "year": 2019,
+              "genre": "Pop"
+            },
+            {
+              "id": "t98",
+              "title": "Heat Waves",
+              "artist": "Glass Animals",
+              "year": 2020,
+              "genre": "Indie Pop"
+            },
+            {
+              "id": "x440",
+              "title": "Bailando",
+              "artist": "Enrique Iglesias",
+              "year": 2014,
+              "genre": "Latin Pop"
+            },
+            {
+              "id": "t34",
+              "title": "Stayin' Alive",
+              "artist": "Bee Gees",
+              "year": 1977,
+              "genre": "Disco"
+            },
+            {
+              "id": "t64",
+              "title": "Can't Get You Out of My Head",
+              "artist": "Kylie Minogue",
+              "year": 2001,
+              "genre": "Dance Pop"
+            },
+            {
+              "id": "t250",
+              "title": "Good Luck, Babe!",
+              "artist": "Chappell Roan",
+              "year": 2024,
+              "genre": "Pop"
+            },
+            {
+              "id": "c519",
+              "title": "The Boys of Summer",
+              "artist": "Don Henley",
+              "year": 1984,
+              "genre": "Rock"
+            },
+            {
+              "id": "c510",
+              "title": "Let Her Go",
+              "artist": "Passenger",
+              "year": 2012,
+              "genre": "Folk Pop Ballad"
+            },
+            {
+              "id": "t110",
+              "title": "Tainted Love",
+              "artist": "Soft Cell",
+              "year": 1981,
+              "genre": "Synthpop"
+            },
+            {
+              "id": "c552",
+              "title": "Jump Around",
+              "artist": "House of Pain",
+              "year": 1992,
+              "genre": "Hip Hop"
+            },
+            {
+              "id": "c529",
+              "title": "Last Resort",
+              "artist": "Papa Roach",
+              "year": 2000,
+              "genre": "Nu Metal"
+            },
+            {
+              "id": "b752",
+              "title": "Hooked on a Feeling",
+              "artist": "Blue Swede",
+              "year": 1974,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t16",
+              "title": "Blinding Lights",
+              "artist": "The Weeknd",
+              "year": 2019,
+              "genre": "Synthpop"
+            },
+            {
+              "id": "c607",
+              "title": "Summer Nights",
+              "artist": "John Travolta & Olivia Newton-John",
+              "year": 1978,
+              "genre": "Movie Pop"
+            },
+            {
+              "id": "c556",
+              "title": "Without Me",
+              "artist": "Eminem",
+              "year": 2002,
+              "genre": "Hip Hop"
+            },
+            {
+              "id": "t296",
+              "title": "Gasolina",
+              "artist": "Daddy Yankee",
+              "year": 2004,
+              "genre": "Reggaeton"
+            },
+            {
+              "id": "t23",
+              "title": "My Girl",
+              "artist": "The Temptations",
+              "year": 1964,
+              "genre": "Soul"
+            },
+            {
+              "id": "v662",
+              "title": "Piano Man",
+              "artist": "Billy Joel",
+              "year": 1973,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "c620",
+              "title": "No Time to Die",
+              "artist": "Billie Eilish",
+              "year": 2020,
+              "genre": "Movie Ballad"
+            },
+            {
+              "id": "v626",
+              "title": "La Bamba",
+              "artist": "Ritchie Valens",
+              "year": 1958,
+              "genre": "Latin Rock"
+            },
+            {
+              "id": "t30",
+              "title": "Superstition",
+              "artist": "Stevie Wonder",
+              "year": 1972,
+              "genre": "Funk"
+            },
+            {
+              "id": "c465",
+              "title": "Pump Up the Jam",
+              "artist": "Technotronic",
+              "year": 1989,
+              "genre": "Dance"
+            },
+            {
+              "id": "c562",
+              "title": "Black and Yellow",
+              "artist": "Wiz Khalifa",
+              "year": 2010,
+              "genre": "Hip Hop"
+            },
+            {
+              "id": "v628",
+              "title": "Only the Lonely",
+              "artist": "Roy Orbison",
+              "year": 1960,
+              "genre": "Pop Ballad"
+            },
+            {
+              "id": "t273",
+              "title": "Lieblingsmensch",
+              "artist": "Namika",
+              "year": 2015,
+              "genre": "Pop"
+            },
+            {
+              "id": "t141",
+              "title": "Yellow",
+              "artist": "Coldplay",
+              "year": 2000,
+              "genre": "Alternative"
+            },
+            {
+              "id": "c474",
+              "title": "We Like to Party",
+              "artist": "Vengaboys",
+              "year": 1998,
+              "genre": "Eurodance"
+            },
+            {
+              "id": "t165",
+              "title": "Stronger",
+              "artist": "Kanye West",
+              "year": 2007,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "t288",
+              "title": "What Is Love",
+              "artist": "Haddaway",
+              "year": 1993,
+              "genre": "Eurodance"
+            },
+            {
+              "id": "v644",
+              "title": "Light My Fire",
+              "artist": "The Doors",
+              "year": 1967,
+              "genre": "Rock"
+            },
+            {
+              "id": "b743",
+              "title": "It's Too Late",
+              "artist": "Carole King",
+              "year": 1971,
+              "genre": "Pop"
+            },
+            {
+              "id": "b773",
+              "title": "Therefore I Am",
+              "artist": "Billie Eilish",
+              "year": 2020,
+              "genre": "Pop"
+            },
+            {
+              "id": "t145",
+              "title": "How You Remind Me",
+              "artist": "Nickelback",
+              "year": 2001,
+              "genre": "Rock"
+            },
+            {
+              "id": "x417",
+              "title": "Puppet on a String",
+              "artist": "Sandie Shaw",
+              "year": 1967,
+              "genre": "Eurovision Pop"
+            },
+            {
+              "id": "t88",
+              "title": "Despacito",
+              "artist": "Luis Fonsi feat. Daddy Yankee",
+              "year": 2017,
+              "genre": "Latin Pop"
+            },
+            {
+              "id": "t200",
+              "title": "All About That Bass",
+              "artist": "Meghan Trainor",
+              "year": 2014,
+              "genre": "Pop"
+            },
+            {
+              "id": "x425",
+              "title": "Tattoo",
+              "artist": "Loreen",
+              "year": 2023,
+              "genre": "Eurovision Pop"
+            },
+            {
+              "id": "t72",
+              "title": "Rehab",
+              "artist": "Amy Winehouse",
+              "year": 2006,
+              "genre": "Soul"
+            },
+            {
+              "id": "c575",
+              "title": "Santa Maria",
+              "artist": "Roland Kaiser",
+              "year": 1980,
+              "genre": "Schlager"
+            },
+            {
+              "id": "b750",
+              "title": "Radar Love",
+              "artist": "Golden Earring",
+              "year": 1973,
+              "genre": "Rock"
+            },
+            {
+              "id": "t170",
+              "title": "Sex on Fire",
+              "artist": "Kings of Leon",
+              "year": 2008,
+              "genre": "Rock"
+            },
+            {
+              "id": "t115",
+              "title": "Radio Ga Ga",
+              "artist": "Queen",
+              "year": 1984,
+              "genre": "Rock"
+            },
+            {
+              "id": "t50",
+              "title": "Nothing Else Matters",
+              "artist": "Metallica",
+              "year": 1991,
+              "genre": "Metal"
+            },
+            {
+              "id": "b711",
+              "title": "Blue Suede Shoes",
+              "artist": "Carl Perkins",
+              "year": 1956,
+              "genre": "Rock and Roll"
+            },
+            {
+              "id": "x431",
+              "title": "Kiss from a Rose",
+              "artist": "Seal",
+              "year": 1994,
+              "genre": "Movie Soul"
+            },
+            {
+              "id": "t25",
+              "title": "Respect",
+              "artist": "Aretha Franklin",
+              "year": 1967,
+              "genre": "Soul"
+            },
+            {
+              "id": "b728",
+              "title": "The Loco-Motion",
+              "artist": "Little Eva",
+              "year": 1962,
+              "genre": "Pop"
+            },
+            {
+              "id": "x430",
+              "title": "Ghostbusters",
+              "artist": "Ray Parker Jr.",
+              "year": 1984,
+              "genre": "Movie Pop"
+            },
+            {
+              "id": "b759",
+              "title": "I Was Made for Lovin' You",
+              "artist": "KISS",
+              "year": 1979,
+              "genre": "Rock Disco"
+            },
+            {
+              "id": "v656",
+              "title": "Let's Stay Together",
+              "artist": "Al Green",
+              "year": 1971,
+              "genre": "Soul"
+            },
+            {
+              "id": "x305",
+              "title": "My Generation",
+              "artist": "The Who",
+              "year": 1965,
+              "genre": "Rock"
+            },
+            {
+              "id": "t54",
+              "title": "Zombie",
+              "artist": "The Cranberries",
+              "year": 1994,
+              "genre": "Alternative"
+            },
+            {
+              "id": "t135",
+              "title": "Believe",
+              "artist": "Cher",
+              "year": 1998,
+              "genre": "Dance Pop"
+            },
+            {
+              "id": "t40",
+              "title": "Every Breath You Take",
+              "artist": "The Police",
+              "year": 1983,
+              "genre": "New Wave"
+            },
+            {
+              "id": "t108",
+              "title": "Heart of Glass",
+              "artist": "Blondie",
+              "year": 1978,
+              "genre": "New Wave"
+            },
+            {
+              "id": "t120",
+              "title": "Black or White",
+              "artist": "Michael Jackson",
+              "year": 1991,
+              "genre": "Pop"
+            },
+            {
+              "id": "b736",
+              "title": "I Heard It Through the Grapevine",
+              "artist": "Marvin Gaye",
+              "year": 1968,
+              "genre": "Soul"
+            },
+            {
+              "id": "v695",
+              "title": "Karma Chameleon",
+              "artist": "Culture Club",
+              "year": 1983,
+              "genre": "Pop"
+            },
+            {
+              "id": "c555",
+              "title": "Get Ur Freak On",
+              "artist": "Missy Elliott",
+              "year": 2001,
+              "genre": "Hip Hop"
+            },
+            {
+              "id": "c599",
+              "title": "Soldi",
+              "artist": "Mahmood",
+              "year": 2019,
+              "genre": "Eurovision Pop"
+            },
+            {
+              "id": "v667",
+              "title": "Fame",
+              "artist": "David Bowie",
+              "year": 1975,
+              "genre": "Funk Rock"
+            },
+            {
+              "id": "v694",
+              "title": "Blue Monday",
+              "artist": "New Order",
+              "year": 1983,
+              "genre": "Electronic"
+            },
+            {
+              "id": "t116",
+              "title": "The Final Countdown",
+              "artist": "Europe",
+              "year": 1986,
+              "genre": "Rock"
+            },
+            {
+              "id": "c573",
+              "title": "Er gehört zu mir",
+              "artist": "Marianne Rosenberg",
+              "year": 1975,
+              "genre": "Schlager"
+            },
+            {
+              "id": "b727",
+              "title": "Do You Love Me",
+              "artist": "The Contours",
+              "year": 1962,
+              "genre": "Motown Soul"
+            },
+            {
+              "id": "c499",
+              "title": "Angels",
+              "artist": "Robbie Williams",
+              "year": 1997,
+              "genre": "Pop Ballad"
+            },
+            {
+              "id": "t223",
+              "title": "Bad Guy",
+              "artist": "Billie Eilish",
+              "year": 2019,
+              "genre": "Pop"
+            },
+            {
+              "id": "c479",
+              "title": "Shut Up and Dance",
+              "artist": "Walk the Moon",
+              "year": 2014,
+              "genre": "Party Pop Rock"
+            },
+            {
+              "id": "b746",
+              "title": "Without You",
+              "artist": "Harry Nilsson",
+              "year": 1971,
+              "genre": "Pop Ballad"
+            },
+            {
+              "id": "t187",
+              "title": "Pumped Up Kicks",
+              "artist": "Foster the People",
+              "year": 2010,
+              "genre": "Indie Pop"
+            },
+            {
+              "id": "b785",
+              "title": "Padam Padam",
+              "artist": "Kylie Minogue",
+              "year": 2023,
+              "genre": "Dance Pop"
+            },
+            {
+              "id": "c534",
+              "title": "I Believe in a Thing Called Love",
+              "artist": "The Darkness",
+              "year": 2003,
+              "genre": "Rock"
+            },
+            {
+              "id": "t8",
+              "title": "In the End",
+              "artist": "Linkin Park",
+              "year": 2000,
+              "genre": "Nu Metal"
+            },
+            {
+              "id": "c594",
+              "title": "Hard Rock Hallelujah",
+              "artist": "Lordi",
+              "year": 2006,
+              "genre": "Eurovision Rock"
+            },
+            {
+              "id": "t271",
+              "title": "Auf uns",
+              "artist": "Andreas Bourani",
+              "year": 2014,
+              "genre": "Pop"
+            },
+            {
+              "id": "t241",
+              "title": "Vampire",
+              "artist": "Olivia Rodrigo",
+              "year": 2023,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "c603",
+              "title": "Circle of Life",
+              "artist": "Elton John",
+              "year": 1994,
+              "genre": "Movie Pop"
+            },
+            {
+              "id": "t272",
+              "title": "80 Millionen",
+              "artist": "Max Giesinger",
+              "year": 2016,
+              "genre": "Pop"
+            },
+            {
+              "id": "t37",
+              "title": "Another One Bites the Dust",
+              "artist": "Queen",
+              "year": 1980,
+              "genre": "Rock"
+            },
+            {
+              "id": "b717",
+              "title": "Yakety Yak",
+              "artist": "The Coasters",
+              "year": 1958,
+              "genre": "Rock and Roll"
+            },
+            {
+              "id": "t80",
+              "title": "Thrift Shop",
+              "artist": "Macklemore & Ryan Lewis feat. Wanz",
+              "year": 2012,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "t41",
+              "title": "Girls Just Want to Have Fun",
+              "artist": "Cyndi Lauper",
+              "year": 1983,
+              "genre": "Pop"
+            },
+            {
+              "id": "t259",
+              "title": "Da Da Da",
+              "artist": "Trio",
+              "year": 1982,
+              "genre": "Neue Deutsche Welle"
+            },
+            {
+              "id": "b749",
+              "title": "You Are the Sunshine of My Life",
+              "artist": "Stevie Wonder",
+              "year": 1973,
+              "genre": "Soul Pop"
+            },
+            {
+              "id": "c509",
+              "title": "Say Something",
+              "artist": "A Great Big World & Christina Aguilera",
+              "year": 2013,
+              "genre": "Pop Ballad"
+            },
+            {
+              "id": "v621",
+              "title": "Rock Around the Clock",
+              "artist": "Bill Haley & His Comets",
+              "year": 1954,
+              "genre": "Rock and Roll"
+            },
+            {
+              "id": "c585",
+              "title": "Herzbeben",
+              "artist": "Helene Fischer",
+              "year": 2017,
+              "genre": "Schlager"
+            },
+            {
+              "id": "t264",
+              "title": "Tage wie diese",
+              "artist": "Die Toten Hosen",
+              "year": 2012,
+              "genre": "Rock"
+            },
+            {
+              "id": "t117",
+              "title": "Never Gonna Give You Up",
+              "artist": "Rick Astley",
+              "year": 1987,
+              "genre": "Pop"
+            },
+            {
+              "id": "t79",
+              "title": "Call Me Maybe",
+              "artist": "Carly Rae Jepsen",
+              "year": 2011,
+              "genre": "Pop"
+            },
+            {
+              "id": "t172",
+              "title": "Use Somebody",
+              "artist": "Kings of Leon",
+              "year": 2008,
+              "genre": "Rock"
+            },
+            {
+              "id": "t15",
+              "title": "Uptown Funk",
+              "artist": "Mark Ronson feat. Bruno Mars",
+              "year": 2014,
+              "genre": "Funk Pop"
+            },
+            {
+              "id": "t125",
+              "title": "All That She Wants",
+              "artist": "Ace of Base",
+              "year": 1992,
+              "genre": "Pop"
+            },
+            {
+              "id": "v701",
+              "title": "West End Girls",
+              "artist": "Pet Shop Boys",
+              "year": 1985,
+              "genre": "Synthpop"
+            },
+            {
+              "id": "t55",
+              "title": "Gangsta's Paradise",
+              "artist": "Coolio feat. L.V.",
+              "year": 1995,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "t198",
+              "title": "Wrecking Ball",
+              "artist": "Miley Cyrus",
+              "year": 2013,
+              "genre": "Pop"
+            },
+            {
+              "id": "v677",
+              "title": "Mr. Blue Sky",
+              "artist": "Electric Light Orchestra",
+              "year": 1977,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t2",
+              "title": "Bohemian Rhapsody",
+              "artist": "Queen",
+              "year": 1975,
+              "genre": "Rock",
+              "spotifyUri": "spotify:track:4u7EnebtmKWzUH433cf5Qv"
+            },
+            {
+              "id": "t167",
+              "title": "Bleeding Love",
+              "artist": "Leona Lewis",
+              "year": 2007,
+              "genre": "Pop"
+            },
+            {
+              "id": "x322",
+              "title": "Le Freak",
+              "artist": "Chic",
+              "year": 1978,
+              "genre": "Disco"
+            },
+            {
+              "id": "t239",
+              "title": "Kill Bill",
+              "artist": "SZA",
+              "year": 2022,
+              "genre": "R&B"
+            },
+            {
+              "id": "c572",
+              "title": "Über den Wolken",
+              "artist": "Reinhard Mey",
+              "year": 1974,
+              "genre": "Deutsch Folk"
+            },
+            {
+              "id": "t103",
+              "title": "American Pie",
+              "artist": "Don McLean",
+              "year": 1971,
+              "genre": "Folk Rock"
+            },
+            {
+              "id": "t225",
+              "title": "Senorita",
+              "artist": "Shawn Mendes & Camila Cabello",
+              "year": 2019,
+              "genre": "Pop"
+            },
+            {
+              "id": "c504",
+              "title": "Chasing Cars",
+              "artist": "Snow Patrol",
+              "year": 2006,
+              "genre": "Indie Ballad"
+            },
+            {
+              "id": "t207",
+              "title": "Stressed Out",
+              "artist": "Twenty One Pilots",
+              "year": 2015,
+              "genre": "Alternative"
+            },
+            {
+              "id": "x343",
+              "title": "Killing Me Softly",
+              "artist": "Fugees",
+              "year": 1996,
+              "genre": "Hip Hop Soul"
+            },
+            {
+              "id": "t256",
+              "title": "Major Tom",
+              "artist": "Peter Schilling",
+              "year": 1982,
+              "genre": "Neue Deutsche Welle"
+            },
+            {
+              "id": "c500",
+              "title": "Torn",
+              "artist": "Natalie Imbruglia",
+              "year": 1997,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t154",
+              "title": "Boulevard of Broken Dreams",
+              "artist": "Green Day",
+              "year": 2004,
+              "genre": "Rock"
+            },
+            {
+              "id": "t102",
+              "title": "Bridge Over Troubled Water",
+              "artist": "Simon & Garfunkel",
+              "year": 1970,
+              "genre": "Folk Rock"
+            },
+            {
+              "id": "c502",
+              "title": "If I Ain't Got You",
+              "artist": "Alicia Keys",
+              "year": 2003,
+              "genre": "R&B Soul Ballad"
+            },
+            {
+              "id": "t14",
+              "title": "Get Lucky",
+              "artist": "Daft Punk feat. Pharrell Williams",
+              "year": 2013,
+              "genre": "Disco"
+            },
+            {
+              "id": "t158",
+              "title": "Hung Up",
+              "artist": "Madonna",
+              "year": 2005,
+              "genre": "Dance Pop"
+            },
+            {
+              "id": "c609",
+              "title": "Flashdance... What a Feeling",
+              "artist": "Irene Cara",
+              "year": 1983,
+              "genre": "Movie Pop"
+            },
+            {
+              "id": "t3",
+              "title": "Sweet Dreams",
+              "artist": "Eurythmics",
+              "year": 1983,
+              "genre": "Synthpop",
+              "spotifyUri": "spotify:track:1TfqLAPs4K3s2rJMoCokcS"
+            },
+            {
+              "id": "v708",
+              "title": "The Look",
+              "artist": "Roxette",
+              "year": 1988,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t203",
+              "title": "See You Again",
+              "artist": "Wiz Khalifa feat. Charlie Puth",
+              "year": 2015,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "c508",
+              "title": "All of Me",
+              "artist": "John Legend",
+              "year": 2013,
+              "genre": "Soul Ballad"
+            },
+            {
+              "id": "v636",
+              "title": "Mr. Tambourine Man",
+              "artist": "The Byrds",
+              "year": 1965,
+              "genre": "Folk Rock"
+            },
+            {
+              "id": "t240",
+              "title": "Escapism.",
+              "artist": "Raye feat. 070 Shake",
+              "year": 2022,
+              "genre": "R&B"
+            },
+            {
+              "id": "t276",
+              "title": "Vincent",
+              "artist": "Sarah Connor",
+              "year": 2019,
+              "genre": "Pop"
+            },
+            {
+              "id": "t121",
+              "title": "Enter Sandman",
+              "artist": "Metallica",
+              "year": 1991,
+              "genre": "Metal"
+            },
+            {
+              "id": "t26",
+              "title": "All Along the Watchtower",
+              "artist": "Jimi Hendrix",
+              "year": 1968,
+              "genre": "Rock"
+            },
+            {
+              "id": "t224",
+              "title": "Someone You Loved",
+              "artist": "Lewis Capaldi",
+              "year": 2018,
+              "genre": "Pop"
+            },
+            {
+              "id": "c592",
+              "title": "Dschinghis Khan",
+              "artist": "Dschinghis Khan",
+              "year": 1979,
+              "genre": "Eurovision Pop"
+            },
+            {
+              "id": "c617",
+              "title": "City of Stars",
+              "artist": "Ryan Gosling & Emma Stone",
+              "year": 2016,
+              "genre": "Movie Ballad"
+            },
+            {
+              "id": "t245",
+              "title": "Houdini",
+              "artist": "Dua Lipa",
+              "year": 2023,
+              "genre": "Dance Pop"
+            },
+            {
+              "id": "t257",
+              "title": "Skandal im Sperrbezirk",
+              "artist": "Spider Murphy Gang",
+              "year": 1981,
+              "genre": "Rock"
+            },
+            {
+              "id": "t71",
+              "title": "Crazy",
+              "artist": "Gnarls Barkley",
+              "year": 2006,
+              "genre": "Soul"
+            },
+            {
+              "id": "c548",
+              "title": "The Message",
+              "artist": "Grandmaster Flash & The Furious Five",
+              "year": 1982,
+              "genre": "Hip Hop"
+            },
+            {
+              "id": "t48",
+              "title": "Fast Car",
+              "artist": "Tracy Chapman",
+              "year": 1988,
+              "genre": "Folk Rock"
+            },
+            {
+              "id": "t53",
+              "title": "What's Up?",
+              "artist": "4 Non Blondes",
+              "year": 1993,
+              "genre": "Alternative"
+            },
+            {
+              "id": "t297",
+              "title": "Danza Kuduro",
+              "artist": "Don Omar feat. Lucenzo",
+              "year": 2010,
+              "genre": "Reggaeton"
+            },
+            {
+              "id": "b766",
+              "title": "Heaven Is a Place on Earth",
+              "artist": "Belinda Carlisle",
+              "year": 1987,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "c547",
+              "title": "Rapper's Delight",
+              "artist": "The Sugarhill Gang",
+              "year": 1979,
+              "genre": "Hip Hop"
+            },
+            {
+              "id": "t28",
+              "title": "Let It Be",
+              "artist": "The Beatles",
+              "year": 1970,
+              "genre": "Rock"
+            },
+            {
+              "id": "c597",
+              "title": "Only Teardrops",
+              "artist": "Emmelie de Forest",
+              "year": 2013,
+              "genre": "Eurovision Pop"
+            },
+            {
+              "id": "t182",
+              "title": "Grenade",
+              "artist": "Bruno Mars",
+              "year": 2010,
+              "genre": "Pop"
+            },
+            {
+              "id": "t186",
+              "title": "Born This Way",
+              "artist": "Lady Gaga",
+              "year": 2011,
+              "genre": "Pop"
+            },
+            {
+              "id": "t91",
+              "title": "Old Town Road",
+              "artist": "Lil Nas X feat. Billy Ray Cyrus",
+              "year": 2019,
+              "genre": "Country Rap"
+            },
+            {
+              "id": "c590",
+              "title": "Mama Laudaaa",
+              "artist": "Almklausi & Specktakel",
+              "year": 2018,
+              "genre": "Schlager Party"
+            },
+            {
+              "id": "t143",
+              "title": "Lady (Hear Me Tonight)",
+              "artist": "Modjo",
+              "year": 2000,
+              "genre": "French House"
+            },
+            {
+              "id": "c468",
+              "title": "Finally",
+              "artist": "CeCe Peniston",
+              "year": 1991,
+              "genre": "Dance"
+            },
+            {
+              "id": "c611",
+              "title": "Danger Zone",
+              "artist": "Kenny Loggins",
+              "year": 1986,
+              "genre": "Movie Rock"
+            },
+            {
+              "id": "t123",
+              "title": "I Will Always Love You",
+              "artist": "Whitney Houston",
+              "year": 1992,
+              "genre": "Pop"
+            },
+            {
+              "id": "c473",
+              "title": "Boom, Boom, Boom, Boom!!",
+              "artist": "Vengaboys",
+              "year": 1998,
+              "genre": "Eurodance"
+            },
+            {
+              "id": "v686",
+              "title": "Upside Down",
+              "artist": "Diana Ross",
+              "year": 1980,
+              "genre": "Disco Pop"
+            },
+            {
+              "id": "t63",
+              "title": "Clint Eastwood",
+              "artist": "Gorillaz",
+              "year": 2001,
+              "genre": "Alternative"
+            },
+            {
+              "id": "t251",
+              "title": "A Bar Song (Tipsy)",
+              "artist": "Shaboozey",
+              "year": 2024,
+              "genre": "Country Pop"
+            },
+            {
+              "id": "c596",
+              "title": "Fairytale",
+              "artist": "Alexander Rybak",
+              "year": 2009,
+              "genre": "Eurovision Pop"
+            },
+            {
+              "id": "t106",
+              "title": "No Woman, No Cry",
+              "artist": "Bob Marley & The Wailers",
+              "year": 1974,
+              "genre": "Reggae"
+            },
+            {
+              "id": "x382",
+              "title": "Can't Feel My Face",
+              "artist": "The Weeknd",
+              "year": 2015,
+              "genre": "R&B Pop"
+            },
+            {
+              "id": "x424",
+              "title": "Zitti e buoni",
+              "artist": "Måneskin",
+              "year": 2021,
+              "genre": "Eurovision Rock"
+            },
+            {
+              "id": "t261",
+              "title": "Männer",
+              "artist": "Herbert Grönemeyer",
+              "year": 1984,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "x414",
+              "title": "Ohne mein Team",
+              "artist": "Bonez MC & RAF Camora",
+              "year": 2016,
+              "genre": "Deutschrap"
+            },
+            {
+              "id": "c511",
+              "title": "When I Was Your Man",
+              "artist": "Bruno Mars",
+              "year": 2012,
+              "genre": "Pop Ballad"
+            },
+            {
+              "id": "b762",
+              "title": "Sledgehammer",
+              "artist": "Peter Gabriel",
+              "year": 1986,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "v664",
+              "title": "Rebel Rebel",
+              "artist": "David Bowie",
+              "year": 1974,
+              "genre": "Rock"
+            },
+            {
+              "id": "t171",
+              "title": "Single Ladies",
+              "artist": "Beyonce",
+              "year": 2008,
+              "genre": "R&B"
+            },
+            {
+              "id": "t243",
+              "title": "Paint the Town Red",
+              "artist": "Doja Cat",
+              "year": 2023,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "t86",
+              "title": "Can't Stop the Feeling!",
+              "artist": "Justin Timberlake",
+              "year": 2016,
+              "genre": "Pop"
+            },
+            {
+              "id": "c464",
+              "title": "I'm Gonna Be (500 Miles)",
+              "artist": "The Proclaimers",
+              "year": 1988,
+              "genre": "Party Pop Rock"
+            },
+            {
+              "id": "t164",
+              "title": "Welcome to the Black Parade",
+              "artist": "My Chemical Romance",
+              "year": 2006,
+              "genre": "Rock"
+            },
+            {
+              "id": "t144",
+              "title": "Drops of Jupiter",
+              "artist": "Train",
+              "year": 2001,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "c604",
+              "title": "Hakuna Matata",
+              "artist": "Nathan Lane & Ernie Sabella",
+              "year": 1994,
+              "genre": "Movie Pop"
+            },
+            {
+              "id": "t51",
+              "title": "Under the Bridge",
+              "artist": "Red Hot Chili Peppers",
+              "year": 1992,
+              "genre": "Alternative"
+            },
+            {
+              "id": "t151",
+              "title": "Where Is the Love?",
+              "artist": "The Black Eyed Peas",
+              "year": 2003,
+              "genre": "Pop"
+            },
+            {
+              "id": "t195",
+              "title": "Royals",
+              "artist": "Lorde",
+              "year": 2013,
+              "genre": "Pop"
+            },
+            {
+              "id": "c553",
+              "title": "California Love",
+              "artist": "2Pac feat. Dr. Dre",
+              "year": 1995,
+              "genre": "Hip Hop"
+            },
+            {
+              "id": "c530",
+              "title": "Chop Suey!",
+              "artist": "System of a Down",
+              "year": 2001,
+              "genre": "Metal"
+            },
+            {
+              "id": "c586",
+              "title": "Regenbogenfarben",
+              "artist": "Kerstin Ott",
+              "year": 2018,
+              "genre": "Schlager"
+            },
+            {
+              "id": "t183",
+              "title": "Party Rock Anthem",
+              "artist": "LMFAO",
+              "year": 2011,
+              "genre": "Dance"
+            },
+            {
+              "id": "t6",
+              "title": "Losing My Religion",
+              "artist": "R.E.M.",
+              "year": 1991,
+              "genre": "Alternative"
+            },
+            {
+              "id": "v709",
+              "title": "Buffalo Stance",
+              "artist": "Neneh Cherry",
+              "year": 1988,
+              "genre": "Hip Hop Pop"
+            },
+            {
+              "id": "t206",
+              "title": "Love Yourself",
+              "artist": "Justin Bieber",
+              "year": 2015,
+              "genre": "Pop"
+            },
+            {
+              "id": "t93",
+              "title": "Don't Start Now",
+              "artist": "Dua Lipa",
+              "year": 2019,
+              "genre": "Disco Pop"
+            },
+            {
+              "id": "x405",
+              "title": "Perfekte Welle",
+              "artist": "Juli",
+              "year": 2004,
+              "genre": "Deutsch Pop Rock"
+            },
+            {
+              "id": "t22",
+              "title": "I Want to Hold Your Hand",
+              "artist": "The Beatles",
+              "year": 1963,
+              "genre": "Rock"
+            },
+            {
+              "id": "b758",
+              "title": "Hot Stuff",
+              "artist": "Donna Summer",
+              "year": 1979,
+              "genre": "Disco"
+            },
+            {
+              "id": "b729",
+              "title": "Where Did Our Love Go",
+              "artist": "The Supremes",
+              "year": 1964,
+              "genre": "Motown Pop"
+            },
+            {
+              "id": "x418",
+              "title": "Save Your Kisses for Me",
+              "artist": "Brotherhood of Man",
+              "year": 1976,
+              "genre": "Eurovision Pop"
+            },
+            {
+              "id": "c522",
+              "title": "Personal Jesus",
+              "artist": "Depeche Mode",
+              "year": 1989,
+              "genre": "Alternative"
+            },
+            {
+              "id": "v689",
+              "title": "Physical",
+              "artist": "Olivia Newton-John",
+              "year": 1981,
+              "genre": "Pop"
+            },
+            {
+              "id": "t11",
+              "title": "Umbrella",
+              "artist": "Rihanna feat. Jay-Z",
+              "year": 2007,
+              "genre": "Pop"
+            },
+            {
+              "id": "t269",
+              "title": "Haus am See",
+              "artist": "Peter Fox",
+              "year": 2008,
+              "genre": "Reggae Pop"
+            },
+            {
+              "id": "t163",
+              "title": "SexyBack",
+              "artist": "Justin Timberlake",
+              "year": 2006,
+              "genre": "Pop"
+            },
+            {
+              "id": "v673",
+              "title": "Go Your Own Way",
+              "artist": "Fleetwood Mac",
+              "year": 1977,
+              "genre": "Rock"
+            },
+            {
+              "id": "b748",
+              "title": "Crocodile Rock",
+              "artist": "Elton John",
+              "year": 1972,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "c587",
+              "title": "Delfin",
+              "artist": "Isi Glück",
+              "year": 2023,
+              "genre": "Schlager Party"
+            },
+            {
+              "id": "c602",
+              "title": "The Code",
+              "artist": "Nemo",
+              "year": 2024,
+              "genre": "Eurovision Pop"
+            },
+            {
+              "id": "v631",
+              "title": "Can't Help Falling in Love",
+              "artist": "Elvis Presley",
+              "year": 1961,
+              "genre": "Pop Ballad"
+            },
+            {
+              "id": "t76",
+              "title": "Tik Tok",
+              "artist": "Kesha",
+              "year": 2009,
+              "genre": "Pop"
+            },
+            {
+              "id": "b725",
+              "title": "Louie Louie",
+              "artist": "The Kingsmen",
+              "year": 1963,
+              "genre": "Rock"
+            },
+            {
+              "id": "t227",
+              "title": "Savage Love",
+              "artist": "Jawsh 685 & Jason Derulo",
+              "year": 2020,
+              "genre": "Pop"
+            },
+            {
+              "id": "b763",
+              "title": "Addicted to Love",
+              "artist": "Robert Palmer",
+              "year": 1985,
+              "genre": "Rock"
+            },
+            {
+              "id": "t211",
+              "title": "Starboy",
+              "artist": "The Weeknd feat. Daft Punk",
+              "year": 2016,
+              "genre": "R&B"
+            },
+            {
+              "id": "t177",
+              "title": "Airplanes",
+              "artist": "B.o.B feat. Hayley Williams",
+              "year": 2010,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "v646",
+              "title": "Mrs. Robinson",
+              "artist": "Simon & Garfunkel",
+              "year": 1968,
+              "genre": "Folk Rock"
+            },
+            {
+              "id": "t277",
+              "title": "Roller",
+              "artist": "Apache 207",
+              "year": 2019,
+              "genre": "Deutschrap"
+            },
+            {
+              "id": "t35",
+              "title": "Roxanne",
+              "artist": "The Police",
+              "year": 1978,
+              "genre": "New Wave"
+            },
+            {
+              "id": "v669",
+              "title": "December, 1963",
+              "artist": "The Four Seasons",
+              "year": 1975,
+              "genre": "Disco Pop"
+            },
+            {
+              "id": "t208",
+              "title": "Cheap Thrills",
+              "artist": "Sia feat. Sean Paul",
+              "year": 2016,
+              "genre": "Pop"
+            },
+            {
+              "id": "c593",
+              "title": "Making Your Mind Up",
+              "artist": "Bucks Fizz",
+              "year": 1981,
+              "genre": "Eurovision Pop"
+            },
+            {
+              "id": "b754",
+              "title": "Love Is in the Air",
+              "artist": "John Paul Young",
+              "year": 1977,
+              "genre": "Disco Pop"
+            },
+            {
+              "id": "b739",
+              "title": "Get Back",
+              "artist": "The Beatles",
+              "year": 1969,
+              "genre": "Rock"
+            },
+            {
+              "id": "t275",
+              "title": "Cordula Grün",
+              "artist": "Josh.",
+              "year": 2018,
+              "genre": "Pop"
+            },
+            {
+              "id": "c498",
+              "title": "Everybody Hurts",
+              "artist": "R.E.M.",
+              "year": 1992,
+              "genre": "Alternative Ballad"
+            },
+            {
+              "id": "c566",
+              "title": "SICKO MODE",
+              "artist": "Travis Scott",
+              "year": 2018,
+              "genre": "Hip Hop"
+            },
+            {
+              "id": "t33",
+              "title": "Hotel California",
+              "artist": "Eagles",
+              "year": 1976,
+              "genre": "Rock"
+            },
+            {
+              "id": "t217",
+              "title": "Perfect",
+              "artist": "Ed Sheeran",
+              "year": 2017,
+              "genre": "Pop"
+            },
+            {
+              "id": "t173",
+              "title": "Human",
+              "artist": "The Killers",
+              "year": 2008,
+              "genre": "Indie Rock"
+            },
+            {
+              "id": "v671",
+              "title": "Dancing in the Moonlight",
+              "artist": "King Harvest",
+              "year": 1972,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t212",
+              "title": "Rockabye",
+              "artist": "Clean Bandit feat. Sean Paul and Anne-Marie",
+              "year": 2016,
+              "genre": "Dance Pop"
+            },
+            {
+              "id": "v678",
+              "title": "Sultans of Swing",
+              "artist": "Dire Straits",
+              "year": 1978,
+              "genre": "Rock"
+            },
+            {
+              "id": "x407",
+              "title": "Dieser Weg",
+              "artist": "Xavier Naidoo",
+              "year": 2005,
+              "genre": "Deutsch Soul"
+            },
+            {
+              "id": "t60",
+              "title": "Baby One More Time",
+              "artist": "Britney Spears",
+              "year": 1998,
+              "genre": "Pop"
+            },
+            {
+              "id": "b720",
+              "title": "Shout",
+              "artist": "The Isley Brothers",
+              "year": 1959,
+              "genre": "Soul Rock"
+            },
+            {
+              "id": "t124",
+              "title": "Mr. Vain",
+              "artist": "Culture Beat",
+              "year": 1993,
+              "genre": "Eurodance"
+            },
+            {
+              "id": "t234",
+              "title": "Cold Heart",
+              "artist": "Elton John & Dua Lipa",
+              "year": 2021,
+              "genre": "Dance Pop"
+            },
+            {
+              "id": "c549",
+              "title": "Walk This Way",
+              "artist": "Run-DMC feat. Aerosmith",
+              "year": 1986,
+              "genre": "Rap Rock"
+            },
+            {
+              "id": "t242",
+              "title": "Seven",
+              "artist": "Jung Kook feat. Latto",
+              "year": 2023,
+              "genre": "Pop"
+            },
+            {
+              "id": "t152",
+              "title": "Hey Ya!",
+              "artist": "Outkast",
+              "year": 2003,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "t59",
+              "title": "Iris",
+              "artist": "Goo Goo Dolls",
+              "year": 1998,
+              "genre": "Alternative"
+            },
+            {
+              "id": "c495",
+              "title": "Eternal Flame",
+              "artist": "The Bangles",
+              "year": 1988,
+              "genre": "Pop Ballad"
+            },
+            {
+              "id": "c589",
+              "title": "Johnny Däpp",
+              "artist": "Lorenz Büffel",
+              "year": 2016,
+              "genre": "Schlager Party"
+            },
+            {
+              "id": "t290",
+              "title": "Alors on danse",
+              "artist": "Stromae",
+              "year": 2009,
+              "genre": "Dance"
+            },
+            {
+              "id": "b751",
+              "title": "The Joker",
+              "artist": "Steve Miller Band",
+              "year": 1973,
+              "genre": "Rock"
+            },
+            {
+              "id": "t295",
+              "title": "La Camisa Negra",
+              "artist": "Juanes",
+              "year": 2004,
+              "genre": "Latin Rock"
+            },
+            {
+              "id": "c536",
+              "title": "Somebody Told Me",
+              "artist": "The Killers",
+              "year": 2004,
+              "genre": "Indie Rock"
+            },
+            {
+              "id": "c564",
+              "title": "Hotline Bling",
+              "artist": "Drake",
+              "year": 2015,
+              "genre": "Hip Hop"
+            },
+            {
+              "id": "t82",
+              "title": "Happy",
+              "artist": "Pharrell Williams",
+              "year": 2013,
+              "genre": "Pop"
+            },
+            {
+              "id": "t285",
+              "title": "Sandstorm",
+              "artist": "Darude",
+              "year": 1999,
+              "genre": "Trance"
+            },
+            {
+              "id": "c456",
+              "title": "Celebration",
+              "artist": "Kool & The Gang",
+              "year": 1980,
+              "genre": "Party Funk"
+            },
+            {
+              "id": "t19",
+              "title": "Hound Dog",
+              "artist": "Elvis Presley",
+              "year": 1956,
+              "genre": "Rock and Roll"
+            },
+            {
+              "id": "x451",
+              "title": "Call on Me",
+              "artist": "Eric Prydz",
+              "year": 2004,
+              "genre": "Dance"
+            },
+            {
+              "id": "v640",
+              "title": "Paint It Black",
+              "artist": "The Rolling Stones",
+              "year": 1966,
+              "genre": "Rock"
+            },
+            {
+              "id": "t97",
+              "title": "Stay",
+              "artist": "The Kid LAROI & Justin Bieber",
+              "year": 2021,
+              "genre": "Pop"
+            },
+            {
+              "id": "t137",
+              "title": "Smooth",
+              "artist": "Santana feat. Rob Thomas",
+              "year": 1999,
+              "genre": "Latin Rock"
+            },
+            {
+              "id": "t191",
+              "title": "Gangnam Style",
+              "artist": "PSY",
+              "year": 2012,
+              "genre": "K-Pop"
+            },
+            {
+              "id": "b768",
+              "title": "Faith",
+              "artist": "George Michael",
+              "year": 1987,
+              "genre": "Pop"
+            },
+            {
+              "id": "t160",
+              "title": "You're Beautiful",
+              "artist": "James Blunt",
+              "year": 2005,
+              "genre": "Pop"
+            },
+            {
+              "id": "t265",
+              "title": "Schrei nach Liebe",
+              "artist": "Die Ärzte",
+              "year": 1993,
+              "genre": "Punk Rock"
+            },
+            {
+              "id": "v670",
+              "title": "Don't Go Breaking My Heart",
+              "artist": "Elton John & Kiki Dee",
+              "year": 1976,
+              "genre": "Pop"
+            },
+            {
+              "id": "x444",
+              "title": "Con Calma",
+              "artist": "Daddy Yankee feat. Snow",
+              "year": 2019,
+              "genre": "Reggaeton"
+            },
+            {
+              "id": "v632",
+              "title": "Twist and Shout",
+              "artist": "The Isley Brothers",
+              "year": 1962,
+              "genre": "Soul Rock"
+            },
+            {
+              "id": "v641",
+              "title": "Sunny Afternoon",
+              "artist": "The Kinks",
+              "year": 1966,
+              "genre": "Rock"
+            },
+            {
+              "id": "t67",
+              "title": "Toxic",
+              "artist": "Britney Spears",
+              "year": 2003,
+              "genre": "Pop"
+            },
+            {
+              "id": "c487",
+              "title": "True Colors",
+              "artist": "Cyndi Lauper",
+              "year": 1986,
+              "genre": "Pop Ballad"
+            },
+            {
+              "id": "t9",
+              "title": "Crazy in Love",
+              "artist": "Beyonce feat. Jay-Z",
+              "year": 2003,
+              "genre": "R&B"
+            },
+            {
+              "id": "t249",
+              "title": "Please Please Please",
+              "artist": "Sabrina Carpenter",
+              "year": 2024,
+              "genre": "Pop"
+            },
+            {
+              "id": "t46",
+              "title": "With or Without You",
+              "artist": "U2",
+              "year": 1987,
+              "genre": "Rock"
+            },
+            {
+              "id": "t131",
+              "title": "Song 2",
+              "artist": "Blur",
+              "year": 1997,
+              "genre": "Britpop"
+            },
+            {
+              "id": "t216",
+              "title": "New Rules",
+              "artist": "Dua Lipa",
+              "year": 2017,
+              "genre": "Pop"
+            },
+            {
+              "id": "c550",
+              "title": "Fight the Power",
+              "artist": "Public Enemy",
+              "year": 1989,
+              "genre": "Hip Hop"
+            },
+            {
+              "id": "c614",
+              "title": "Can You Feel the Love Tonight",
+              "artist": "Elton John",
+              "year": 1994,
+              "genre": "Movie Ballad"
+            },
+            {
+              "id": "c583",
+              "title": "Hulapalu",
+              "artist": "Andreas Gabalier",
+              "year": 2015,
+              "genre": "Schlager"
+            },
+            {
+              "id": "t196",
+              "title": "Counting Stars",
+              "artist": "OneRepublic",
+              "year": 2013,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "c506",
+              "title": "Someone Like You",
+              "artist": "Adele",
+              "year": 2011,
+              "genre": "Pop Ballad"
+            },
+            {
+              "id": "x434",
+              "title": "This Is Me",
+              "artist": "Keala Settle",
+              "year": 2017,
+              "genre": "Movie Pop"
+            },
+            {
+              "id": "v666",
+              "title": "Kung Fu Fighting",
+              "artist": "Carl Douglas",
+              "year": 1974,
+              "genre": "Disco Pop"
+            },
+            {
+              "id": "t70",
+              "title": "Hips Don't Lie",
+              "artist": "Shakira feat. Wyclef Jean",
+              "year": 2005,
+              "genre": "Pop"
+            },
+            {
+              "id": "x318",
+              "title": "Born to Run",
+              "artist": "Bruce Springsteen",
+              "year": 1975,
+              "genre": "Rock"
+            },
+            {
+              "id": "t300",
+              "title": "La Bachata",
+              "artist": "Manuel Turizo",
+              "year": 2022,
+              "genre": "Bachata"
+            },
+            {
+              "id": "t235",
+              "title": "Easy on Me",
+              "artist": "Adele",
+              "year": 2021,
+              "genre": "Soul Pop"
+            },
+            {
+              "id": "c618",
+              "title": "A Million Dreams",
+              "artist": "Ziv Zaifman, Hugh Jackman & Michelle Williams",
+              "year": 2017,
+              "genre": "Movie Pop"
+            },
+            {
+              "id": "v697",
+              "title": "Smalltown Boy",
+              "artist": "Bronski Beat",
+              "year": 1984,
+              "genre": "Synthpop"
+            },
+            {
+              "id": "c598",
+              "title": "Heroes",
+              "artist": "Måns Zelmerlöw",
+              "year": 2015,
+              "genre": "Eurovision Pop"
+            },
+            {
+              "id": "t95",
+              "title": "Levitating",
+              "artist": "Dua Lipa",
+              "year": 2020,
+              "genre": "Disco Pop"
+            },
+            {
+              "id": "v696",
+              "title": "Jump",
+              "artist": "Van Halen",
+              "year": 1984,
+              "genre": "Rock"
+            },
+            {
+              "id": "v629",
+              "title": "The Twist",
+              "artist": "Chubby Checker",
+              "year": 1960,
+              "genre": "Party Rock and Roll"
+            },
+            {
+              "id": "t162",
+              "title": "Promiscuous",
+              "artist": "Nelly Furtado feat. Timbaland",
+              "year": 2006,
+              "genre": "Pop"
+            },
+            {
+              "id": "t1",
+              "title": "Hey Jude",
+              "artist": "The Beatles",
+              "year": 1968,
+              "genre": "Rock",
+              "spotifyUri": "spotify:track:0aym2LBJBk9DAYuHHutrIl"
+            },
+            {
+              "id": "x435",
+              "title": "Skyfall",
+              "artist": "Adele",
+              "year": 2012,
+              "genre": "Movie Pop"
+            },
+            {
+              "id": "b744",
+              "title": "Maggie May",
+              "artist": "Rod Stewart",
+              "year": 1971,
+              "genre": "Rock"
+            },
+            {
+              "id": "t248",
+              "title": "Espresso",
+              "artist": "Sabrina Carpenter",
+              "year": 2024,
+              "genre": "Pop"
+            },
+            {
+              "id": "b737",
+              "title": "Crimson and Clover",
+              "artist": "Tommy James and the Shondells",
+              "year": 1968,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "b731",
+              "title": "You Can't Hurry Love",
+              "artist": "The Supremes",
+              "year": 1966,
+              "genre": "Motown Pop"
+            },
+            {
+              "id": "c475",
+              "title": "Mambo No. 5",
+              "artist": "Lou Bega",
+              "year": 1999,
+              "genre": "Party Pop"
+            },
+            {
+              "id": "t155",
+              "title": "Since U Been Gone",
+              "artist": "Kelly Clarkson",
+              "year": 2004,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t104",
+              "title": "Rocket Man",
+              "artist": "Elton John",
+              "year": 1972,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t278",
+              "title": "Komet",
+              "artist": "Udo Lindenberg & Apache 207",
+              "year": 2023,
+              "genre": "Pop"
+            },
+            {
+              "id": "v685",
+              "title": "Call Me",
+              "artist": "Blondie",
+              "year": 1980,
+              "genre": "New Wave Rock"
+            },
+            {
+              "id": "t148",
+              "title": "Complicated",
+              "artist": "Avril Lavigne",
+              "year": 2002,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t136",
+              "title": "Blue (Da Ba Dee)",
+              "artist": "Eiffel 65",
+              "year": 1998,
+              "genre": "Eurodance"
+            },
+            {
+              "id": "t5",
+              "title": "Like a Prayer",
+              "artist": "Madonna",
+              "year": 1989,
+              "genre": "Pop"
+            },
+            {
+              "id": "t291",
+              "title": "Papaoutai",
+              "artist": "Stromae",
+              "year": 2013,
+              "genre": "Dance Pop"
+            },
+            {
+              "id": "b786",
+              "title": "Dance the Night",
+              "artist": "Dua Lipa",
+              "year": 2023,
+              "genre": "Movie Pop"
+            },
+            {
+              "id": "t27",
+              "title": "Whole Lotta Love",
+              "artist": "Led Zeppelin",
+              "year": 1969,
+              "genre": "Hard Rock"
+            },
+            {
+              "id": "c616",
+              "title": "Lady Marmalade",
+              "artist": "Christina Aguilera, Lil' Kim, Mya & Pink",
+              "year": 2001,
+              "genre": "Movie Pop"
+            },
+            {
+              "id": "t188",
+              "title": "Paradise",
+              "artist": "Coldplay",
+              "year": 2011,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "v659",
+              "title": "Stuck in the Middle with You",
+              "artist": "Stealers Wheel",
+              "year": 1972,
+              "genre": "Rock"
+            },
+            {
+              "id": "v655",
+              "title": "Take Me Home, Country Roads",
+              "artist": "John Denver",
+              "year": 1971,
+              "genre": "Country Folk"
+            },
+            {
+              "id": "t83",
+              "title": "Chandelier",
+              "artist": "Sia",
+              "year": 2014,
+              "genre": "Pop"
+            },
+            {
+              "id": "c480",
+              "title": "Cake by the Ocean",
+              "artist": "DNCE",
+              "year": 2015,
+              "genre": "Party Pop"
+            },
+            {
+              "id": "t268",
+              "title": "Jein",
+              "artist": "Fettes Brot",
+              "year": 1996,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "c477",
+              "title": "Who Let the Dogs Out",
+              "artist": "Baha Men",
+              "year": 2000,
+              "genre": "Party Pop"
+            },
+            {
+              "id": "t282",
+              "title": "Cotton Eye Joe",
+              "artist": "Rednex",
+              "year": 1994,
+              "genre": "Eurodance"
+            },
+            {
+              "id": "t156",
+              "title": "Drop It Like It's Hot",
+              "artist": "Snoop Dogg feat. Pharrell",
+              "year": 2004,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "v623",
+              "title": "Heartbreak Hotel",
+              "artist": "Elvis Presley",
+              "year": 1956,
+              "genre": "Rock and Roll"
+            },
+            {
+              "id": "c544",
+              "title": "Do I Wanna Know?",
+              "artist": "Arctic Monkeys",
+              "year": 2013,
+              "genre": "Indie Rock"
+            },
+            {
+              "id": "t209",
+              "title": "Closer",
+              "artist": "The Chainsmokers feat. Halsey",
+              "year": 2016,
+              "genre": "Dance Pop"
+            },
+            {
+              "id": "c490",
+              "title": "Time After Time",
+              "artist": "Cyndi Lauper",
+              "year": 1983,
+              "genre": "Pop Ballad"
+            },
+            {
+              "id": "b747",
+              "title": "School's Out",
+              "artist": "Alice Cooper",
+              "year": 1972,
+              "genre": "Rock"
+            },
+            {
+              "id": "v706",
+              "title": "Never Tear Us Apart",
+              "artist": "INXS",
+              "year": 1987,
+              "genre": "Rock Ballad"
+            },
+            {
+              "id": "t159",
+              "title": "Gold Digger",
+              "artist": "Kanye West feat. Jamie Foxx",
+              "year": 2005,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "c491",
+              "title": "I Want to Know What Love Is",
+              "artist": "Foreigner",
+              "year": 1984,
+              "genre": "Rock Ballad"
+            },
+            {
+              "id": "t254",
+              "title": "Die With a Smile",
+              "artist": "Lady Gaga & Bruno Mars",
+              "year": 2024,
+              "genre": "Pop"
+            },
+            {
+              "id": "t179",
+              "title": "Only Girl (In the World)",
+              "artist": "Rihanna",
+              "year": 2010,
+              "genre": "Pop"
+            },
+            {
+              "id": "v672",
+              "title": "Blitzkrieg Bop",
+              "artist": "Ramones",
+              "year": 1976,
+              "genre": "Punk Rock"
+            },
+            {
+              "id": "v679",
+              "title": "September",
+              "artist": "Earth, Wind & Fire",
+              "year": 1978,
+              "genre": "Disco Funk"
+            },
+            {
+              "id": "v704",
+              "title": "Don't Dream It's Over",
+              "artist": "Crowded House",
+              "year": 1986,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t32",
+              "title": "Waterloo",
+              "artist": "ABBA",
+              "year": 1974,
+              "genre": "Pop"
+            },
+            {
+              "id": "v676",
+              "title": "Psycho Killer",
+              "artist": "Talking Heads",
+              "year": 1977,
+              "genre": "New Wave"
+            },
+            {
+              "id": "c557",
+              "title": "In Da Club",
+              "artist": "50 Cent",
+              "year": 2003,
+              "genre": "Hip Hop"
+            },
+            {
+              "id": "c541",
+              "title": "Little Lion Man",
+              "artist": "Mumford & Sons",
+              "year": 2009,
+              "genre": "Folk Rock"
+            },
+            {
+              "id": "x416",
+              "title": "Nel Blu Dipinto Di Blu",
+              "artist": "Domenico Modugno",
+              "year": 1958,
+              "genre": "Eurovision Pop"
+            },
+            {
+              "id": "x432",
+              "title": "Men in Black",
+              "artist": "Will Smith",
+              "year": 1997,
+              "genre": "Movie Hip Hop"
+            },
+            {
+              "id": "t39",
+              "title": "Africa",
+              "artist": "Toto",
+              "year": 1982,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t244",
+              "title": "Greedy",
+              "artist": "Tate McRae",
+              "year": 2023,
+              "genre": "Pop"
+            },
+            {
+              "id": "c521",
+              "title": "Welcome to the Jungle",
+              "artist": "Guns N' Roses",
+              "year": 1987,
+              "genre": "Hard Rock"
+            },
+            {
+              "id": "t132",
+              "title": "Tubthumping",
+              "artist": "Chumbawamba",
+              "year": 1997,
+              "genre": "Alternative"
+            },
+            {
+              "id": "b721",
+              "title": "Runaway",
+              "artist": "Del Shannon",
+              "year": 1961,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t24",
+              "title": "Satisfaction",
+              "artist": "The Rolling Stones",
+              "year": 1965,
+              "genre": "Rock"
+            },
+            {
+              "id": "t219",
+              "title": "God's Plan",
+              "artist": "Drake",
+              "year": 2018,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "b765",
+              "title": "I Wanna Dance with Somebody",
+              "artist": "Whitney Houston",
+              "year": 1987,
+              "genre": "Dance Pop"
+            },
+            {
+              "id": "c574",
+              "title": "Anita",
+              "artist": "Costa Cordalis",
+              "year": 1976,
+              "genre": "Schlager"
+            },
+            {
+              "id": "t274",
+              "title": "Atemlos durch die Nacht",
+              "artist": "Helene Fischer",
+              "year": 2013,
+              "genre": "Schlager"
+            },
+            {
+              "id": "b772",
+              "title": "Save Your Tears",
+              "artist": "The Weeknd",
+              "year": 2020,
+              "genre": "Synthpop"
+            },
+            {
+              "id": "t112",
+              "title": "Beat It",
+              "artist": "Michael Jackson",
+              "year": 1982,
+              "genre": "Pop"
+            },
+            {
+              "id": "x420",
+              "title": "Hold Me Now",
+              "artist": "Johnny Logan",
+              "year": 1987,
+              "genre": "Eurovision Pop"
+            },
+            {
+              "id": "t262",
+              "title": "Verdammt, ich lieb' dich",
+              "artist": "Matthias Reim",
+              "year": 1990,
+              "genre": "Schlager"
+            },
+            {
+              "id": "c581",
+              "title": "Ich war noch niemals in New York",
+              "artist": "Udo Jürgens",
+              "year": 1982,
+              "genre": "Schlager"
+            },
+            {
+              "id": "x311",
+              "title": "Paranoid",
+              "artist": "Black Sabbath",
+              "year": 1970,
+              "genre": "Metal"
+            },
+            {
+              "id": "t12",
+              "title": "Viva la Vida",
+              "artist": "Coldplay",
+              "year": 2008,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "c512",
+              "title": "Stay With Me",
+              "artist": "Sam Smith",
+              "year": 2014,
+              "genre": "Soul Ballad"
+            },
+            {
+              "id": "t75",
+              "title": "Empire State of Mind",
+              "artist": "Jay-Z feat. Alicia Keys",
+              "year": 2009,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "b723",
+              "title": "Green Onions",
+              "artist": "Booker T. & the M.G.'s",
+              "year": 1962,
+              "genre": "Soul Funk"
+            },
+            {
+              "id": "t7",
+              "title": "No Scrubs",
+              "artist": "TLC",
+              "year": 1999,
+              "genre": "R&B"
+            },
+            {
+              "id": "c520",
+              "title": "Here I Go Again",
+              "artist": "Whitesnake",
+              "year": 1987,
+              "genre": "Rock"
+            },
+            {
+              "id": "b778",
+              "title": "Montero",
+              "artist": "Lil Nas X",
+              "year": 2021,
+              "genre": "Pop Rap"
+            },
+            {
+              "id": "t169",
+              "title": "Kids",
+              "artist": "MGMT",
+              "year": 2007,
+              "genre": "Indie Pop"
+            },
+            {
+              "id": "t258",
+              "title": "Sternenhimmel",
+              "artist": "Hubert Kah",
+              "year": 1982,
+              "genre": "Neue Deutsche Welle"
+            },
+            {
+              "id": "t31",
+              "title": "Dream On",
+              "artist": "Aerosmith",
+              "year": 1973,
+              "genre": "Rock"
+            },
+            {
+              "id": "t96",
+              "title": "Drivers License",
+              "artist": "Olivia Rodrigo",
+              "year": 2021,
+              "genre": "Pop"
+            },
+            {
+              "id": "b734",
+              "title": "Somebody to Love",
+              "artist": "Jefferson Airplane",
+              "year": 1967,
+              "genre": "Rock"
+            },
+            {
+              "id": "t267",
+              "title": "MfG",
+              "artist": "Die Fantastischen Vier",
+              "year": 1999,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "c533",
+              "title": "American Idiot",
+              "artist": "Green Day",
+              "year": 2004,
+              "genre": "Punk Rock"
+            },
+            {
+              "id": "t87",
+              "title": "Shape of You",
+              "artist": "Ed Sheeran",
+              "year": 2017,
+              "genre": "Pop"
+            },
+            {
+              "id": "b745",
+              "title": "Me and Bobby McGee",
+              "artist": "Janis Joplin",
+              "year": 1971,
+              "genre": "Rock"
+            },
+            {
+              "id": "t49",
+              "title": "Enjoy the Silence",
+              "artist": "Depeche Mode",
+              "year": 1990,
+              "genre": "Synthpop"
+            },
+            {
+              "id": "v674",
+              "title": "Dreams",
+              "artist": "Fleetwood Mac",
+              "year": 1977,
+              "genre": "Rock"
+            },
+            {
+              "id": "c554",
+              "title": "Hypnotize",
+              "artist": "The Notorious B.I.G.",
+              "year": 1997,
+              "genre": "Hip Hop"
+            },
+            {
+              "id": "t176",
+              "title": "Rude Boy",
+              "artist": "Rihanna",
+              "year": 2009,
+              "genre": "R&B"
+            },
+            {
+              "id": "t193",
+              "title": "Diamonds",
+              "artist": "Rihanna",
+              "year": 2012,
+              "genre": "Pop"
+            },
+            {
+              "id": "x406",
+              "title": "Durch den Monsun",
+              "artist": "Tokio Hotel",
+              "year": 2005,
+              "genre": "Deutsch Rock"
+            },
+            {
+              "id": "c460",
+              "title": "Walking on Sunshine",
+              "artist": "Katrina and the Waves",
+              "year": 1985,
+              "genre": "Party Pop"
+            },
+            {
+              "id": "t197",
+              "title": "Blurred Lines",
+              "artist": "Robin Thicke feat. T.I. and Pharrell",
+              "year": 2013,
+              "genre": "R&B"
+            },
+            {
+              "id": "x428",
+              "title": "The Power of Love",
+              "artist": "Huey Lewis and the News",
+              "year": 1985,
+              "genre": "Movie Rock"
+            },
+            {
+              "id": "v624",
+              "title": "Jailhouse Rock",
+              "artist": "Elvis Presley",
+              "year": 1957,
+              "genre": "Rock and Roll"
+            },
+            {
+              "id": "x454",
+              "title": "Summer",
+              "artist": "Calvin Harris",
+              "year": 2014,
+              "genre": "EDM"
+            },
+            {
+              "id": "x310",
+              "title": "Proud Mary",
+              "artist": "Creedence Clearwater Revival",
+              "year": 1969,
+              "genre": "Rock"
+            },
+            {
+              "id": "t178",
+              "title": "Love the Way You Lie",
+              "artist": "Eminem feat. Rihanna",
+              "year": 2010,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "t185",
+              "title": "We Found Love",
+              "artist": "Rihanna feat. Calvin Harris",
+              "year": 2011,
+              "genre": "Dance Pop"
+            },
+            {
+              "id": "t294",
+              "title": "Macarena",
+              "artist": "Los Del Rio",
+              "year": 1993,
+              "genre": "Latin Pop"
+            },
+            {
+              "id": "t114",
+              "title": "99 Luftballons",
+              "artist": "Nena",
+              "year": 1983,
+              "genre": "Neue Deutsche Welle"
+            },
+            {
+              "id": "t255",
+              "title": "APT.",
+              "artist": "ROSÉ & Bruno Mars",
+              "year": 2024,
+              "genre": "Pop"
+            },
+            {
+              "id": "t214",
+              "title": "Believer",
+              "artist": "Imagine Dragons",
+              "year": 2017,
+              "genre": "Alternative"
+            },
+            {
+              "id": "c600",
+              "title": "Stefania",
+              "artist": "Kalush Orchestra",
+              "year": 2022,
+              "genre": "Eurovision Folk Rap"
+            },
+            {
+              "id": "t81",
+              "title": "Wake Me Up",
+              "artist": "Avicii",
+              "year": 2013,
+              "genre": "Dance"
+            },
+            {
+              "id": "t232",
+              "title": "Industry Baby",
+              "artist": "Lil Nas X feat. Jack Harlow",
+              "year": 2021,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "v703",
+              "title": "The Lady in Red",
+              "artist": "Chris de Burgh",
+              "year": 1986,
+              "genre": "Pop Ballad"
+            },
+            {
+              "id": "b761",
+              "title": "Another Day in Paradise",
+              "artist": "Phil Collins",
+              "year": 1989,
+              "genre": "Pop"
+            },
+            {
+              "id": "t56",
+              "title": "Wannabe",
+              "artist": "Spice Girls",
+              "year": 1996,
+              "genre": "Pop"
+            },
+            {
+              "id": "v639",
+              "title": "These Boots Are Made for Walkin'",
+              "artist": "Nancy Sinatra",
+              "year": 1966,
+              "genre": "Pop"
+            },
+            {
+              "id": "b790",
+              "title": "Texas Hold 'Em",
+              "artist": "Beyoncé",
+              "year": 2024,
+              "genre": "Country Pop"
+            },
+            {
+              "id": "c613",
+              "title": "(I've Had) The Time of My Life",
+              "artist": "Bill Medley & Jennifer Warnes",
+              "year": 1987,
+              "genre": "Movie Pop"
+            },
+            {
+              "id": "t199",
+              "title": "Rather Be",
+              "artist": "Clean Bandit feat. Jess Glynne",
+              "year": 2014,
+              "genre": "Dance"
+            },
+            {
+              "id": "t230",
+              "title": "Good 4 U",
+              "artist": "Olivia Rodrigo",
+              "year": 2021,
+              "genre": "Pop Punk"
+            },
+            {
+              "id": "t18",
+              "title": "Flowers",
+              "artist": "Miley Cyrus",
+              "year": 2023,
+              "genre": "Pop"
+            },
+            {
+              "id": "t105",
+              "title": "Killing Me Softly with His Song",
+              "artist": "Roberta Flack",
+              "year": 1973,
+              "genre": "Soul"
+            },
+            {
+              "id": "x421",
+              "title": "Euphoria",
+              "artist": "Loreen",
+              "year": 2012,
+              "genre": "Eurovision Dance"
+            },
+            {
+              "id": "x386",
+              "title": "Havana",
+              "artist": "Camila Cabello feat. Young Thug",
+              "year": 2017,
+              "genre": "Latin Pop"
+            },
+            {
+              "id": "t299",
+              "title": "Taki Taki",
+              "artist": "DJ Snake feat. Selena Gomez, Ozuna & Cardi B",
+              "year": 2018,
+              "genre": "Reggaeton"
+            },
+            {
+              "id": "x423",
+              "title": "Arcade",
+              "artist": "Duncan Laurence",
+              "year": 2019,
+              "genre": "Eurovision Pop"
+            },
+            {
+              "id": "t246",
+              "title": "Lose Control",
+              "artist": "Teddy Swims",
+              "year": 2023,
+              "genre": "Soul Pop"
+            },
+            {
+              "id": "t42",
+              "title": "Purple Rain",
+              "artist": "Prince",
+              "year": 1984,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "t85",
+              "title": "Lean On",
+              "artist": "Major Lazer & DJ Snake feat. MO",
+              "year": 2015,
+              "genre": "Dance"
+            },
+            {
+              "id": "t270",
+              "title": "Augenbling",
+              "artist": "Seeed",
+              "year": 2012,
+              "genre": "Dancehall"
+            },
+            {
+              "id": "x323",
+              "title": "I Will Survive",
+              "artist": "Gloria Gaynor",
+              "year": 1978,
+              "genre": "Disco"
+            },
+            {
+              "id": "t65",
+              "title": "Lose Yourself",
+              "artist": "Eminem",
+              "year": 2002,
+              "genre": "Hip-Hop"
+            },
+            {
+              "id": "v663",
+              "title": "Jolene",
+              "artist": "Dolly Parton",
+              "year": 1973,
+              "genre": "Country"
+            },
+            {
+              "id": "x314",
+              "title": "Smoke on the Water",
+              "artist": "Deep Purple",
+              "year": 1972,
+              "genre": "Rock"
+            },
+            {
+              "id": "v645",
+              "title": "Happy Together",
+              "artist": "The Turtles",
+              "year": 1967,
+              "genre": "Pop Rock"
+            },
+            {
+              "id": "x303",
+              "title": "Be My Baby",
+              "artist": "The Ronettes",
+              "year": 1963,
+              "genre": "Pop"
+            },
+            {
+              "id": "t43",
+              "title": "Careless Whisper",
+              "artist": "George Michael",
+              "year": 1984,
+              "genre": "Pop"
+            }
+          ],
+          "activePlayerIndex": 3,
+          "currentTrack": null,
+          "selectedInsertIndex": null,
+          "currentTrackJokerAwarded": false,
+          "currentTrackJokerGuessReviewed": true,
+          "jokerClaims": [],
+          "selectedJokerPlayerId": null,
+          "jokerDuel": {
+            "active": false,
+            "playerIds": [],
+            "choices": {},
+            "round": 0,
+            "lastResult": null
+          },
+          "lastResult": null,
+          "targetScore": 10,
+          "maxTurns": 0,
+          "playLimitSeconds": 20,
+          "difficulty": "normal",
+          "gameMode": "solo",
+          "turnNumber": 8,
+          "showDebugSong": false,
+          "discardedTracks": [
+            {
+              "id": "b756",
+              "title": "More Than a Feeling",
+              "artist": "Boston",
+              "year": 1976,
+              "genre": "Rock"
+            },
+            {
+              "id": "c523",
+              "title": "Alive",
+              "artist": "Pearl Jam",
+              "year": 1991,
+              "genre": "Grunge"
+            },
+            {
+              "id": "t128",
+              "title": "Wonderwall",
+              "artist": "Oasis",
+              "year": 1995,
+              "genre": "Britpop"
+            }
+          ],
+          "playedTrackHistory": [
+            {
+              "id": "played-1779532412338-c305bbb7bcdc5",
+              "trackId": "c605",
+              "trackKey": "a whole new world",
+              "title": "A Whole New World",
+              "artist": "Peabo Bryson & Regina Belle",
+              "year": 1992,
+              "genre": "Movie Pop",
+              "playerName": "123",
+              "teamName": "123",
+              "activeMemberName": "",
+              "correct": true,
+              "skipped": false,
+              "createdAt": "12:33:32"
+            },
+            {
+              "id": "played-1779532399870-19c7cbaffa9bf",
+              "trackId": "b756",
+              "trackKey": "more than a feeling",
+              "title": "More Than a Feeling",
+              "artist": "Boston",
+              "year": 1976,
+              "genre": "Rock",
+              "playerName": "Alex",
+              "teamName": "Alex",
+              "activeMemberName": "",
+              "correct": false,
+              "skipped": true,
+              "createdAt": "12:33:19"
+            },
+            {
+              "id": "played-1779532393132-4f7b1e28df39b",
+              "trackId": "c523",
+              "trackKey": "alive",
+              "title": "Alive",
+              "artist": "Pearl Jam",
+              "year": 1991,
+              "genre": "Grunge",
+              "playerName": "Christoph",
+              "teamName": "Christoph",
+              "activeMemberName": "",
+              "correct": false,
+              "skipped": true,
+              "createdAt": "12:33:13"
+            },
+            {
+              "id": "played-1779532386101-6b8d067a55896",
+              "trackId": "c601",
+              "trackKey": "cha cha cha",
+              "title": "Cha Cha Cha",
+              "artist": "Käärijä",
+              "year": 2023,
+              "genre": "Eurovision Electronic",
+              "playerName": "456",
+              "teamName": "456",
+              "activeMemberName": "",
+              "correct": true,
+              "skipped": false,
+              "createdAt": "12:33:06"
+            },
+            {
+              "id": "played-1779532355697-164fdfcfcfd55",
+              "trackId": "v705",
+              "trackKey": "beds are burning",
+              "title": "Beds Are Burning",
+              "artist": "Midnight Oil",
+              "year": 1987,
+              "genre": "Rock",
+              "playerName": "123",
+              "teamName": "123",
+              "activeMemberName": "",
+              "correct": true,
+              "skipped": false,
+              "createdAt": "12:32:35"
+            },
+            {
+              "id": "played-1779532325677-79f955ea5b4b9",
+              "trackId": "t202",
+              "trackKey": "thinking out loud",
+              "title": "Thinking Out Loud",
+              "artist": "Ed Sheeran",
+              "year": 2014,
+              "genre": "Pop",
+              "playerName": "Alex",
+              "teamName": "Alex",
+              "activeMemberName": "",
+              "correct": true,
+              "skipped": false,
+              "createdAt": "12:32:05"
+            },
+            {
+              "id": "played-1779532304804-aaf78a342c6a2",
+              "trackId": "t168",
+              "trackKey": "paper planes",
+              "title": "Paper Planes",
+              "artist": "M.I.A.",
+              "year": 2007,
+              "genre": "Alternative",
+              "playerName": "Christoph",
+              "teamName": "Christoph",
+              "activeMemberName": "",
+              "correct": true,
+              "skipped": false,
+              "createdAt": "12:31:44"
+            }
+          ],
+          "songReports": [],
+          "blockedTrackKeys": [],
+          "usedTrackIds": [
+            "t128",
+            "t168",
+            "t202",
+            "v705",
+            "c601",
+            "c523",
+            "b756",
+            "c605"
+          ],
+          "usedTrackKeys": [
+            "wonderwall",
+            "paper planes",
+            "thinking out loud",
+            "beds are burning",
+            "cha cha cha",
+            "alive",
+            "more than a feeling",
+            "a whole new world"
+          ],
+          "overtime": false,
+          "overtimePlayerIds": [],
+          "overtimePendingPlayerIds": [],
+          "gameLog": [
+            {
+              "id": "log-1779532412338-ea60aa0c56da88",
+              "text": "123 nutzt den Sicheren-Karten-Joker und erhaelt A Whole New World automatisch."
+            },
+            {
+              "id": "log-1779532404307-3795d310a45cd8",
+              "text": "Christoph hat den verdeckten Song gestartet oder erneut angefordert."
+            },
+            {
+              "id": "log-1779532399870-baaf2dfce215d8",
+              "text": "Alex hat More Than a Feeling uebersprungen."
+            },
+            {
+              "id": "log-1779532393132-f3775f67b26a38",
+              "text": "Christoph hat Alive uebersprungen."
+            },
+            {
+              "id": "log-1779532388889-b3376da8342758",
+              "text": "456 erhaelt +1 Joker fuer Song und Interpret."
+            },
+            {
+              "id": "log-1779532386102-41a0a38184e2f8",
+              "text": "456 hat Cha Cha Cha (2023) richtig nach Dancing Queen einsortiert."
+            },
+            {
+              "id": "log-1779532379085-3a315323ea1228",
+              "text": "Christoph hat den verdeckten Song gestartet oder erneut angefordert."
+            },
+            {
+              "id": "log-1779532363357-86db7a531846b8",
+              "text": "123 erhaelt +1 Joker fuer Song und Interpret."
+            },
+            {
+              "id": "log-1779532355697-ff75b1c3c425f",
+              "text": "123 hat Beds Are Burning (1987) richtig vor Smells Like Teen Spirit einsortiert."
+            },
+            {
+              "id": "log-1779532347610-d0c39a0d125a6",
+              "text": "Christoph hat den verdeckten Song gestartet oder erneut angefordert."
+            },
+            {
+              "id": "log-1779532328668-550b4c1b38d948",
+              "text": "Alex erhaelt +1 Joker fuer Song und Interpret."
+            },
+            {
+              "id": "log-1779532325677-c754da926ffe08",
+              "text": "Alex hat Thinking Out Loud (2014) richtig nach Rolling in the Deep einsortiert."
+            }
+          ],
+          "eventHistory": [
+            {
+              "id": "event-1779532421321-c7f615e85973b8",
+              "type": "NEXT_PLAYER",
+              "details": "456",
+              "turnNumber": 8
+            },
+            {
+              "id": "event-1779532412338-d9ba1fe1be35a",
+              "type": "TRACK_AUTO_CARD_JOKER",
+              "details": "123 kauft die Karte",
+              "turnNumber": 7
+            },
+            {
+              "id": "event-1779532404307-2f4e0aea244c68",
+              "type": "TRACK_PLAY_REQUESTED",
+              "details": "Christoph fordert Playback an",
+              "turnNumber": 7
+            },
+            {
+              "id": "event-1779532402217-d20e70694d9d58",
+              "type": "TRACK_DRAWN",
+              "details": "Verdeckter Song gezogen",
+              "turnNumber": 7
+            },
+            {
+              "id": "event-1779532401209-c8ba2ab80f541",
+              "type": "NEXT_PLAYER",
+              "details": "123",
+              "turnNumber": 7
+            },
+            {
+              "id": "event-1779532399870-2e12e71af4a1a",
+              "type": "TRACK_SKIPPED",
+              "details": "Song uebersprungen",
+              "turnNumber": 6
+            },
+            {
+              "id": "event-1779532396234-5d19ced5f0757",
+              "type": "TRACK_DRAWN",
+              "details": "Verdeckter Song gezogen",
+              "turnNumber": 6
+            },
+            {
+              "id": "event-1779532395149-93232f892d3658",
+              "type": "NEXT_PLAYER",
+              "details": "Alex",
+              "turnNumber": 6
+            },
+            {
+              "id": "event-1779532393132-a4c2c0319dbe88",
+              "type": "TRACK_SKIPPED",
+              "details": "Song uebersprungen",
+              "turnNumber": 5
+            },
+            {
+              "id": "event-1779532392255-0fd554143228",
+              "type": "TRACK_DRAWN",
+              "details": "Verdeckter Song gezogen",
+              "turnNumber": 5
+            },
+            {
+              "id": "event-1779532390333-54c1fb6df6bc88",
+              "type": "NEXT_PLAYER",
+              "details": "Christoph",
+              "turnNumber": 5
+            },
+            {
+              "id": "event-1779532388889-510db9896ee19",
+              "type": "JOKER_EARNED",
+              "details": "456",
+              "turnNumber": 4
+            },
+            {
+              "id": "event-1779532386102-268dee1940bdc8",
+              "type": "TRACK_REVEALED",
+              "details": "richtig",
+              "turnNumber": 4
+            },
+            {
+              "id": "event-1779532384106-eaef942eb755b",
+              "type": "PLACEMENT_CONFIRMED",
+              "details": "456 hat die Position bestaetigt",
+              "turnNumber": 4
+            },
+            {
+              "id": "event-1779532383140-bc487d8f0a5da8",
+              "type": "PLACEMENT_SELECTED",
+              "details": "Index 1",
+              "turnNumber": 4
+            },
+            {
+              "id": "event-1779532379085-41fc3d8d9c6cb",
+              "type": "TRACK_PLAY_REQUESTED",
+              "details": "Christoph fordert Playback an",
+              "turnNumber": 4
+            },
+            {
+              "id": "event-1779532369140-498130201cb79",
+              "type": "TRACK_DRAWN",
+              "details": "Verdeckter Song gezogen",
+              "turnNumber": 4
+            },
+            {
+              "id": "event-1779532368059-ddaf5fbea87828",
+              "type": "NEXT_PLAYER",
+              "details": "456",
+              "turnNumber": 4
+            },
+            {
+              "id": "event-1779532363357-842018a5b36db",
+              "type": "JOKER_EARNED",
+              "details": "123",
+              "turnNumber": 3
+            },
+            {
+              "id": "event-1779532355698-5022bf72314bb8",
+              "type": "TRACK_REVEALED",
+              "details": "richtig",
+              "turnNumber": 3
+            }
+          ],
+          "playbackRequests": [
+            {
+              "id": "playback-1779532404307-6dc9d2eefb0aa",
+              "requester": "Christoph",
+              "trackId": "c605",
+              "hiddenLabel": "Verdeckter Song",
+              "playLimitSeconds": 20,
+              "createdAt": "12:33:24"
+            },
+            {
+              "id": "playback-1779532379085-ccb482b1354e5",
+              "requester": "Christoph",
+              "trackId": "c601",
+              "hiddenLabel": "Verdeckter Song",
+              "playLimitSeconds": 20,
+              "createdAt": "12:32:59"
+            },
+            {
+              "id": "playback-1779532347610-e8c71513ae5a8",
+              "requester": "Christoph",
+              "trackId": "v705",
+              "hiddenLabel": "Verdeckter Song",
+              "playLimitSeconds": 20,
+              "createdAt": "12:32:27"
+            },
+            {
+              "id": "playback-1779532321032-b4bd89a1d6b848",
+              "requester": "Christoph",
+              "trackId": "t202",
+              "hiddenLabel": "Verdeckter Song",
+              "playLimitSeconds": 20,
+              "createdAt": "12:32:01"
+            },
+            {
+              "id": "playback-1779532237641-9240eb7dd41168",
+              "requester": "Christoph",
+              "trackId": "t168",
+              "hiddenLabel": "Verdeckter Song",
+              "playLimitSeconds": 20,
+              "createdAt": "12:30:37"
+            },
+            {
+              "id": "playback-1779532167403-caaaddc18d168",
+              "requester": "Christoph",
+              "trackId": "t128",
+              "hiddenLabel": "Verdeckter Song",
+              "playLimitSeconds": 20,
+              "createdAt": "12:29:27"
+            }
+          ]
+        },
+        "playerClaims": [
+          [
+            "player-1779532152173-8704f15b5dbe6",
+            {
+              "clientInstanceId": "client-1778881160758-3d29542f6e0e",
+              "playerName": "Christoph",
+              "claimedAt": 1779532421346
+            }
+          ],
+          [
+            "player-1779532152173-2428d100917178",
+            {
+              "clientInstanceId": "client-1778881160758-3d29542f6e0e",
+              "playerName": "Alex",
+              "claimedAt": 1779532291944
+            }
+          ],
+          [
+            "player-1779532152173-09bf7d5526192",
+            {
+              "clientInstanceId": "client-1778881160758-3d29542f6e0e",
+              "playerName": "123",
+              "claimedAt": 1779532294845
+            }
+          ],
+          [
+            "player-1779532152173-21d40618877908",
+            {
+              "clientInstanceId": "client-1778881160758-3d29542f6e0e",
+              "playerName": "456",
+              "claimedAt": 1779532298776
+            }
+          ]
+        ],
+        "spotify": {
+          "deviceId": "3dafae7887404902dbe43f211c2f3c0935d33d6a",
+          "deviceName": "DESKTOP-DRHSEO2"
+        },
+        "updatedAt": 1779532421346
+      }
+    ],
+    [
+      "W8U1FH",
+      {
+        "gameState": {
+          "phase": "lobby",
+          "room": null,
+          "players": [],
+          "deck": [],
+          "activePlayerIndex": 0,
+          "currentTrack": null,
+          "selectedInsertIndex": null,
+          "currentTrackJokerAwarded": false,
+          "currentTrackJokerGuessReviewed": false,
+          "jokerClaims": [],
+          "selectedJokerPlayerId": null,
+          "jokerDuel": {
+            "active": false,
+            "playerIds": [],
+            "choices": {},
+            "round": 0,
+            "lastResult": null
+          },
+          "lastResult": null,
+          "targetScore": 10,
+          "maxTurns": 0,
+          "playLimitSeconds": 20,
+          "difficulty": "normal",
+          "gameMode": "solo",
+          "turnNumber": 1,
+          "showDebugSong": false,
+          "discardedTracks": [],
+          "playedTrackHistory": [],
+          "songReports": [],
+          "blockedTrackKeys": [],
+          "usedTrackIds": [],
+          "usedTrackKeys": [],
+          "overtime": false,
+          "overtimePlayerIds": [],
+          "overtimePendingPlayerIds": [],
+          "gameLog": [],
+          "eventHistory": [],
+          "playbackRequests": []
+        },
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "3dafae7887404902dbe43f211c2f3c0935d33d6a",
+          "deviceName": "DESKTOP-DRHSEO2"
+        },
+        "updatedAt": 1779533518383
+      }
+    ],
+    [
+      "4Y72OA",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779533518398
+      }
+    ],
+    [
+      "7CDSQT",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779533538142
+      }
+    ],
+    [
+      "WVZTTK",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779533544492
+      }
+    ],
+    [
+      "8XV5AH",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779533623567
+      }
+    ],
+    [
+      "7160UR",
+      {
+        "gameState": {
+          "phase": "lobby",
+          "room": null,
+          "players": [],
+          "deck": [],
+          "activePlayerIndex": 0,
+          "currentTrack": null,
+          "selectedInsertIndex": null,
+          "currentTrackJokerAwarded": false,
+          "currentTrackJokerGuessReviewed": false,
+          "jokerClaims": [],
+          "selectedJokerPlayerId": null,
+          "jokerDuel": {
+            "active": false,
+            "playerIds": [],
+            "choices": {},
+            "round": 0,
+            "lastResult": null
+          },
+          "lastResult": null,
+          "targetScore": 10,
+          "maxTurns": 0,
+          "playLimitSeconds": 20,
+          "difficulty": "normal",
+          "gameMode": "solo",
+          "turnNumber": 1,
+          "showDebugSong": false,
+          "discardedTracks": [],
+          "playedTrackHistory": [],
+          "songReports": [],
+          "blockedTrackKeys": [],
+          "usedTrackIds": [],
+          "usedTrackKeys": [],
+          "overtime": false,
+          "overtimePlayerIds": [],
+          "overtimePendingPlayerIds": [],
+          "gameLog": [],
+          "eventHistory": [],
+          "playbackRequests": []
+        },
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779534572048
+      }
+    ],
+    [
+      "Q92OUH",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779534572064
+      }
+    ],
+    [
+      "7DEFZJ",
+      {
+        "gameState": {
+          "phase": "lobby",
+          "room": null,
+          "players": [],
+          "deck": [],
+          "activePlayerIndex": 0,
+          "currentTrack": null,
+          "selectedInsertIndex": null,
+          "currentTrackJokerAwarded": false,
+          "currentTrackJokerGuessReviewed": false,
+          "jokerClaims": [],
+          "selectedJokerPlayerId": null,
+          "jokerDuel": {
+            "active": false,
+            "playerIds": [],
+            "choices": {},
+            "round": 0,
+            "lastResult": null
+          },
+          "lastResult": null,
+          "targetScore": 10,
+          "maxTurns": 0,
+          "playLimitSeconds": 20,
+          "difficulty": "normal",
+          "gameMode": "solo",
+          "turnNumber": 1,
+          "showDebugSong": false,
+          "discardedTracks": [],
+          "playedTrackHistory": [],
+          "songReports": [],
+          "blockedTrackKeys": [],
+          "usedTrackIds": [],
+          "usedTrackKeys": [],
+          "overtime": false,
+          "overtimePlayerIds": [],
+          "overtimePendingPlayerIds": [],
+          "gameLog": [],
+          "eventHistory": [],
+          "playbackRequests": []
+        },
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "3dafae7887404902dbe43f211c2f3c0935d33d6a",
+          "deviceName": "DESKTOP-DRHSEO2"
+        },
+        "updatedAt": 1779534808932
+      }
+    ],
+    [
+      "RXD07V",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779534808951
+      }
+    ],
+    [
+      "QK3YUP",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779534840986
+      }
+    ],
+    [
+      "P7O8T7",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779534851062
+      }
+    ],
+    [
+      "XV02M4",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779534965507
+      }
+    ],
+    [
+      "H0ROBN",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779535051458
+      }
+    ],
+    [
+      "5SD5WG",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779535053607
+      }
+    ],
+    [
+      "O06PX9",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779535346280
+      }
+    ],
+    [
+      "WBYT41",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779535359960
+      }
+    ],
+    [
+      "FVPQ5A",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779535454409
+      }
+    ],
+    [
+      "R7UPS2",
+      {
+        "gameState": {
+          "phase": "lobby",
+          "room": null,
+          "players": [],
+          "deck": [],
+          "activePlayerIndex": 0,
+          "currentTrack": null,
+          "selectedInsertIndex": null,
+          "currentTrackJokerAwarded": false,
+          "currentTrackJokerGuessReviewed": false,
+          "jokerClaims": [],
+          "selectedJokerPlayerId": null,
+          "jokerDuel": {
+            "active": false,
+            "playerIds": [],
+            "choices": {},
+            "round": 0,
+            "lastResult": null
+          },
+          "lastResult": null,
+          "targetScore": 10,
+          "maxTurns": 0,
+          "playLimitSeconds": 20,
+          "difficulty": "normal",
+          "gameMode": "solo",
+          "turnNumber": 1,
+          "showDebugSong": false,
+          "discardedTracks": [],
+          "playedTrackHistory": [],
+          "songReports": [],
+          "blockedTrackKeys": [],
+          "usedTrackIds": [],
+          "usedTrackKeys": [],
+          "overtime": false,
+          "overtimePlayerIds": [],
+          "overtimePendingPlayerIds": [],
+          "gameLog": [],
+          "eventHistory": [],
+          "playbackRequests": []
+        },
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779535813652
+      }
+    ],
+    [
+      "G1QILA",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779535904075
+      }
+    ],
+    [
+      "EAKOT5",
+      {
+        "gameState": {
+          "phase": "lobby",
+          "room": null,
+          "players": [],
+          "deck": [],
+          "activePlayerIndex": 0,
+          "currentTrack": null,
+          "selectedInsertIndex": null,
+          "currentTrackJokerAwarded": false,
+          "currentTrackJokerGuessReviewed": false,
+          "jokerClaims": [],
+          "selectedJokerPlayerId": null,
+          "jokerDuel": {
+            "active": false,
+            "playerIds": [],
+            "choices": {},
+            "round": 0,
+            "lastResult": null
+          },
+          "lastResult": null,
+          "targetScore": 10,
+          "maxTurns": 0,
+          "playLimitSeconds": 20,
+          "difficulty": "normal",
+          "gameMode": "solo",
+          "turnNumber": 1,
+          "showDebugSong": false,
+          "discardedTracks": [],
+          "playedTrackHistory": [],
+          "songReports": [],
+          "blockedTrackKeys": [],
+          "usedTrackIds": [],
+          "usedTrackKeys": [],
+          "overtime": false,
+          "overtimePlayerIds": [],
+          "overtimePendingPlayerIds": [],
+          "gameLog": [],
+          "eventHistory": [],
+          "playbackRequests": []
+        },
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "3dafae7887404902dbe43f211c2f3c0935d33d6a",
+          "deviceName": "DESKTOP-DRHSEO2"
+        },
+        "updatedAt": 1779536056351
+      }
+    ],
+    [
+      "R1HE02",
+      {
+        "gameState": null,
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "",
+          "deviceName": ""
+        },
+        "updatedAt": 1779536279096
+      }
+    ],
+    [
+      "PDIERR",
+      {
+        "gameState": {
+          "phase": "lobby",
+          "room": null,
+          "players": [],
+          "deck": [],
+          "activePlayerIndex": 0,
+          "currentTrack": null,
+          "selectedInsertIndex": null,
+          "currentTrackJokerAwarded": false,
+          "currentTrackJokerGuessReviewed": false,
+          "jokerClaims": [],
+          "selectedJokerPlayerId": null,
+          "jokerDuel": {
+            "active": false,
+            "playerIds": [],
+            "choices": {},
+            "round": 0,
+            "lastResult": null
+          },
+          "lastResult": null,
+          "targetScore": 10,
+          "maxTurns": 0,
+          "playLimitSeconds": 20,
+          "difficulty": "normal",
+          "gameMode": "solo",
+          "turnNumber": 1,
+          "showDebugSong": false,
+          "discardedTracks": [],
+          "playedTrackHistory": [],
+          "songReports": [],
+          "blockedTrackKeys": [],
+          "usedTrackIds": [],
+          "usedTrackKeys": [],
+          "overtime": false,
+          "overtimePlayerIds": [],
+          "overtimePendingPlayerIds": [],
+          "gameLog": [],
+          "eventHistory": [],
+          "playbackRequests": []
+        },
+        "playerClaims": [],
+        "spotify": {
+          "deviceId": "3dafae7887404902dbe43f211c2f3c0935d33d6a",
+          "deviceName": "DESKTOP-DRHSEO2"
+        },
+        "updatedAt": 1779536497680
+      }
+    ]
+  ]
+}
