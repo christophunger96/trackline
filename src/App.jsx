@@ -64,7 +64,6 @@ const SPOTIFY_SCOPES = [
 
 const SPOTIFY_PLAY_EVENT_NAME = "trackline.spotify.playCurrent";
 const DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS = 20;
-const SPOTIFY_WEB_PLAYBACK_SDK_URL = "https://sdk.scdn.co/spotify-player.js";
 const PLAY_LIMIT_OPTIONS = [10, 20, 30];
 const DIFFICULTY_OPTIONS = [
   { id: "easy", label: "Leicht", description: "bekannte Hits und große Klassiker" },
@@ -4585,6 +4584,7 @@ export default function App() {
               statsStatus={supabaseStatsStatus}
               onChange={updateSupabaseConfig}
               onTest={handleTestSupabaseConnection}
+              defaultOpen={false}
             />
 
             {showSpotifyPanel && (
@@ -5132,77 +5132,99 @@ function PlayerLobbyWaitingView({ roomCode, playerName, supabaseRoomPlayers = []
   );
 }
 
-function SupabaseFoundationCard({ config, status, statsStatus, onChange, onTest, compact = false }) {
+function SupabaseFoundationCard({ config, status, statsStatus, onChange, onTest, compact = false, defaultOpen = false }) {
   const enabled = Boolean(config?.enabled);
+  const configured = isSupabaseConfigured(config);
+  const title = compact ? "Technische Verbindung" : "System & Supabase";
 
   return (
     <Card>
-      <CardContent style={{ display: "grid", gap: compact ? 10 : 14 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <details open={defaultOpen} style={{ display: "grid" }}>
+        <summary
+          style={{
+            cursor: "pointer",
+            listStyle: "none",
+            padding: compact ? 12 : 14,
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
           <div>
-            <Badge variant={enabled ? "default" : "secondary"}>Supabase Phase 4</Badge>
-            <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5 }}>Lobby + Statistiken speichern</h2>
+            <Badge variant={configured ? "default" : "secondary"}>{configured ? "Supabase aktiv" : "Einrichtung"}</Badge>
+            <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5, fontSize: compact ? 18 : 22 }}>{title}</h2>
             <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-              Optionaler Datenbank-Anschluss. Solange Supabase nicht aktiv ist, läuft Trackline wie bisher über den bestehenden Sync.
+              {configured
+                ? "Verbindung ist automatisch gefüllt. Nur öffnen, wenn etwas nicht funktioniert."
+                : "Supabase ist noch nicht vollständig konfiguriert."}
             </p>
           </div>
 
-          <Button variant="secondary" onClick={onTest}>
-            Verbindung testen
-          </Button>
-        </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <Badge variant={enabled ? "default" : "secondary"}>{enabled ? "aktiv" : "aus"}</Badge>
+            <Badge variant="secondary">Details</Badge>
+          </div>
+        </summary>
 
-        <label style={{ display: "flex", gap: 8, alignItems: "center", color: colors.muted, fontSize: 13 }}>
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={(event) => onChange?.({ enabled: event.target.checked })}
-          />
-          Supabase aktivieren
-        </label>
+        <CardContent style={{ display: "grid", gap: compact ? 10 : 14, paddingTop: 0 }}>
+          <div style={{ display: "grid", gridTemplateColumns: compact ? "1fr" : "1fr 1fr", gap: 10 }}>
+            <div style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg }}>
+              <span style={{ display: "block", color: colors.muted, fontSize: 12 }}>Verbindung</span>
+              <strong style={{ display: "block", marginTop: 4, fontSize: 13 }}>{status || "Nicht verbunden."}</strong>
+            </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: compact ? "1fr" : "minmax(0, 1fr) minmax(0, 1fr)", gap: 10 }}>
-          <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: colors.muted, fontSize: 13 }}>Project URL</span>
-            <Input
-              value={config?.url || ""}
-              onChange={(event) => onChange?.({ url: event.target.value })}
-              placeholder="https://xxxxx.supabase.co"
-            />
-          </label>
-
-          <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: colors.muted, fontSize: 13 }}>anon public key</span>
-            <Input
-              value={config?.anonKey || ""}
-              onChange={(event) => onChange?.({ anonKey: event.target.value })}
-              placeholder="eyJhbGciOi..."
-              type="password"
-            />
-          </label>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: compact ? "1fr" : "1fr 1fr", gap: 10 }}>
-          <div style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg }}>
-            <span style={{ display: "block", color: colors.muted, fontSize: 12 }}>Status</span>
-            <strong style={{ display: "block", marginTop: 4, fontSize: 13 }}>{status || "Nicht verbunden."}</strong>
+            <div style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg }}>
+              <span style={{ display: "block", color: colors.muted, fontSize: 12 }}>Statistiken</span>
+              <strong style={{ display: "block", marginTop: 4, fontSize: 13 }}>{statsStatus || "Noch keine Statistik gespeichert."}</strong>
+            </div>
           </div>
 
-          <div style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg }}>
-            <span style={{ display: "block", color: colors.muted, fontSize: 12 }}>Statistiken</span>
-            <strong style={{ display: "block", marginTop: 4, fontSize: 13 }}>{statsStatus || "Noch keine Statistik gespeichert."}</strong>
-          </div>
-        </div>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", color: colors.muted, fontSize: 13 }}>
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(event) => onChange?.({ enabled: event.target.checked })}
+            />
+            Supabase aktivieren
+          </label>
 
-        {!compact && (
-          <p style={{ margin: 0, color: colors.muted, fontSize: 12 }}>
-            Phase 4 liest room_players automatisch in die Lobby ein und speichert Ergebnisse/Spielerstatistiken nach Spielende. Der Spiel-Sync bleibt vorerst beim bisherigen Server.
-          </p>
-        )}
-      </CardContent>
+          <div style={{ display: "grid", gridTemplateColumns: compact ? "1fr" : "minmax(0, 1fr) minmax(0, 1fr)", gap: 10 }}>
+            <label style={{ display: "grid", gap: 8 }}>
+              <span style={{ color: colors.muted, fontSize: 13 }}>Project URL</span>
+              <Input
+                value={config?.url || ""}
+                onChange={(event) => onChange?.({ url: event.target.value })}
+                placeholder="https://xxxxx.supabase.co"
+              />
+            </label>
+
+            <label style={{ display: "grid", gap: 8 }}>
+              <span style={{ color: colors.muted, fontSize: 13 }}>anon public key</span>
+              <Input
+                value={config?.anonKey || ""}
+                onChange={(event) => onChange?.({ anonKey: event.target.value })}
+                placeholder="eyJhbGciOi..."
+                type="password"
+              />
+            </label>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <Button variant="secondary" onClick={onTest}>
+              Verbindung testen
+            </Button>
+            <span style={{ color: colors.muted, fontSize: 12 }}>
+              Normalerweise musst du hier nichts ändern. Die Werte kommen über Vercel Environment Variables oder aus dem Einladungslink.
+            </span>
+          </div>
+        </CardContent>
+      </details>
     </Card>
   );
 }
+
 
 function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supabaseConfig, supabaseStatus, supabaseStatsStatus, onSupabaseConfigChange, onTestSupabase, onOpenStatsPage, onEnter }) {
   const [name, setName] = useState(initialName || "");
@@ -5248,7 +5270,7 @@ function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supa
     <div style={{ minHeight: "100vh", background: colors.bg, color: colors.text, fontFamily: "Inter, system-ui, sans-serif", padding: 18, display: "grid", placeItems: "center" }}>
       <div style={{ width: "min(1040px, 100%)", display: "grid", gap: 18 }}>
         <header style={{ display: "grid", gap: 8, textAlign: "center" }}>
-          <Badge variant="secondary">Trackline Phase 1</Badge>
+          <Badge variant="secondary">Trackline</Badge>
           <h1 style={{ margin: 0, fontSize: 46, letterSpacing: -1.4 }}>Trackline starten</h1>
           <p style={{ margin: "0 auto", color: colors.muted, maxWidth: 720, lineHeight: 1.5 }}>
             Erstelle einen privaten Raum oder tritt einem bestehenden Raum bei. Spotify bleibt unverändert optional – der Host kann weiterhin manuell, per Discord Stream oder Spotify Jam abspielen.
@@ -5327,9 +5349,9 @@ function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supa
 
         <Card>
           <CardContent style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
-            <InfoTile label="Online-Sync" value="wird aktiviert" />
-            <InfoTile label="Server" value={String(socketUrl || "").replace(/^https?:\/\//, "") || "-"} />
-            <InfoTile label="Status" value={syncStatus || "bereit"} />
+            <InfoTile label="Online" value="bereit" />
+            <InfoTile label="Spielstand" value="Supabase" />
+            <InfoTile label="Spotify" value="optional" />
           </CardContent>
         </Card>
 
@@ -5395,7 +5417,7 @@ function HostControlArea({ children, onReset, onOpenStatsPage, isInGame }) {
         <div>
           <strong style={{ fontSize: 18 }}>Host-Bereich</strong>
           <p style={{ margin: "3px 0 0", color: colors.muted, fontSize: 12 }}>
-            Link, Spotify, Sync und Admin. Im Spiel einklappen und darunter normal spielen.
+            Link, Spieler, Einstellungen und Spotify. Technisches ist eingeklappt.
           </p>
         </div>
 
@@ -5459,8 +5481,8 @@ function WebsiteShareCard({ room, roomCode, playerNames, socketUrl, syncClientCo
           }}
         >
           <div>
-            <Badge variant="secondary">Host-Dashboard</Badge>
-            <h2 style={{ margin: "10px 0 6px", letterSpacing: -0.6 }}>Runde bereitstellen</h2>
+            <Badge variant="secondary">Host</Badge>
+            <h2 style={{ margin: "10px 0 6px", letterSpacing: -0.6 }}>Freunde einladen</h2>
             <p style={{ margin: 0, color: colors.muted }}>
               {syncClientCount} verbunden · Host: {hostName} · Raum {activeRoomCode}
             </p>
@@ -5482,7 +5504,7 @@ function WebsiteShareCard({ room, roomCode, playerNames, socketUrl, syncClientCo
           <p style={{ margin: "10px 0 0", color: colors.muted, wordBreak: "break-all", fontSize: 13 }}>{joinUrl}</p>
           {isSupabaseConfigured(supabaseConfig) && (
             <p style={{ margin: "8px 0 0", color: colors.muted, fontSize: 12 }}>
-              Enthält den öffentlichen Supabase anon key, damit Inkognito-/Freunde-Links automatisch in dieselbe Lobby schreiben können.
+              Der Link enthält alles Nötige, damit Freunde automatisch in dieser Lobby landen.
             </p>
           )}
         </details>
@@ -5494,90 +5516,54 @@ function WebsiteShareCard({ room, roomCode, playerNames, socketUrl, syncClientCo
 function MultiplayerSyncCard({ roomCode, socketUrl, setSocketUrl, syncEnabled, setSyncEnabled, syncStatus, syncClientCount }) {
   return (
     <Card>
-      <CardContent style={{ display: "grid", gap: 16 }}>
+      <CardContent style={{ display: "grid", gap: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
           <div>
-            <Badge variant="secondary">Supabase Spielsync</Badge>
-            <h2 style={{ margin: "10px 0 6px" }}>GameState über Supabase synchronisieren</h2>
-            <p style={{ margin: 0, color: colors.muted }}>
-              Verbindet alle Browser mit gleichem Raumcode über Supabase. Render/Socket.io wird für den Spielsync nicht mehr genutzt. Spotify läuft jetzt über Supabase Edge Functions.
+            <Badge variant={syncEnabled ? "default" : "secondary"}>Online bereit</Badge>
+            <h2 style={{ margin: "8px 0 4px" }}>Raumstatus</h2>
+            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+              Spielstand, Lobby und Statistiken laufen über Supabase. Render wird nicht mehr benötigt.
             </p>
           </div>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Badge variant={syncEnabled ? "default" : "secondary"}>{syncEnabled ? "Sync aktiv" : "Sync aus"}</Badge>
-            <Badge variant="secondary">{syncClientCount} Client(s)</Badge>
+            <Badge variant="secondary">{syncClientCount} Spieler/Client(s)</Badge>
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, alignItems: "end" }}>
-          <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: colors.muted, fontSize: 14 }}>Legacy Spotify/Auth Server</span>
-            <Input
-              value={socketUrl}
-              onChange={(event) => setSocketUrl(event.target.value)}
-              placeholder="nicht mehr nötig, nur Legacy-Fallback"
-            />
-          </label>
-
-          <Button variant={syncEnabled ? "danger" : "primary"} onClick={() => setSyncEnabled(!syncEnabled)}>
-            {syncEnabled ? "Supabase Sync trennen" : "Supabase Sync verbinden"}
-          </Button>
-        </div>
-
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
-          <InfoTile label="Sync-Raum" value={roomCode} />
+          <InfoTile label="Raum" value={roomCode} />
           <InfoTile label="Status" value={syncStatus} />
         </div>
 
-        <div style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 14, background: colors.bg }}>
-          <p style={{ margin: "0 0 6px", fontWeight: 800 }}>Testablauf</p>
-          <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-            Oeffne denselben Raum in zwei Browserfenstern oder bei zwei Freunden. Aktionen wie Spielstart, Song ziehen, Platzierung und Reveal werden in Supabase gespeichert und von allen Clients geladen.
-          </p>
-        </div>
+        <details style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg }}>
+          <summary style={{ cursor: "pointer", fontWeight: 900, listStyle: "none" }}>Technik / Fallback anzeigen</summary>
+
+          <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+              Nur relevant, wenn du einen alten Render-/Legacy-Fallback testen möchtest. Für den normalen Betrieb ist dieses Feld nicht nötig.
+            </p>
+
+            <label style={{ display: "grid", gap: 8 }}>
+              <span style={{ color: colors.muted, fontSize: 13 }}>Legacy Server URL</span>
+              <Input
+                value={socketUrl}
+                onChange={(event) => setSocketUrl(event.target.value)}
+                placeholder="nicht nötig"
+              />
+            </label>
+
+            <Button variant={syncEnabled ? "danger" : "primary"} onClick={() => setSyncEnabled(!syncEnabled)} style={{ justifySelf: "start" }}>
+              {syncEnabled ? "Sync deaktivieren" : "Sync aktivieren"}
+            </Button>
+          </div>
+        </details>
       </CardContent>
     </Card>
   );
 }
 
-
-function loadSpotifyWebPlaybackSdk() {
-  if (typeof window === "undefined") {
-    return Promise.reject(new Error("Spotify Web Playback SDK ist nur im Browser verfuegbar."));
-  }
-
-  if (window.Spotify?.Player) {
-    return Promise.resolve(window.Spotify);
-  }
-
-  if (window.__tracklineSpotifySdkPromise) {
-    return window.__tracklineSpotifySdkPromise;
-  }
-
-  window.__tracklineSpotifySdkPromise = new Promise((resolve, reject) => {
-    const existingScript = document.querySelector(`script[src="${SPOTIFY_WEB_PLAYBACK_SDK_URL}"]`);
-
-    window.onSpotifyWebPlaybackSDKReady = () => {
-      if (window.Spotify?.Player) {
-        resolve(window.Spotify);
-      } else {
-        reject(new Error("Spotify Web Playback SDK konnte nicht geladen werden."));
-      }
-    };
-
-    if (existingScript) return;
-
-    const script = document.createElement("script");
-    script.src = SPOTIFY_WEB_PLAYBACK_SDK_URL;
-    script.async = true;
-    script.onerror = () => reject(new Error("Spotify Web Playback SDK konnte nicht geladen werden."));
-
-    document.body.appendChild(script);
-  });
-
-  return window.__tracklineSpotifySdkPromise;
-}
 
 function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify, roomCode, spotifyAuthServerUrl, roundPlayLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS, onPlaybackRequested }) {
   const [clientId] = useState(() => {
@@ -5598,14 +5584,8 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
   const [savedDeviceId, setSavedDeviceId] = useState("");
   const [savedDeviceName, setSavedDeviceName] = useState("");
   const [spotifyDetailsOpen, setSpotifyDetailsOpen] = useState(false);
-  const [webPlayerReady, setWebPlayerReady] = useState(false);
-  const [webPlayerDeviceId, setWebPlayerDeviceId] = useState("");
-  const [webPlayerDeviceName, setWebPlayerDeviceName] = useState("");
-  const [webPlayerConnected, setWebPlayerConnected] = useState(false);
 
   const countdownIntervalRef = useRef(null);
-  const webPlayerRef = useRef(null);
-  const webPlayerTokenRef = useRef(null);
 
   function getSpotifyAuthServerBaseUrl() {
     return String(spotifyAuthServerUrl || "").trim().replace(/\/+$/, "");
@@ -5627,125 +5607,6 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
     }
 
     return `${baseUrl}/room/${encodeURIComponent(roomCode)}/spotify${path}`;
-  }
-
-
-  async function getSpotifyWebToken() {
-    const response = await fetch(getRoomSpotifyUrl("/web-token"));
-
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-
-    const data = await response.json();
-
-    if (!data.accessToken) {
-      throw new Error("Spotify Web Token fehlt.");
-    }
-
-    webPlayerTokenRef.current = data.accessToken;
-
-    return data.accessToken;
-  }
-
-  async function startBrowserSpotifyPlayer() {
-    try {
-      setIsBusy(true);
-      setStatus("Trackline Browser-Player wird gestartet...");
-
-      const Spotify = await loadSpotifyWebPlaybackSdk();
-
-      if (webPlayerRef.current) {
-        try {
-          await webPlayerRef.current.disconnect();
-        } catch {
-          // ignore
-        }
-
-        webPlayerRef.current = null;
-      }
-
-      await getSpotifyWebToken();
-
-      const playerName = `Trackline ${roomCode}`;
-
-      const player = new Spotify.Player({
-        name: playerName,
-        getOAuthToken: async (callback) => {
-          try {
-            const token = await getSpotifyWebToken();
-            callback(token);
-          } catch (error) {
-            setStatus(error.message || "Spotify Web Token konnte nicht geladen werden.");
-          }
-        },
-        volume: 0.65,
-      });
-
-      player.addListener("ready", async ({ device_id }) => {
-        setWebPlayerDeviceId(device_id);
-        setWebPlayerDeviceName(playerName);
-        setWebPlayerReady(true);
-        setWebPlayerConnected(true);
-        setSelectedSpotifyDeviceId(device_id);
-        setSavedDeviceId(device_id);
-        setSavedDeviceName(playerName);
-        setStatus(`Browser-Player bereit: ${playerName}. Dieses Trackline-Fenster ist jetzt das Spotify-Zielgeraet.`);
-
-        try {
-          const response = await fetch(getRoomSpotifyUrl("/device"), {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              deviceId: device_id,
-              deviceName: playerName,
-            }),
-          });
-
-          if (!response.ok) {
-            throw new Error(await response.text());
-          }
-        } catch (error) {
-          setStatus(`Browser-Player bereit, aber Zielgeraet konnte nicht gespeichert werden: ${error.message || "Fehler"}`);
-        }
-      });
-
-      player.addListener("not_ready", ({ device_id }) => {
-        setWebPlayerConnected(false);
-        setStatus(`Browser-Player ist nicht mehr bereit: ${device_id}`);
-      });
-
-      player.addListener("initialization_error", ({ message }) => {
-        setStatus(`Spotify Browser-Player Initialisierungsfehler: ${message}`);
-      });
-
-      player.addListener("authentication_error", ({ message }) => {
-        setStatus(`Spotify Browser-Player Auth-Fehler: ${message}. Bitte Spotify neu verbinden.`);
-      });
-
-      player.addListener("account_error", ({ message }) => {
-        setStatus(`Spotify Browser-Player Account-Fehler: ${message}. Spotify Premium ist erforderlich.`);
-      });
-
-      player.addListener("playback_error", ({ message }) => {
-        setStatus(`Spotify Browser-Player Playback-Fehler: ${message}`);
-      });
-
-      const connected = await player.connect();
-
-      if (!connected) {
-        throw new Error("Spotify Browser-Player konnte nicht verbunden werden. Prüfe Spotify Premium und Browser-Autoplay.");
-      }
-
-      webPlayerRef.current = player;
-      setStatus("Browser-Player verbindet... Wenn dein Browser fragt, Audio erlauben.");
-    } catch (error) {
-      setStatus(error.message || "Spotify Browser-Player konnte nicht gestartet werden.");
-    } finally {
-      setIsBusy(false);
-    }
   }
 
   function clearCountdown() {
@@ -5796,14 +5657,6 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
   useEffect(() => {
     return () => {
       clearCountdown();
-
-      if (webPlayerRef.current) {
-        try {
-          webPlayerRef.current.disconnect();
-        } catch {
-          // ignore
-        }
-      }
     };
   }, []);
 
@@ -6167,35 +6020,6 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
           </div>
         )}
 
-        {canManageSpotify && spotifyConnected && (
-          <div
-            style={{
-              border: `1px solid ${webPlayerReady ? colors.primary : colors.border}`,
-              borderRadius: 18,
-              padding: 14,
-              background: webPlayerReady ? "rgba(126,87,255,0.13)" : colors.bg,
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 12,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <div>
-              <strong>Direkt im Browser abspielen</strong>
-              <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>
-                {webPlayerReady
-                  ? `Browser-Player bereit: ${webPlayerDeviceName || "Trackline"}${webPlayerDeviceId ? ` · ${webPlayerDeviceId.slice(0, 6)}…` : ""}`
-                  : "Trackline kann dieses Browserfenster als Spotify-Player verwenden. Spotify Premium ist erforderlich."}
-              </p>
-            </div>
-
-            <Button onClick={startBrowserSpotifyPlayer} disabled={isBusy}>
-              {webPlayerReady ? "Browser-Player neu starten" : "Browser-Player starten"}
-            </Button>
-          </div>
-        )}
-
         {canManageSpotify && spotifyConnected && !savedDeviceName && (
           <div
             style={{
@@ -6217,14 +6041,9 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
               </p>
             </div>
 
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Button variant="secondary" onClick={refreshSpotifyDevices} disabled={isBusy}>
-                Geraete laden
-              </Button>
-              <Button onClick={startBrowserSpotifyPlayer} disabled={isBusy}>
-                Browser-Player starten
-              </Button>
-            </div>
+            <Button variant="secondary" onClick={refreshSpotifyDevices} disabled={isBusy}>
+              Geraete laden
+            </Button>
           </div>
         )}
 
