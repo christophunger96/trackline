@@ -47,6 +47,7 @@ const SUPABASE_URL_STORAGE_KEY = "trackline.supabase.url";
 const SUPABASE_ANON_KEY_STORAGE_KEY = "trackline.supabase.anonKey";
 const SUPABASE_ENABLED_STORAGE_KEY = "trackline.supabase.enabled";
 const SUPABASE_SAVED_RESULTS_STORAGE_KEY = "trackline.supabase.savedResults.v1";
+const SUPABASE_AUTH_SESSION_STORAGE_KEY = "trackline.supabase.authSession.v1";
 const DEFAULT_SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || "";
 const DEFAULT_SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || "";
 
@@ -3288,6 +3289,138 @@ async function supabaseRestRequest(config, path, options = {}) {
   return text ? JSON.parse(text) : null;
 }
 
+
+function getInitialSupabaseAuthSession() {
+  try {
+    const raw = localStorage.getItem(SUPABASE_AUTH_SESSION_STORAGE_KEY);
+
+    if (!raw) return null;
+
+    const session = JSON.parse(raw);
+    const expiresAt = Number(session?.expires_at || 0) * 1000;
+
+    if (!session?.access_token || !session?.user) return null;
+    if (expiresAt && expiresAt < Date.now() - 60_000) return null;
+
+    return session;
+  } catch {
+    return null;
+  }
+}
+
+function getAuthDisplayName(session) {
+  return (
+    String(session?.user?.user_metadata?.display_name || "").trim() ||
+    String(session?.user?.email || "").split("@")[0] ||
+    ""
+  );
+}
+
+function getAuthEmail(session) {
+  return String(session?.user?.email || "").trim();
+}
+
+function getAuthGuestId(session, fallbackGuestId) {
+  const userId = session?.user?.id;
+
+  return userId ? `auth-${userId}` : String(fallbackGuestId || "");
+}
+
+async function supabaseAuthRequest(config, path, options = {}, accessToken = "") {
+  const baseUrl = normalizeSupabaseUrl(config?.url);
+  const anonKey = String(config?.anonKey || "").trim();
+
+  if (!baseUrl || !anonKey) {
+    throw new Error("Supabase URL oder anon public key fehlt.");
+  }
+
+  const response = await fetch(`${baseUrl}/auth/v1${path}`, {
+    ...options,
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${accessToken || anonKey}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!response.ok) {
+    throw new Error(data?.msg || data?.message || data?.error_description || text || `Supabase Auth Fehler ${response.status}`);
+  }
+
+  return data;
+}
+
+async function signUpWithSupabase(config, { email, password, displayName }) {
+  return supabaseAuthRequest(config, "/signup", {
+    method: "POST",
+    body: JSON.stringify({
+      email: String(email || "").trim(),
+      password,
+      data: {
+        display_name: String(displayName || "").trim(),
+      },
+    }),
+  });
+}
+
+async function signInWithSupabase(config, { email, password }) {
+  return supabaseAuthRequest(config, "/token?grant_type=password", {
+    method: "POST",
+    body: JSON.stringify({
+      email: String(email || "").trim(),
+      password,
+    }),
+  });
+}
+
+async function signOutWithSupabase(config, session) {
+  if (!session?.access_token) return null;
+
+  return supabaseAuthRequest(
+    config,
+    "/logout",
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+    session.access_token
+  );
+}
+
+async function createOrUpdateAuthProfile(config, session, displayName, fallbackGuestId) {
+  if (!isSupabaseConfigured(config) || !session?.user?.id) return null;
+
+  const safeDisplayName = String(displayName || getAuthDisplayName(session) || "Spieler").trim() || "Spieler";
+  const stableGuestId = getAuthGuestId(session, fallbackGuestId);
+
+  await supabaseRestRequest(config, "/profiles?on_conflict=guest_id", {
+    method: "POST",
+    headers: {
+      Prefer: "resolution=merge-duplicates,return=representation",
+    },
+    body: JSON.stringify({
+      guest_id: stableGuestId,
+      auth_user_id: session.user.id,
+      display_name: safeDisplayName,
+      updated_at: new Date().toISOString(),
+    }),
+  });
+
+  const data = await supabaseRestRequest(
+    config,
+    `/profiles?select=id,guest_id,auth_user_id,display_name&guest_id=eq.${encodeURIComponent(stableGuestId)}&limit=1`,
+    {
+      method: "GET",
+    }
+  );
+
+  return Array.isArray(data) ? data[0] || null : null;
+}
+
 async function testSupabaseConnection(config) {
   const data = await supabaseRestRequest(config, "/rooms?select=code&limit=1", {
     method: "GET",
@@ -3296,7 +3429,7 @@ async function testSupabaseConnection(config) {
   return Array.isArray(data) ? data.length : 0;
 }
 
-async function registerSupabaseRoomEntry(config, { mode, roomCode, name, clientInstanceId }) {
+async function registerSupabaseRoomEntry(config, { mode, roomCode, name, clientInstanceId, authSession }) {
   if (!isSupabaseConfigured(config)) {
     return {
       skipped: true,
@@ -3304,21 +3437,25 @@ async function registerSupabaseRoomEntry(config, { mode, roomCode, name, clientI
     };
   }
 
-  const displayName = String(name || "Spieler").trim() || "Spieler";
+  const displayName = String(name || getAuthDisplayName(authSession) || "Spieler").trim() || "Spieler";
   const normalizedRoomCode = String(roomCode || "").trim().toUpperCase();
-  const guestId = String(clientInstanceId || createId("guest"));
+  const rawGuestId = String(clientInstanceId || createId("guest"));
+  const guestId = getAuthGuestId(authSession, rawGuestId);
+  const profile = authSession?.user?.id ? await createOrUpdateAuthProfile(config, authSession, displayName, rawGuestId) : null;
 
-  await supabaseRestRequest(config, "/profiles?on_conflict=guest_id", {
-    method: "POST",
-    headers: {
-      Prefer: "resolution=merge-duplicates,return=minimal",
-    },
-    body: JSON.stringify({
-      guest_id: guestId,
-      display_name: displayName,
-      updated_at: new Date().toISOString(),
-    }),
-  });
+  if (!authSession?.user?.id) {
+    await supabaseRestRequest(config, "/profiles?on_conflict=guest_id", {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify({
+        guest_id: guestId,
+        display_name: displayName,
+        updated_at: new Date().toISOString(),
+      }),
+    });
+  }
 
   await supabaseRestRequest(config, "/rooms?on_conflict=code", {
     method: "POST",
@@ -3327,11 +3464,12 @@ async function registerSupabaseRoomEntry(config, { mode, roomCode, name, clientI
     },
     body: JSON.stringify({
       code: normalizedRoomCode,
+      host_profile_id: mode === "create" && profile?.id ? profile.id : null,
       host_guest_id: mode === "create" ? guestId : null,
       status: "lobby",
       last_seen_at: new Date().toISOString(),
       metadata: {
-        source: "trackline-phase2",
+        source: "trackline-phase9-auth",
       },
     }),
   });
@@ -3343,21 +3481,30 @@ async function registerSupabaseRoomEntry(config, { mode, roomCode, name, clientI
     },
     body: JSON.stringify({
       room_code: normalizedRoomCode,
+      profile_id: profile?.id || null,
       guest_id: guestId,
       display_name: displayName,
       is_host: mode === "create",
       last_seen_at: new Date().toISOString(),
       metadata: {
-        client_instance_id: guestId,
+        client_instance_id: rawGuestId,
+        auth_user_id: authSession?.user?.id || null,
       },
     }),
   });
 
   return {
     skipped: false,
-    message: mode === "create" ? "Supabase-Raum registriert." : "Supabase-Beitritt registriert.",
+    message: authSession?.user?.id
+      ? mode === "create"
+        ? "Supabase-Raum mit Login-Profil registriert."
+        : "Supabase-Beitritt mit Login-Profil registriert."
+      : mode === "create"
+        ? "Supabase-Raum registriert."
+        : "Supabase-Beitritt registriert.",
   };
 }
+
 
 async function fetchSupabaseRoomPlayers(config, roomCode) {
   if (!isSupabaseConfigured(config)) return [];
@@ -3368,7 +3515,7 @@ async function fetchSupabaseRoomPlayers(config, roomCode) {
 
   const data = await supabaseRestRequest(
     config,
-    `/room_players?select=display_name,is_host,guest_id,last_seen_at,joined_at&room_code=eq.${normalizedRoomCode}&order=is_host.desc,joined_at.asc`,
+    `/room_players?select=display_name,is_host,guest_id,profile_id,last_seen_at,joined_at&room_code=eq.${normalizedRoomCode}&order=is_host.desc,joined_at.asc`,
     {
       method: "GET",
     }
@@ -3379,6 +3526,7 @@ async function fetchSupabaseRoomPlayers(config, roomCode) {
       displayName: String(player.display_name || "").trim(),
       isHost: Boolean(player.is_host),
       guestId: player.guest_id || "",
+      profileId: player.profile_id || "",
       lastSeenAt: player.last_seen_at || "",
       joinedAt: player.joined_at || "",
     }))
@@ -3816,6 +3964,8 @@ export default function App() {
   );
   const [supabaseRoomPlayers, setSupabaseRoomPlayers] = useState([]);
   const [supabaseStatsStatus, setSupabaseStatsStatus] = useState("Noch keine Statistik gespeichert.");
+  const [authSession, setAuthSession] = useState(() => getInitialSupabaseAuthSession());
+  const [authStatus, setAuthStatus] = useState(() => (getInitialSupabaseAuthSession() ? "Angemeldet." : "Gastmodus aktiv."));
   const [showStatsPage, setShowStatsPage] = useState(false);
   const [statsPageStatus, setStatsPageStatus] = useState("Statistiken noch nicht geladen.");
   const [playerStatsRows, setPlayerStatsRows] = useState([]);
@@ -4350,8 +4500,67 @@ export default function App() {
     loadStatsPageData();
   }
 
+
+  async function handleAuthSignUp({ email, password, displayName }) {
+    if (!isSupabaseConfigured(supabaseConfig)) {
+      setAuthStatus("Supabase ist nicht aktiv oder nicht konfiguriert.");
+      return;
+    }
+
+    setAuthStatus("Account wird erstellt...");
+
+    try {
+      const session = await signUpWithSupabase(supabaseConfig, { email, password, displayName });
+
+      if (session?.access_token) {
+        setAuthSession(session);
+        await createOrUpdateAuthProfile(supabaseConfig, session, displayName, clientInstanceId);
+        setPlayerNames([getAuthDisplayName(session) || displayName || email]);
+        setAuthStatus("Account erstellt und angemeldet.");
+      } else {
+        setAuthStatus("Account erstellt. Bitte bestätige ggf. deine E-Mail und melde dich danach an.");
+      }
+    } catch (error) {
+      setAuthStatus(`Registrierung fehlgeschlagen: ${error.message || "Fehler"}`);
+    }
+  }
+
+  async function handleAuthSignIn({ email, password }) {
+    if (!isSupabaseConfigured(supabaseConfig)) {
+      setAuthStatus("Supabase ist nicht aktiv oder nicht konfiguriert.");
+      return;
+    }
+
+    setAuthStatus("Login läuft...");
+
+    try {
+      const session = await signInWithSupabase(supabaseConfig, { email, password });
+      const displayName = getAuthDisplayName(session) || email;
+
+      setAuthSession(session);
+      await createOrUpdateAuthProfile(supabaseConfig, session, displayName, clientInstanceId);
+      setPlayerNames([displayName]);
+      setAuthStatus(`Angemeldet als ${displayName}.`);
+    } catch (error) {
+      setAuthStatus(`Login fehlgeschlagen: ${error.message || "Fehler"}`);
+    }
+  }
+
+  async function handleAuthLogout() {
+    try {
+      if (authSession) {
+        await signOutWithSupabase(supabaseConfig, authSession);
+      }
+    } catch {
+      // local logout should still happen
+    }
+
+    setAuthSession(null);
+    setAuthStatus("Abgemeldet. Gastmodus aktiv.");
+  }
+
   async function applyStartSetup({ mode, name, roomCode: nextRoomCode }) {
-    const safeName = String(name || "").trim() || "Spieler";
+    const safeName = String(name || getAuthDisplayName(authSession) || "").trim() || "Spieler";
     const safeRoomCode = String(nextRoomCode || createRoomCode()).trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || createRoomCode();
 
     setRoomCode(safeRoomCode);
@@ -4373,6 +4582,7 @@ export default function App() {
           roomCode: safeRoomCode,
           name: safeName,
           clientInstanceId,
+          authSession,
         });
         setSupabaseStatus(result.message);
       } catch (error) {
@@ -4540,12 +4750,17 @@ export default function App() {
     return (
       <StartScreen
         initialRoomCode={roomCode}
-        initialName={playerNames[0] || ""}
+        initialName={getAuthDisplayName(authSession) || playerNames[0] || ""}
         socketUrl={socketUrl}
         syncStatus={syncStatus}
         supabaseConfig={supabaseConfig}
         supabaseStatus={supabaseStatus}
         supabaseStatsStatus={supabaseStatsStatus}
+        authSession={authSession}
+        authStatus={authStatus}
+        onAuthSignUp={handleAuthSignUp}
+        onAuthSignIn={handleAuthSignIn}
+        onAuthLogout={handleAuthLogout}
         onSupabaseConfigChange={updateSupabaseConfig}
         onTestSupabase={handleTestSupabaseConnection}
         onOpenStatsPage={openStatsPage}
@@ -4558,7 +4773,7 @@ export default function App() {
     <div style={{ minHeight: "100vh", background: colors.bg, color: colors.text, padding: gameState.phase === "lobby" ? 12 : 8, fontFamily: "Inter, system-ui, sans-serif", overflowX: "hidden" }}>
       <div style={{ maxWidth: gameState.phase === "lobby" ? 1320 : "100%", margin: "0 auto", display: "grid", gap: gameState.phase === "lobby" ? 14 : 8 }}>
         {showAdminPanels ? (
-          <HostControlArea onReset={resetGame} onOpenStatsPage={openStatsPage} isInGame={gameState.phase !== "lobby"}>
+          <HostControlArea onReset={resetGame} onOpenStatsPage={openStatsPage} authSession={authSession} authStatus={authStatus} onAuthLogout={handleAuthLogout} isInGame={gameState.phase !== "lobby"}>
             <WebsiteShareCard
               room={gameState.room}
               roomCode={roomCode}
@@ -5132,6 +5347,113 @@ function PlayerLobbyWaitingView({ roomCode, playerName, supabaseRoomPlayers = []
   );
 }
 
+
+function AuthPanel({ session, status, defaultName, onSignUp, onSignIn, onLogout }) {
+  const [mode, setMode] = useState("signin");
+  const [displayName, setDisplayName] = useState(defaultName || "");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const loggedInName = getAuthDisplayName(session);
+  const canSubmit = email.trim() && password.length >= 6 && (mode === "signin" || displayName.trim());
+
+  useEffect(() => {
+    if (defaultName && !displayName.trim()) {
+      setDisplayName(defaultName);
+    }
+  }, [defaultName]);
+
+  if (session) {
+    return (
+      <Card>
+        <CardContent style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div>
+            <Badge>Login aktiv</Badge>
+            <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5 }}>Angemeldet als {loggedInName || getAuthEmail(session)}</h2>
+            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+              Räume und Statistiken werden mit deinem Profil verknüpft.
+            </p>
+          </div>
+
+          <Button variant="secondary" onClick={onLogout}>
+            Logout
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+          <div>
+            <Badge variant="secondary">Login optional</Badge>
+            <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5 }}>Profil speichern</h2>
+            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+              Mit Login bleiben deine Statistiken langfristig deinem Profil zugeordnet. Ohne Login kannst du weiter als Gast spielen.
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button variant={mode === "signin" ? "primary" : "secondary"} onClick={() => setMode("signin")}>
+              Einloggen
+            </Button>
+            <Button variant={mode === "signup" ? "primary" : "secondary"} onClick={() => setMode("signup")}>
+              Registrieren
+            </Button>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: mode === "signup" ? "minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)" : "minmax(0, 1fr) minmax(0, 1fr)", gap: 10 }}>
+          {mode === "signup" && (
+            <label style={{ display: "grid", gap: 8 }}>
+              <span style={{ color: colors.muted, fontSize: 13 }}>Anzeigename</span>
+              <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="z. B. Christoph" />
+            </label>
+          )}
+
+          <label style={{ display: "grid", gap: 8 }}>
+            <span style={{ color: colors.muted, fontSize: 13 }}>E-Mail</span>
+            <Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" type="email" />
+          </label>
+
+          <label style={{ display: "grid", gap: 8 }}>
+            <span style={{ color: colors.muted, fontSize: 13 }}>Passwort</span>
+            <Input
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="mind. 6 Zeichen"
+              type="password"
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && canSubmit) {
+                  mode === "signin"
+                    ? onSignIn?.({ email, password })
+                    : onSignUp?.({ email, password, displayName });
+                }
+              }}
+            />
+          </label>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ color: colors.muted, fontSize: 12 }}>{status || "Gastmodus aktiv."}</span>
+          <Button
+            onClick={() =>
+              mode === "signin"
+                ? onSignIn?.({ email, password })
+                : onSignUp?.({ email, password, displayName })
+            }
+            disabled={!canSubmit}
+          >
+            {mode === "signin" ? "Einloggen" : "Account erstellen"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function SupabaseFoundationCard({ config, status, statsStatus, onChange, onTest, compact = false, defaultOpen = false }) {
   const enabled = Boolean(config?.enabled);
   const configured = isSupabaseConfigured(config);
@@ -5226,7 +5548,7 @@ function SupabaseFoundationCard({ config, status, statsStatus, onChange, onTest,
 }
 
 
-function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supabaseConfig, supabaseStatus, supabaseStatsStatus, onSupabaseConfigChange, onTestSupabase, onOpenStatsPage, onEnter }) {
+function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supabaseConfig, supabaseStatus, supabaseStatsStatus, authSession, authStatus, onAuthSignUp, onAuthSignIn, onAuthLogout, onSupabaseConfigChange, onTestSupabase, onOpenStatsPage, onEnter }) {
   const [name, setName] = useState(initialName || "");
   const [joinCode, setJoinCode] = useState(String(initialRoomCode || "").toUpperCase());
   const [createdCode, setCreatedCode] = useState(() => createRoomCode());
@@ -5264,6 +5586,14 @@ function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supa
     setCreatedCode(createRoomCode());
   }
 
+  useEffect(() => {
+    const authName = getAuthDisplayName(authSession);
+
+    if (authName && !name.trim()) {
+      setName(authName);
+    }
+  }, [authSession?.user?.id]);
+
   const canContinue = String(name || "").trim().length > 0;
 
   return (
@@ -5282,6 +5612,15 @@ function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supa
             </Button>
           </div>
         </header>
+
+        <AuthPanel
+          session={authSession}
+          status={authStatus}
+          defaultName={name}
+          onSignUp={onAuthSignUp}
+          onSignIn={onAuthSignIn}
+          onLogout={onAuthLogout}
+        />
 
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 16 }}>
           <Card>
@@ -5368,7 +5707,7 @@ function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supa
   );
 }
 
-function Header({ onReset, onOpenStatsPage, isInGame }) {
+function Header({ onReset, onOpenStatsPage, authSession, authStatus, onAuthLogout, isInGame }) {
   return (
     <header style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
       <div>
@@ -5376,7 +5715,15 @@ function Header({ onReset, onOpenStatsPage, isInGame }) {
         <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>Privates Musik-Timeline-Quiz als Web-Spiel</p>
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        {authSession && (
+          <Badge variant="secondary">{getAuthDisplayName(authSession) || getAuthEmail(authSession)}</Badge>
+        )}
+        {authSession && onAuthLogout && (
+          <Button variant="secondary" onClick={onAuthLogout}>
+            Logout
+          </Button>
+        )}
         {onOpenStatsPage && (
           <Button variant="secondary" onClick={onOpenStatsPage}>
             Statistiken
@@ -5392,7 +5739,7 @@ function Header({ onReset, onOpenStatsPage, isInGame }) {
 }
 
 
-function HostControlArea({ children, onReset, onOpenStatsPage, isInGame }) {
+function HostControlArea({ children, onReset, onOpenStatsPage, authSession, authStatus, onAuthLogout, isInGame }) {
   return (
     <details
       open={!isInGame}
@@ -5434,7 +5781,7 @@ function HostControlArea({ children, onReset, onOpenStatsPage, isInGame }) {
       </summary>
 
       <div style={{ display: "grid", gap: 12, padding: "0 12px 12px" }}>
-        <Header onReset={onReset} onOpenStatsPage={onOpenStatsPage} isInGame={isInGame} />
+        <Header onReset={onReset} onOpenStatsPage={onOpenStatsPage} authSession={authSession} authStatus={authStatus} onAuthLogout={onAuthLogout} isInGame={isInGame} />
         {children}
       </div>
     </details>
