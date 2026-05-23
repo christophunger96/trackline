@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { io } from "socket.io-client";
 
 const colors = {
   bg: "#020617",
@@ -43,7 +42,7 @@ const SYNC_SOCKET_URL_STORAGE_KEY = "trackline.sync.socketUrl";
 const SYNC_ENABLED_STORAGE_KEY = "trackline.sync.enabled";
 const CLIENT_INSTANCE_ID_STORAGE_KEY = "trackline.clientInstanceId.v1";
 const VIEWER_PLAYER_STORAGE_PREFIX = "trackline.viewerPlayer.v1.";
-const DEFAULT_SYNC_SOCKET_URL = import.meta.env?.VITE_SOCKET_URL || "http://127.0.0.1:3001";
+const DEFAULT_SYNC_SOCKET_URL = import.meta.env?.VITE_SOCKET_URL || "optional: https://dein-render-server.onrender.com";
 const SUPABASE_URL_STORAGE_KEY = "trackline.supabase.url";
 const SUPABASE_ANON_KEY_STORAGE_KEY = "trackline.supabase.anonKey";
 const SUPABASE_ENABLED_STORAGE_KEY = "trackline.supabase.enabled";
@@ -3664,6 +3663,102 @@ function formatStatsDate(value) {
 }
 
 
+function createSupabaseSyncedState(state, action = {}) {
+  return {
+    ...state,
+    syncMeta: {
+      version: Date.now(),
+      actionType: action.type || "UNKNOWN",
+      actorPlayerId: action.actorPlayerId || null,
+      actorName: action.actorName || "",
+      updatedAt: new Date().toISOString(),
+    },
+  };
+}
+
+async function upsertSupabaseGameState(config, roomCode, nextState, action = {}) {
+  if (!isSupabaseConfigured(config)) {
+    return {
+      skipped: true,
+      message: "Supabase nicht aktiv.",
+    };
+  }
+
+  const normalizedRoomCode = String(roomCode || nextState?.room?.code || "").trim().toUpperCase();
+
+  if (!normalizedRoomCode) {
+    throw new Error("Raumcode fehlt.");
+  }
+
+  const syncedState = createSupabaseSyncedState(nextState, action);
+
+  await supabaseRestRequest(config, "/game_states?on_conflict=room_code", {
+    method: "POST",
+    headers: {
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body: JSON.stringify({
+      room_code: normalizedRoomCode,
+      state: syncedState,
+      updated_at: new Date().toISOString(),
+    }),
+  });
+
+  await supabaseRestRequest(config, `/rooms?code=eq.${encodeURIComponent(normalizedRoomCode)}`, {
+    method: "PATCH",
+    headers: {
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({
+      status: syncedState.phase || "lobby",
+      updated_at: new Date().toISOString(),
+      last_seen_at: new Date().toISOString(),
+    }),
+  });
+
+  return {
+    skipped: false,
+    state: syncedState,
+    message: `Supabase GameState gespeichert: ${action.type || "Aktion"}.`,
+  };
+}
+
+async function fetchSupabaseGameState(config, roomCode) {
+  if (!isSupabaseConfigured(config)) return null;
+
+  const normalizedRoomCode = String(roomCode || "").trim().toUpperCase();
+
+  if (!normalizedRoomCode) return null;
+
+  const data = await supabaseRestRequest(
+    config,
+    `/game_states?select=state,updated_at&room_code=eq.${encodeURIComponent(normalizedRoomCode)}&limit=1`,
+    {
+      method: "GET",
+    }
+  );
+
+  const row = Array.isArray(data) ? data[0] : null;
+
+  return row?.state || null;
+}
+
+async function clearSupabaseGameState(config, roomCode) {
+  if (!isSupabaseConfigured(config)) return;
+
+  const normalizedRoomCode = String(roomCode || "").trim().toUpperCase();
+
+  if (!normalizedRoomCode) return;
+
+  await supabaseRestRequest(config, `/game_states?room_code=eq.${encodeURIComponent(normalizedRoomCode)}`, {
+    method: "DELETE",
+    headers: {
+      Prefer: "return=minimal",
+    },
+  });
+}
+
+
 function getInitialSocketUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -3724,9 +3819,9 @@ export default function App() {
   const [activeJokerBusy, setActiveJokerBusy] = useState(false);
   const [activeJokerFeedback, setActiveJokerFeedback] = useState(null);
 
-  const socketRef = useRef(null);
   const lastRemoteStateRef = useRef("");
   const lastEmittedStateRef = useRef("");
+  const currentGameStateRef = useRef(gameState);
 
   const fullDeck = useMemo(() => dedupeTrackDeck([...BASE_TRACK_DECK, ...THEME_TRACK_DECK, ...CATEGORY_EXPANSION_TRACKS, ...VINTAGE_EXPANSION_TRACKS, ...ERA_BALANCE_EXPANSION_TRACKS, ...customTracks]), [customTracks]);
   const presetDeck = useMemo(() => dedupeTrackDeck(filterDeckByPreset(fullDeck, selectedPreset)), [fullDeck, selectedPreset]);
@@ -3741,20 +3836,17 @@ export default function App() {
     if (viewerPlayerId === "auto-host") return gameState.room?.hostPlayerId || "spectator";
 
     if (viewerPlayerId === "auto-player") {
+      const localName = playerNames[0];
+      const playerByName = gameState.players.find((player) => player.name === localName && player.id !== gameState.room?.hostPlayerId);
+
+      if (playerByName) return playerByName.id;
+
       const storedPlayerId = getStoredViewerPlayerId(activeRoomCode);
       const storedPlayer = gameState.players.find((player) => player.id === storedPlayerId);
 
       if (storedPlayer && storedPlayer.id !== gameState.room?.hostPlayerId) return storedPlayer.id;
 
-      const claimedByOther = new Set(
-        roomClients
-          .filter((client) => client.clientInstanceId && client.clientInstanceId !== clientInstanceId)
-          .map((client) => client.playerId)
-          .filter(Boolean)
-      );
-
       return (
-        gameState.players.find((player) => player.id !== gameState.room?.hostPlayerId && !claimedByOther.has(player.id))?.id ||
         gameState.players.find((player) => player.id !== gameState.room?.hostPlayerId)?.id ||
         "spectator"
       );
@@ -3771,6 +3863,10 @@ export default function App() {
   const leaderboard = useMemo(() => {
     return [...gameState.players].sort((a, b) => b.score - a.score || a.wrong - b.wrong);
   }, [gameState.players]);
+
+  useEffect(() => {
+    currentGameStateRef.current = gameState;
+  }, [gameState]);
 
   useEffect(() => {
     localStorage.setItem(CUSTOM_TRACKS_STORAGE_KEY, JSON.stringify(customTracks));
@@ -3813,6 +3909,7 @@ export default function App() {
         if (cancelled) return;
 
         setSupabaseRoomPlayers(players);
+        setSyncClientCount(Math.max(1, players.length));
 
         const mergedNames = mergePlayerNamesWithSupabase(playerNames, players);
 
@@ -3902,111 +3999,68 @@ export default function App() {
 
   useEffect(() => {
     if (!syncEnabled) {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
-
-      setSyncStatus("Sync deaktiviert.");
+      setSyncStatus("Supabase Sync deaktiviert.");
       setSyncClientCount(1);
-      return;
+      return undefined;
     }
 
-    const activeRoomCode = gameState.room?.code || roomCode;
-    const socket = io(socketUrl, {
-      transports: ["websocket", "polling"],
-    });
+    if (!isSupabaseConfigured(supabaseConfig)) {
+      setSyncStatus("Supabase Sync wartet auf Konfiguration.");
+      return undefined;
+    }
 
-    socketRef.current = socket;
-    setSyncStatus("Sync verbindet...");
+    let cancelled = false;
+    const activeCode = String(gameState.room?.code || roomCode || "").trim().toUpperCase();
 
-    socket.on("connect", () => {
-      setSyncStatus(`Sync verbunden: ${socket.id}`);
-      socket.emit("room:join", {
-        roomCode: activeRoomCode,
-        playerName: playerNames[0] || "Spieler",
-        clientInstanceId,
-      });
-    });
+    async function loadSupabaseGameState({ quiet = false } = {}) {
+      if (!activeCode) return;
 
-    socket.on("connect_error", (error) => {
-      setSyncStatus(`Sync Fehler: ${error.message}`);
-    });
+      try {
+        const remoteState = await fetchSupabaseGameState(supabaseConfig, activeCode);
 
-    socket.on("disconnect", () => {
-      setSyncStatus("Sync getrennt.");
-      setSyncClientCount(1);
-    });
+        if (cancelled || !remoteState) {
+          if (!quiet && !cancelled) setSyncStatus(`Supabase Sync bereit: Raum ${activeCode}`);
+          return;
+        }
 
-    socket.on("room:joined", ({ roomCode: joinedRoomCode, gameState: remoteGameState, clientCount, clients }) => {
-      setSyncStatus(`Raum ${joinedRoomCode} verbunden.`);
-      setSyncClientCount(clientCount || 1);
-      setRoomClients(Array.isArray(clients) ? clients : []);
+        const serializedRemoteState = JSON.stringify(remoteState);
+        const serializedLocalState = JSON.stringify(currentGameStateRef.current);
 
-      if (remoteGameState && remoteGameState.phase !== "lobby") {
-        const serializedRemoteState = JSON.stringify(remoteGameState);
-        lastRemoteStateRef.current = serializedRemoteState;
-        lastEmittedStateRef.current = serializedRemoteState;
-        dispatch({ type: "SERVER_STATE_RECEIVED", gameState: remoteGameState });
+        if (serializedRemoteState !== serializedLocalState && serializedRemoteState !== lastRemoteStateRef.current) {
+          lastRemoteStateRef.current = serializedRemoteState;
+          lastEmittedStateRef.current = serializedRemoteState;
+          dispatch({ type: "SERVER_STATE_RECEIVED", gameState: remoteState });
+
+          if (!quiet) setSyncStatus(`Supabase Sync aktualisiert: ${activeCode}`);
+          return;
+        }
+
+        if (!quiet) setSyncStatus(`Supabase Sync verbunden: ${activeCode}`);
+      } catch (error) {
+        if (!cancelled) {
+          setSyncStatus(`Supabase Sync Fehler: ${error.message || "Fehler"}`);
+        }
       }
-    });
+    }
 
-    socket.on("room:state", ({ gameState: remoteGameState, clientCount, clients }) => {
-      setSyncClientCount(clientCount || 1);
-      if (Array.isArray(clients)) setRoomClients(clients);
+    loadSupabaseGameState();
 
-      if (!remoteGameState) return;
-
-      const serializedRemoteState = JSON.stringify(remoteGameState);
-      if (serializedRemoteState === lastEmittedStateRef.current) return;
-
-      lastRemoteStateRef.current = serializedRemoteState;
-      lastEmittedStateRef.current = serializedRemoteState;
-      dispatch({ type: "SERVER_STATE_RECEIVED", gameState: remoteGameState });
-    });
-
-    socket.on("room:presence", ({ clientCount, clients }) => {
-      setSyncClientCount(clientCount || 1);
-      setRoomClients(Array.isArray(clients) ? clients : []);
-    });
-
-    socket.on("room:claimResult", ({ ok, playerId, playerName, message }) => {
-      if (ok) {
-        setSyncStatus(`${playerName || "Spieler"} verbunden.`);
-        storeViewerPlayerId(activeRoomCode, playerId);
-      } else {
-        setSyncStatus(`Namensauswahl abgelehnt: ${message}`);
-      }
-    });
-
-    socket.on("room:error", ({ message }) => {
-      setSyncStatus(`Sync Aktion abgelehnt: ${message}`);
-    });
+    const intervalId = window.setInterval(() => {
+      loadSupabaseGameState({ quiet: true });
+    }, 1200);
 
     return () => {
-      socket.disconnect();
-      if (socketRef.current === socket) {
-        socketRef.current = null;
-      }
+      cancelled = true;
+      window.clearInterval(intervalId);
     };
-  }, [syncEnabled, socketUrl, roomCode, gameState.room?.code, playerNames[0], clientInstanceId]);
-
-  useEffect(() => {
-    const socket = socketRef.current;
-    if (!syncEnabled || !socket?.connected) return;
-    if (viewerPlayerId === "auto-host") return;
-    if (!resolvedViewerPlayerId || resolvedViewerPlayerId === "spectator") return;
-
-    const activeRoomCode = gameState.room?.code || roomCode;
-    const claimedPlayer = gameState.players.find((player) => player.id === resolvedViewerPlayerId);
-
-    socket.emit("room:claimPlayer", {
-      roomCode: activeRoomCode,
-      playerId: resolvedViewerPlayerId,
-      playerName: claimedPlayer?.name || playerNames[0] || "Spieler",
-      clientInstanceId,
-    });
-  }, [syncEnabled, viewerPlayerId, resolvedViewerPlayerId, gameState.room?.code, roomCode, gameState.players, playerNames, clientInstanceId]);
+  }, [
+    syncEnabled,
+    supabaseConfig.enabled,
+    supabaseConfig.url,
+    supabaseConfig.anonKey,
+    roomCode,
+    gameState.room?.code,
+  ]);
 
   useEffect(() => {
     if (!resolvedViewerPlayerId || resolvedViewerPlayerId === "spectator" || resolvedViewerPlayerId.startsWith("auto-")) return;
@@ -4165,7 +4219,7 @@ export default function App() {
     const serverBaseUrl = String(socketUrl || "").trim().replace(/\/+$/, "");
 
     if (!serverBaseUrl) {
-      window.alert("Socket Server URL fehlt. Der Host muss die Server-URL setzen.");
+      window.alert("Optionaler Spotify/Auth Server fehlt. Der Host muss die Server-URL setzen.");
       return;
     }
 
@@ -4196,8 +4250,7 @@ export default function App() {
     }
   }
 
-  function sendGameAction(action) {
-    const socket = socketRef.current;
+  async function sendGameAction(action) {
     const actorPlayerId = resolvedViewerPlayerId || null;
     const actorPlayer = gameState.players.find((player) => player.id === actorPlayerId);
     const actionWithActor = {
@@ -4206,16 +4259,25 @@ export default function App() {
       actorName: actorPlayer?.name || playerNames[0] || "Spieler",
     };
 
+    const nextState = gameReducer(gameState, actionWithActor);
+    const syncedState = createSupabaseSyncedState(nextState, actionWithActor);
+    const serializedNextState = JSON.stringify(syncedState);
 
-    if (syncEnabled && socket?.connected) {
-      socket.emit("room:event", {
-        roomCode: activeRoomCode,
-        action: actionWithActor,
-      });
+    lastRemoteStateRef.current = serializedNextState;
+    lastEmittedStateRef.current = serializedNextState;
+    dispatch({ type: "SERVER_STATE_RECEIVED", gameState: syncedState });
+
+    if (!syncEnabled || !isSupabaseConfigured(supabaseConfig)) {
+      setSyncStatus("Aktion lokal ausgeführt. Supabase Sync ist nicht aktiv.");
       return;
     }
 
-    dispatch(actionWithActor);
+    try {
+      await upsertSupabaseGameState(supabaseConfig, activeRoomCode, nextState, actionWithActor);
+      setSyncStatus(`Supabase Sync gespeichert: ${action.type}`);
+    } catch (error) {
+      setSyncStatus(`Supabase Sync speichern fehlgeschlagen: ${error.message || "Fehler"}`);
+    }
   }
 
   function updateSupabaseConfig(patch) {
@@ -4420,8 +4482,17 @@ export default function App() {
     });
   }
 
-  function resetGame() {
+  async function resetGame() {
     localStorage.removeItem(GAME_STATE_STORAGE_KEY);
+
+    if (isSupabaseConfigured(supabaseConfig)) {
+      try {
+        await clearSupabaseGameState(supabaseConfig, activeRoomCode);
+      } catch {
+        // local reset should still work even if remote clearing fails
+      }
+    }
+
     setShowStartScreen(true);
     sendGameAction({ type: "RESET_GAME" });
   }
@@ -5407,10 +5478,10 @@ function MultiplayerSyncCard({ roomCode, socketUrl, setSocketUrl, syncEnabled, s
       <CardContent style={{ display: "grid", gap: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
           <div>
-            <Badge variant="secondary">Multiplayer Sync</Badge>
-            <h2 style={{ margin: "10px 0 6px" }}>Room-State synchronisieren</h2>
+            <Badge variant="secondary">Supabase Spielsync</Badge>
+            <h2 style={{ margin: "10px 0 6px" }}>GameState über Supabase synchronisieren</h2>
             <p style={{ margin: 0, color: colors.muted }}>
-              Verbindet alle Browser mit gleichem Raumcode. Clients senden nur Aktionen; der Server berechnet den GameState.
+              Verbindet alle Browser mit gleichem Raumcode über Supabase. Render/Socket.io wird für den Spielsync nicht mehr genutzt.
             </p>
           </div>
 
@@ -5422,16 +5493,16 @@ function MultiplayerSyncCard({ roomCode, socketUrl, setSocketUrl, syncEnabled, s
 
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, alignItems: "end" }}>
           <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: colors.muted, fontSize: 14 }}>Socket Server URL</span>
+            <span style={{ color: colors.muted, fontSize: 14 }}>Optionaler Spotify/Auth Server</span>
             <Input
               value={socketUrl}
               onChange={(event) => setSocketUrl(event.target.value)}
-              placeholder="http://127.0.0.1:3001"
+              placeholder="optional: https://dein-render-server.onrender.com"
             />
           </label>
 
           <Button variant={syncEnabled ? "danger" : "primary"} onClick={() => setSyncEnabled(!syncEnabled)}>
-            {syncEnabled ? "Sync trennen" : "Sync verbinden"}
+            {syncEnabled ? "Supabase Sync trennen" : "Supabase Sync verbinden"}
           </Button>
         </div>
 
@@ -5443,8 +5514,7 @@ function MultiplayerSyncCard({ roomCode, socketUrl, setSocketUrl, syncEnabled, s
         <div style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 14, background: colors.bg }}>
           <p style={{ margin: "0 0 6px", fontWeight: 800 }}>Testablauf</p>
           <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-            Oeffne denselben Raum in zwei Browserfenstern oder bei zwei Freunden, stelle denselben Raumcode ein und aktiviere Sync.
-            Aktionen wie Spielstart, Song ziehen, Platzierung und Reveal werden an den Server gesendet und dann an alle Clients verteilt.
+            Oeffne denselben Raum in zwei Browserfenstern oder bei zwei Freunden. Aktionen wie Spielstart, Song ziehen, Platzierung und Reveal werden in Supabase gespeichert und von allen Clients geladen.
           </p>
         </div>
       </CardContent>
@@ -5481,7 +5551,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
   function getSpotifyServerRedirectUri() {
     const baseUrl = getSpotifyAuthServerBaseUrl();
 
-    if (!baseUrl) return "Socket Server URL fehlt";
+    if (!baseUrl) return "Optionaler Spotify/Auth Server fehlt";
 
     return `${baseUrl}/spotify/callback`;
   }
@@ -5490,7 +5560,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
     const baseUrl = getSpotifyAuthServerBaseUrl();
 
     if (!baseUrl) {
-      throw new Error("Socket Server URL fehlt.");
+      throw new Error("Optionaler Spotify/Auth Server fehlt.");
     }
 
     return `${baseUrl}/room/${encodeURIComponent(roomCode)}/spotify${path}`;
@@ -5658,7 +5728,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
     const baseUrl = getSpotifyAuthServerBaseUrl();
 
     if (!baseUrl) {
-      throw new Error("Bitte zuerst eine Socket Server URL eintragen.");
+      throw new Error("Bitte zuerst eine Optionaler Spotify/Auth Server eintragen.");
     }
 
     const response = await fetch(`${baseUrl}/spotify/create-login`, {
