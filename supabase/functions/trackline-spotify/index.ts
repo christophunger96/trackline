@@ -8,6 +8,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SPOTIFY_ACCOUNTS_BASE = "https://accounts.spotify.com";
 const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
 const DEFAULT_PLAY_LIMIT_SECONDS = 20;
+const CANONICAL_SPOTIFY_REDIRECT_URI =
+  Deno.env.get("SPOTIFY_REDIRECT_URI") ||
+  "https://cdjgxdffyqnsuxdxuplf.functions.supabase.co/trackline-spotify/spotify/callback";
 const SPOTIFY_SCOPES = [
   "streaming",
   "user-read-email",
@@ -107,6 +110,11 @@ function getFunctionBaseUrl(req: Request) {
   const url = new URL(req.url);
   const pathname = url.pathname;
 
+  // Supabase Edge Functions may receive an internal/proxied URL.
+  // Spotify requires the redirect_uri to match the dashboard entry exactly,
+  // so force the public HTTPS protocol for callbacks.
+  url.protocol = "https:";
+
   if (pathname.includes("/spotify/")) {
     url.pathname = pathname.replace(/\/spotify\/.*$/, "");
   } else if (pathname.includes("/room/")) {
@@ -114,15 +122,40 @@ function getFunctionBaseUrl(req: Request) {
   }
 
   url.search = "";
+  url.hash = "";
   return url.toString().replace(/\/+$/, "");
 }
 
-function getCallbackUrl(req: Request) {
-  return `${getFunctionBaseUrl(req)}/spotify/callback`;
+function getCallbackUrl(_req: Request) {
+  // Spotify requires the redirect_uri to match the Developer Dashboard entry exactly.
+  // Do not derive this from the incoming Supabase request URL, because the same
+  // Edge Function can be reached through different public URLs.
+  return CANONICAL_SPOTIFY_REDIRECT_URI;
 }
 
 function safeJsonError(error: unknown) {
-  return error instanceof Error ? error.message : String(error || "Unbekannter Fehler");
+  if (error instanceof Error) return error.message;
+
+  if (typeof error === "object" && error !== null) {
+    const err = error as Record<string, unknown>;
+    const message =
+      err.message ||
+      err.error_description ||
+      err.error ||
+      err.details ||
+      err.hint ||
+      err.code;
+
+    if (message) return String(message);
+
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return "Unbekannter Objekt-Fehler";
+    }
+  }
+
+  return String(error || "Unbekannter Fehler");
 }
 
 async function spotifyTokenRequest(form: URLSearchParams) {
@@ -168,7 +201,9 @@ async function saveRoomSpotify(admin: ReturnType<typeof createClient>, roomCode:
       },
     );
 
-  if (error) throw error;
+  if (error) {
+    throw new Error(error.message || JSON.stringify(error));
+  }
 }
 
 async function refreshAccessTokenIfNeeded(admin: ReturnType<typeof createClient>, room: any) {
@@ -220,6 +255,13 @@ async function spotifyFetch(admin: ReturnType<typeof createClient>, room: any, u
 
   if (!response.ok) {
     const text = await response.text();
+
+    if (response.status === 404) {
+      throw new Error(
+        `Spotify Fehler 404: Kein aktiver Spotify-Kontext gefunden. Starte im Host-Spotify einmal manuell einen Song im Jam und versuche es erneut. Details: ${text || response.statusText}`
+      );
+    }
+
     throw new Error(`Spotify Fehler ${response.status}: ${text || response.statusText}`);
   }
 
@@ -461,7 +503,9 @@ async function saveDevice(req: Request, roomCode: string) {
   const deviceId = String(body.deviceId || "").trim();
   const deviceName = String(body.deviceName || "Spotify-Geraet").trim();
 
-  if (!deviceId) throw new Error("deviceId fehlt.");
+  if (!deviceId || deviceId === "undefined" || deviceId === "null" || deviceId === "[object Object]") {
+    throw new Error("deviceId fehlt oder ist ungueltig. Bitte Spotify-Geraete neu laden und ein echtes Zielgeraet auswaehlen.");
+  }
 
   await getRoomSpotify(admin, roomCode);
   await saveRoomSpotify(admin, roomCode, {
@@ -485,21 +529,20 @@ async function play(req: Request, roomCode: string) {
   const body = await readJsonBody(req);
   const room = await getRoomSpotify(admin, roomCode);
   const track = body.track || await getCurrentTrackFromSupabase(admin, roomCode);
-  const jamMode = Boolean(body.jamMode || body.playbackMode === "jam");
+  const requestedJamMode = Boolean(body.jamMode || body.playbackMode === "jam" || body.useActiveContext);
+  const useActiveSpotifyContext = requestedJamMode || !room.device_id;
   const playLimitSeconds = Math.max(1, Math.min(120, Math.round(Number(body.playLimitSeconds || DEFAULT_PLAY_LIMIT_SECONDS))));
 
   if (!track) throw new Error("Kein aktueller Song im Raum.");
 
-  if (!jamMode && !room.device_id) {
-    throw new Error("Kein Spotify-Zielgeraet gespeichert. Host muss Geraete laden und Zielgeraet speichern.");
-  }
-
   const spotifyUri = await searchSpotifyUri(admin, room, track);
 
-  if (jamMode) {
-    // Jam mode: do not transfer playback and do not force a device_id.
-    // Spotify should use the currently active playback context of the host account,
-    // which is the closest Web API-compatible behavior to an existing Spotify Jam.
+  if (useActiveSpotifyContext) {
+    // Active-context mode:
+    // - Jam mode explicitly uses this path.
+    // - If no device is saved, we also use this path instead of failing.
+    // This prevents player browsers from getting "Kein Spotify-Zielgeraet gespeichert"
+    // while the host already has an active Spotify/Jam session.
     await spotifyFetch(admin, room, `${SPOTIFY_API_BASE}/me/player/play`, {
       method: "PUT",
       headers: {
@@ -513,11 +556,12 @@ async function play(req: Request, roomCode: string) {
     return json({
       roomCode,
       ok: true,
-      jamMode: true,
+      jamMode: requestedJamMode,
+      activeContext: true,
       trackId: track.id,
       hiddenLabel: "Verdeckter Song",
       deviceId: "",
-      deviceName: "Aktiver Spotify/Jam-Kontext",
+      deviceName: requestedJamMode ? "Aktiver Spotify/Jam-Kontext" : "Aktiver Spotify-Kontext",
       playLimitSeconds,
     });
   }
@@ -549,6 +593,7 @@ async function play(req: Request, roomCode: string) {
     roomCode,
     ok: true,
     jamMode: false,
+    activeContext: false,
     trackId: track.id,
     hiddenLabel: "Verdeckter Song",
     deviceId: room.device_id,
@@ -561,9 +606,10 @@ async function pause(req: Request, roomCode: string) {
   const admin = getSupabaseAdmin();
   const body = await readJsonBody(req);
   const room = await getRoomSpotify(admin, roomCode);
-  const jamMode = Boolean(body.jamMode || body.playbackMode === "jam");
+  const requestedJamMode = Boolean(body.jamMode || body.playbackMode === "jam" || body.useActiveContext);
+  const useActiveSpotifyContext = requestedJamMode || !room.device_id;
 
-  if (jamMode) {
+  if (useActiveSpotifyContext) {
     await spotifyFetch(admin, room, `${SPOTIFY_API_BASE}/me/player/pause`, {
       method: "PUT",
     });
@@ -571,11 +617,10 @@ async function pause(req: Request, roomCode: string) {
     return json({
       roomCode,
       ok: true,
-      jamMode: true,
+      jamMode: requestedJamMode,
+      activeContext: true,
     });
   }
-
-  if (!room.device_id) throw new Error("Kein Spotify-Zielgeraet gespeichert.");
 
   await spotifyFetch(admin, room, `${SPOTIFY_API_BASE}/me/player/pause?device_id=${encodeURIComponent(room.device_id)}`, {
     method: "PUT",
@@ -585,6 +630,7 @@ async function pause(req: Request, roomCode: string) {
     roomCode,
     ok: true,
     jamMode: false,
+    activeContext: false,
   });
 }
 

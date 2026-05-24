@@ -65,6 +65,7 @@ const SPOTIFY_SCOPES = [
 ].join(" ");
 
 const SPOTIFY_PLAY_EVENT_NAME = "trackline.spotify.playCurrent";
+const SPOTIFY_CANONICAL_REDIRECT_URI = "https://cdjgxdffyqnsuxdxuplf.functions.supabase.co/trackline-spotify/spotify/callback";
 const DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS = 20;
 const PLAY_LIMIT_OPTIONS = [10, 20, 30];
 const DIFFICULTY_OPTIONS = [
@@ -6448,11 +6449,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
   }
 
   function getSpotifyServerRedirectUri() {
-    const baseUrl = getSpotifyAuthServerBaseUrl();
-
-    if (!baseUrl) return "Legacy Spotify/Auth Server fehlt";
-
-    return `${baseUrl}/spotify/callback`;
+    return SPOTIFY_CANONICAL_REDIRECT_URI;
   }
 
   function getRoomSpotifyUrl(path = "") {
