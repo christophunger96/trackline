@@ -3370,6 +3370,17 @@ function getInitialViewerPlayerId() {
   return "auto-host";
 }
 
+function getInitialPlayerAccessLocked() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const roleFromUrl = params.get("role");
+
+    return roleFromUrl === "player";
+  } catch {
+    return false;
+  }
+}
+
 function getClientInstanceId() {
   try {
     const existingId = localStorage.getItem(CLIENT_INSTANCE_ID_STORAGE_KEY);
@@ -3742,6 +3753,7 @@ export default function App() {
     isDiscordLikeEnvironment() ? "Web-App erkannt." : "Browsermodus."
   );
   const [viewerPlayerId, setViewerPlayerId] = useState(() => getInitialViewerPlayerId());
+  const [playerAccessLocked, setPlayerAccessLocked] = useState(() => getInitialPlayerAccessLocked());
   const [socketUrl, setSocketUrl] = useState(() => getInitialSocketUrl());
   const [syncEnabled, setSyncEnabled] = useState(() => getInitialSyncEnabled());
   const [syncStatus, setSyncStatus] = useState("Sync nicht verbunden.");
@@ -3785,13 +3797,13 @@ export default function App() {
   const socketDisplayName = localDisplayName || "Gast";
 
   const resolvedViewerPlayerId = (() => {
-    if (viewerPlayerId === "auto-host") return gameState.room?.hostPlayerId || "spectator";
+    const hostPlayerId = gameState.room?.hostPlayerId || null;
 
-    if (viewerPlayerId === "auto-player") {
+    const getAutoPlayerId = () => {
       const storedPlayerId = getStoredViewerPlayerId(activeRoomCode);
       const storedPlayer = gameState.players.find((player) => player.id === storedPlayerId);
 
-      if (storedPlayer && storedPlayer.id !== gameState.room?.hostPlayerId) return storedPlayer.id;
+      if (storedPlayer && storedPlayer.id !== hostPlayerId) return storedPlayer.id;
 
       const claimedByOther = new Set(
         roomClients
@@ -3803,7 +3815,7 @@ export default function App() {
       const matchingLocalPlayer = localDisplayName
         ? gameState.players.find(
             (player) =>
-              player.id !== gameState.room?.hostPlayerId &&
+              player.id !== hostPlayerId &&
               player.name?.toLowerCase() === localDisplayName.toLowerCase() &&
               !claimedByOther.has(player.id)
           )
@@ -3812,18 +3824,30 @@ export default function App() {
       if (matchingLocalPlayer) return matchingLocalPlayer.id;
 
       return (
-        gameState.players.find((player) => player.id !== gameState.room?.hostPlayerId && !claimedByOther.has(player.id))?.id ||
-        gameState.players.find((player) => player.id !== gameState.room?.hostPlayerId)?.id ||
+        gameState.players.find((player) => player.id !== hostPlayerId && !claimedByOther.has(player.id))?.id ||
+        gameState.players.find((player) => player.id !== hostPlayerId)?.id ||
         "spectator"
       );
+    };
+
+    if (playerAccessLocked) {
+      const selectedPlayer = gameState.players.find((player) => player.id === viewerPlayerId);
+
+      if (selectedPlayer && selectedPlayer.id !== hostPlayerId) return selectedPlayer.id;
+
+      return getAutoPlayerId();
     }
+
+    if (viewerPlayerId === "auto-host") return hostPlayerId || "spectator";
+
+    if (viewerPlayerId === "auto-player") return getAutoPlayerId();
 
     return viewerPlayerId;
   })();
   const viewerRole = getViewerRoleFromPlayer(resolvedViewerPlayerId, gameState);
   const viewerPermissions = getViewerPermissions(viewerRole);
-  const isPlayerJoinView = viewerPlayerId === "auto-player";
-  const isHostSetupView = !isPlayerJoinView && (viewerPlayerId === "auto-host" || viewerRole === "host");
+  const isPlayerJoinView = playerAccessLocked || viewerPlayerId === "auto-player";
+  const isHostSetupView = !playerAccessLocked && !isPlayerJoinView && (viewerPlayerId === "auto-host" || viewerRole === "host");
   const showAdminPanels = gameState.phase === "lobby" ? isHostSetupView : viewerRole === "host";
   const showSpotifyPanel = showAdminPanels;
   const showLobbyHostView = gameState.phase === "lobby" && isHostSetupView;
@@ -4257,6 +4281,7 @@ export default function App() {
 
     setRoomCode(safeCode);
     setViewerPlayerId("auto-player");
+    setPlayerAccessLocked(true);
     storeViewerPlayerId(safeCode, "auto-player");
     setSyncEnabled(true);
     setSyncStatus(`Du trittst Raum ${safeCode} als ${socketDisplayName || "Gast"} bei...`);
@@ -4272,6 +4297,7 @@ export default function App() {
   }
 
   function switchToHostView() {
+    setPlayerAccessLocked(false);
     setViewerPlayerId("auto-host");
     setSyncEnabled(true);
     updateBrowserRoomUrl(roomCode, "");
@@ -4710,6 +4736,7 @@ export default function App() {
                       })
                     }
                     canPlace={viewerPermissions.canPlace}
+                    viewerRole={viewerRole}
                   />
 
                   {gameState.lastResult && (
@@ -4749,6 +4776,8 @@ export default function App() {
                 roomClients={roomClients}
                 clientInstanceId={clientInstanceId}
                 roomCode={activeRoomCode}
+                playerAccessLocked={playerAccessLocked}
+                hostPlayerId={gameState.room?.hostPlayerId}
               />
 
               <Leaderboard players={leaderboard} />
@@ -4933,16 +4962,14 @@ function PlayerLobbyWaitingCard({ roomCode, syncStatus, syncEnabled, syncClientC
       </main>
 
       <aside style={{ display: "grid", gap: 12, minWidth: 0 }}>
-        <LocalRoleCard
-          viewerPlayerId={viewerPlayerId}
-          setViewerPlayerId={setViewerPlayerId}
-          viewerRole={viewerRole}
-          permissions={getViewerPermissions(viewerRole)}
-          players={visiblePlayers}
-          roomClients={roomClients}
-          clientInstanceId={clientInstanceId}
-          roomCode={roomCode}
-        />
+        <Card>
+          <CardContent style={{ display: "grid", gap: 10 }}>
+            <Badge variant="secondary">Automatische Zuordnung</Badge>
+            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+              Nach dem Spielstart wirst du automatisch deinem Login- oder Gastnamen zugeordnet. Die Host-Ansicht ist für Spieler gesperrt.
+            </p>
+          </CardContent>
+        </Card>
 
         <RulesCard />
 
@@ -7177,7 +7204,7 @@ function JokerChallengePanel({ gameState, activePlayer, viewerPlayerId, canRevea
 }
 
 
-function TimelineChooser({ playerName, timeline, phase, selectedInsertIndex, setSelectedInsertIndex, canPlace }) {
+function TimelineChooser({ playerName, timeline, phase, selectedInsertIndex, setSelectedInsertIndex, canPlace, viewerRole = "spectator" }) {
   const orderedTimeline = sortTimeline(timeline);
   const disabled = phase !== "placing" || !canPlace;
   const isSlotDisabled = (insertIndex) => disabled || !isInsertSlotAllowed(orderedTimeline, insertIndex);
@@ -7191,6 +7218,12 @@ function TimelineChooser({ playerName, timeline, phase, selectedInsertIndex, set
 
         <Badge variant="secondary">{orderedTimeline.length} Karten</Badge>
       </div>
+
+      {phase === "placing" && !canPlace && (
+        <div style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg, color: colors.muted, fontSize: 13 }}>
+          Du bist aktuell nicht als aktiver Spieler zugeordnet. Prüfe rechts „Deine Ansicht“ und wähle deinen Spielernamen.
+        </div>
+      )}
 
       <div
         style={{
@@ -7981,7 +8014,21 @@ function PlayerFocusedCard({ viewerRole, activePlayer, permissions }) {
   );
 }
 
-function LocalRoleCard({ viewerPlayerId, setViewerPlayerId, viewerRole, permissions, players, roomClients = [], clientInstanceId, roomCode }) {
+function LocalRoleCard({
+  viewerPlayerId,
+  setViewerPlayerId,
+  viewerRole,
+  permissions,
+  players,
+  roomClients = [],
+  clientInstanceId,
+  roomCode,
+  playerAccessLocked = false,
+  hostPlayerId = "",
+}) {
+  const safeHostPlayerId = hostPlayerId || players.find((player) => player.role === "host")?.id || "";
+  const selectablePlayers = players.filter((player) => !player.isDisplayOnly);
+  const selectablePlayerIds = new Set(selectablePlayers.map((player) => player.id));
   const claimedByOther = new Set(
     roomClients
       .filter((client) => client.clientInstanceId && client.clientInstanceId !== clientInstanceId)
@@ -7989,8 +8036,22 @@ function LocalRoleCard({ viewerPlayerId, setViewerPlayerId, viewerRole, permissi
       .filter(Boolean)
   );
 
+  const safeSelectValue =
+    playerAccessLocked &&
+    (
+      viewerPlayerId === "auto-host" ||
+      viewerPlayerId === "spectator" ||
+      (viewerPlayerId !== "auto-player" && !selectablePlayerIds.has(viewerPlayerId))
+    )
+      ? "auto-player"
+      : viewerPlayerId || "auto-player";
+
   function handleViewerChange(event) {
     const nextPlayerId = event.target.value;
+
+    if (playerAccessLocked && (nextPlayerId === "auto-host" || nextPlayerId === safeHostPlayerId)) {
+      return;
+    }
 
     setViewerPlayerId(nextPlayerId);
     storeViewerPlayerId(roomCode, nextPlayerId);
@@ -8001,25 +8062,41 @@ function LocalRoleCard({ viewerPlayerId, setViewerPlayerId, viewerRole, permissi
       <CardContent style={{ display: "grid", gap: 8 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
           <h3 style={{ margin: 0, fontSize: 16 }}>Deine Ansicht</h3>
-          <Badge variant="secondary">{players.some(isTeamPlayer) ? "Team" : "Name"}</Badge>
+          <Badge variant="secondary">{playerAccessLocked ? "Spieler gesperrt" : players.some(isTeamPlayer) ? "Team" : "Name"}</Badge>
         </div>
 
-        <Select value={viewerPlayerId} onChange={handleViewerChange}>
-          <option value="auto-host">Host automatisch</option>
-          <option value="auto-player">Automatisch per Einladungslink</option>
+        <Select value={safeSelectValue} onChange={handleViewerChange}>
+          {!playerAccessLocked && <option value="auto-host">Host automatisch</option>}
+          <option value="auto-player">Automatisch deinem Namen zuordnen</option>
 
-          {players.map((player) => {
+          {selectablePlayers.map((player) => {
+            const isHostPlayer = player.id === safeHostPlayerId || player.role === "host";
             const isClaimedByOther = claimedByOther.has(player.id);
+            const isDisabled = isClaimedByOther || (playerAccessLocked && isHostPlayer);
+
+            if (playerAccessLocked && isHostPlayer) {
+              return (
+                <option key={player.id} value={player.id} disabled>
+                  {player.name} (Host belegt)
+                </option>
+              );
+            }
 
             return (
-              <option key={player.id} value={player.id} disabled={isClaimedByOther}>
+              <option key={player.id} value={player.id} disabled={isDisabled}>
                 {player.name}{isClaimedByOther ? " (belegt)" : ""}
               </option>
             );
           })}
 
-          <option value="spectator">Zuschauer</option>
+          {!playerAccessLocked && <option value="spectator">Zuschauer</option>}
         </Select>
+
+        {playerAccessLocked && (
+          <p style={{ margin: 0, color: colors.muted, fontSize: 12 }}>
+            Spieler können nicht zur Host-Ansicht wechseln. Wähle hier nur deinen eigenen Spielernamen, falls die automatische Zuordnung nicht passt.
+          </p>
+        )}
       </CardContent>
     </Card>
   );
