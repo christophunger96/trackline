@@ -107,11 +107,6 @@ function getFunctionBaseUrl(req: Request) {
   const url = new URL(req.url);
   const pathname = url.pathname;
 
-  // Supabase Edge Functions may expose the request internally as http.
-  // Spotify, however, must receive the public HTTPS redirect URI exactly
-  // as configured in the Spotify Developer Dashboard.
-  url.protocol = "https:";
-
   if (pathname.includes("/spotify/")) {
     url.pathname = pathname.replace(/\/spotify\/.*$/, "");
   } else if (pathname.includes("/room/")) {
@@ -127,29 +122,7 @@ function getCallbackUrl(req: Request) {
 }
 
 function safeJsonError(error: unknown) {
-  if (error instanceof Error) return error.message;
-
-  if (error && typeof error === "object") {
-    const anyError = error as Record<string, unknown>;
-    const parts = [
-      anyError.message,
-      anyError.details,
-      anyError.hint,
-      anyError.code ? `Code: ${anyError.code}` : "",
-    ]
-      .filter(Boolean)
-      .map(String);
-
-    if (parts.length) return parts.join(" · ");
-
-    try {
-      return JSON.stringify(error);
-    } catch {
-      return String(error);
-    }
-  }
-
-  return String(error || "Unbekannter Fehler");
+  return error instanceof Error ? error.message : String(error || "Unbekannter Fehler");
 }
 
 async function spotifyTokenRequest(form: URLSearchParams) {
@@ -182,42 +155,18 @@ async function getRoomSpotify(admin: ReturnType<typeof createClient>, roomCode: 
 }
 
 async function saveRoomSpotify(admin: ReturnType<typeof createClient>, roomCode: string, patch: Record<string, unknown>) {
-  const payload = {
-    ...patch,
-    updated_at: new Date().toISOString(),
-  };
-
-  const { data: existing, error: selectError } = await admin
-    .from("room_spotify")
-    .select("room_code")
-    .eq("room_code", roomCode)
-    .maybeSingle();
-
-  if (selectError) throw selectError;
-
-  if (existing?.room_code) {
-    const { error } = await admin
-      .from("room_spotify")
-      .update(payload)
-      .eq("room_code", roomCode);
-
-    if (error) throw error;
-    return;
-  }
-
-  const clientId = String(payload.client_id || "").trim();
-
-  if (!clientId) {
-    throw new Error("Spotify client_id fehlt beim Erstellen des Raum-Spotify-Eintrags.");
-  }
-
   const { error } = await admin
     .from("room_spotify")
-    .insert({
-      room_code: roomCode,
-      ...payload,
-      client_id: clientId,
-    });
+    .upsert(
+      {
+        room_code: roomCode,
+        ...patch,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "room_code",
+      },
+    );
 
   if (error) throw error;
 }
@@ -433,16 +382,11 @@ async function callback(req: Request) {
       .eq("login_id", state);
 
     return html(`
-      <!doctype html>
-      <html lang="de">
-        <head>
-          <meta charset="utf-8" />
-          <title>Trackline Spotify</title>
-        </head>
+      <html>
         <body style="font-family: system-ui; background:#020617; color:#f8fafc; display:grid; place-items:center; min-height:100vh;">
           <main style="max-width:560px; padding:24px; border:1px solid #1e293b; border-radius:18px; background:#0f172a;">
             <h1>Spotify verbunden</h1>
-            <p>Du kannst dieses Fenster schliessen und zu Trackline zurueckkehren.</p>
+            <p>Du kannst dieses Fenster schließen und zu Trackline zurückkehren.</p>
           </main>
         </body>
       </html>
@@ -541,12 +485,42 @@ async function play(req: Request, roomCode: string) {
   const body = await readJsonBody(req);
   const room = await getRoomSpotify(admin, roomCode);
   const track = body.track || await getCurrentTrackFromSupabase(admin, roomCode);
+  const jamMode = Boolean(body.jamMode || body.playbackMode === "jam");
   const playLimitSeconds = Math.max(1, Math.min(120, Math.round(Number(body.playLimitSeconds || DEFAULT_PLAY_LIMIT_SECONDS))));
 
   if (!track) throw new Error("Kein aktueller Song im Raum.");
-  if (!room.device_id) throw new Error("Kein Spotify-Zielgeraet gespeichert. Host muss Geraete laden und Zielgeraet speichern.");
+
+  if (!jamMode && !room.device_id) {
+    throw new Error("Kein Spotify-Zielgeraet gespeichert. Host muss Geraete laden und Zielgeraet speichern.");
+  }
 
   const spotifyUri = await searchSpotifyUri(admin, room, track);
+
+  if (jamMode) {
+    // Jam mode: do not transfer playback and do not force a device_id.
+    // Spotify should use the currently active playback context of the host account,
+    // which is the closest Web API-compatible behavior to an existing Spotify Jam.
+    await spotifyFetch(admin, room, `${SPOTIFY_API_BASE}/me/player/play`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        uris: [spotifyUri],
+      }),
+    });
+
+    return json({
+      roomCode,
+      ok: true,
+      jamMode: true,
+      trackId: track.id,
+      hiddenLabel: "Verdeckter Song",
+      deviceId: "",
+      deviceName: "Aktiver Spotify/Jam-Kontext",
+      playLimitSeconds,
+    });
+  }
 
   await spotifyFetch(admin, room, `${SPOTIFY_API_BASE}/me/player`, {
     method: "PUT",
@@ -574,6 +548,7 @@ async function play(req: Request, roomCode: string) {
   return json({
     roomCode,
     ok: true,
+    jamMode: false,
     trackId: track.id,
     hiddenLabel: "Verdeckter Song",
     deviceId: room.device_id,
@@ -582,9 +557,23 @@ async function play(req: Request, roomCode: string) {
   });
 }
 
-async function pause(roomCode: string) {
+async function pause(req: Request, roomCode: string) {
   const admin = getSupabaseAdmin();
+  const body = await readJsonBody(req);
   const room = await getRoomSpotify(admin, roomCode);
+  const jamMode = Boolean(body.jamMode || body.playbackMode === "jam");
+
+  if (jamMode) {
+    await spotifyFetch(admin, room, `${SPOTIFY_API_BASE}/me/player/pause`, {
+      method: "PUT",
+    });
+
+    return json({
+      roomCode,
+      ok: true,
+      jamMode: true,
+    });
+  }
 
   if (!room.device_id) throw new Error("Kein Spotify-Zielgeraet gespeichert.");
 
@@ -595,6 +584,7 @@ async function pause(roomCode: string) {
   return json({
     roomCode,
     ok: true,
+    jamMode: false,
   });
 }
 
@@ -634,7 +624,7 @@ Deno.serve(async (req) => {
       if (req.method === "GET" && actionPath === "/devices") return await devices(roomCode);
       if (req.method === "POST" && actionPath === "/device") return await saveDevice(req, roomCode);
       if (req.method === "POST" && actionPath === "/play") return await play(req, roomCode);
-      if (req.method === "POST" && actionPath === "/pause") return await pause(roomCode);
+      if (req.method === "POST" && actionPath === "/pause") return await pause(req, roomCode);
     }
 
     return json({ error: "Route nicht gefunden.", pathname }, 404);

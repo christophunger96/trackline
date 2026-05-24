@@ -55,6 +55,7 @@ const SPOTIFY_CLIENT_ID_STORAGE_KEY = "trackline.spotify.clientId";
 const DEFAULT_SPOTIFY_CLIENT_ID = "eb70ba4d164248d8810e52caae6b40cb";
 const SPOTIFY_CODE_VERIFIER_STORAGE_KEY = "trackline.spotify.codeVerifier";
 const SPOTIFY_TOKEN_STORAGE_KEY = "trackline.spotify.token";
+const SPOTIFY_JAM_MODE_STORAGE_KEY = "trackline.spotify.jamMode.v1";
 const SPOTIFY_SCOPES = [
   "streaming",
   "user-read-email",
@@ -4326,6 +4327,7 @@ export default function App() {
     remainingSeconds: 0,
     endsAt: 0,
   });
+  const [spotifyJamMode, setSpotifyJamMode] = useState(() => localStorage.getItem(SPOTIFY_JAM_MODE_STORAGE_KEY) === "true");
   const [activeJokerBusy, setActiveJokerBusy] = useState(false);
   const [activeJokerFeedback, setActiveJokerFeedback] = useState(null);
 
@@ -4382,6 +4384,10 @@ export default function App() {
   useEffect(() => {
     currentGameStateRef.current = gameState;
   }, [gameState]);
+
+  useEffect(() => {
+    localStorage.setItem(SPOTIFY_JAM_MODE_STORAGE_KEY, spotifyJamMode ? "true" : "false");
+  }, [spotifyJamMode]);
 
   useEffect(() => {
     return () => {
@@ -4775,6 +4781,12 @@ export default function App() {
       try {
         await fetch(`${serverBaseUrl}/room/${encodeURIComponent(activeRoomCode)}/spotify/pause`, {
           method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            jamMode: spotifyJamMode,
+          }),
         });
       } catch {
         // The visible countdown/game flow should continue even if Spotify pause fails.
@@ -4807,6 +4819,7 @@ export default function App() {
         body: JSON.stringify({
           playLimitSeconds,
           track: gameState.currentTrack,
+          jamMode: spotifyJamMode,
         }),
       });
 
@@ -5248,6 +5261,8 @@ export default function App() {
                 roomCode={gameState.room?.code || roomCode}
                 spotifyAuthServerUrl={spotifyHelperUrl}
                 roundPlayLimitSeconds={gameState.playLimitSeconds}
+                jamMode={spotifyJamMode}
+                setJamMode={setSpotifyJamMode}
                 onPlaybackRequested={() =>
                   sendGameAction({
                     type: "TRACK_PLAY_REQUESTED",
@@ -6366,7 +6381,7 @@ function MultiplayerSyncCard({ roomCode, socketUrl, setSocketUrl, syncEnabled, s
 }
 
 
-function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify, roomCode, spotifyAuthServerUrl, roundPlayLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS, onPlaybackRequested }) {
+function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify, roomCode, spotifyAuthServerUrl, roundPlayLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS, jamMode = false, setJamMode = () => {}, onPlaybackRequested }) {
   const [clientId] = useState(() => {
     const storedClientId = localStorage.getItem(SPOTIFY_CLIENT_ID_STORAGE_KEY);
     return storedClientId?.trim() || DEFAULT_SPOTIFY_CLIENT_ID;
@@ -6437,6 +6452,12 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
       try {
         const response = await fetch(getRoomSpotifyUrl("/pause"), {
           method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            jamMode,
+          }),
         });
 
         if (!response.ok) {
@@ -6486,7 +6507,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
     return () => {
       window.removeEventListener(SPOTIFY_PLAY_EVENT_NAME, handleExternalPlayRequest);
     };
-  }, [currentTrack, phase, canPlayTrack, isBusy, roomCode, spotifyAuthServerUrl, playLimitSeconds, selectedSpotifyDeviceId]);
+  }, [currentTrack, phase, canPlayTrack, isBusy, roomCode, spotifyAuthServerUrl, playLimitSeconds, selectedSpotifyDeviceId, jamMode]);
 
   useEffect(() => {
     setPlayLimitSeconds(Math.max(1, Math.min(120, Number(roundPlayLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS))));
@@ -6752,7 +6773,11 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
 
     try {
       setIsBusy(true);
-      setStatus("Spotify-Helfer startet den aktuellen Supabase-Song auf dem gespeicherten Spotify-Geraet...");
+      setStatus(
+        jamMode
+          ? "Spotify-Helfer startet den aktuellen Supabase-Song im aktiven Spotify/Jam-Kontext..."
+          : "Spotify-Helfer startet den aktuellen Supabase-Song auf dem gespeicherten Spotify-Geraet..."
+      );
 
       const response = await fetch(getRoomSpotifyUrl("/play"), {
         method: "POST",
@@ -6762,6 +6787,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
         body: JSON.stringify({
           playLimitSeconds,
           track: currentTrack,
+          jamMode,
         }),
       });
 
@@ -6771,11 +6797,17 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
 
       const data = await response.json();
       setSpotifyConnected(true);
-      setSavedDeviceId(data.deviceId || savedDeviceId);
-      setSavedDeviceName(data.deviceName || savedDeviceName);
+      if (!jamMode) {
+        setSavedDeviceId(data.deviceId || savedDeviceId);
+        setSavedDeviceName(data.deviceName || savedDeviceName);
+      }
       startLocalCountdown(playLimitSeconds);
       scheduleSpotifyAutoPause(playLimitSeconds);
-      setStatus(`Verdeckter Song laeuft auf ${data.deviceName || "Spotify"}. TimeLimit: ${playLimitSeconds} Sekunden.`);
+      setStatus(
+        jamMode
+          ? `Verdeckter Song laeuft im aktiven Spotify/Jam-Kontext. TimeLimit: ${playLimitSeconds} Sekunden.`
+          : `Verdeckter Song laeuft auf ${data.deviceName || "Spotify"}. TimeLimit: ${playLimitSeconds} Sekunden.`
+      );
       onPlaybackRequested?.();
     } catch (error) {
       setStatus(error.message || "Spotify Wiedergabe fehlgeschlagen.");
@@ -6791,6 +6823,12 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
 
       const response = await fetch(getRoomSpotifyUrl("/pause"), {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jamMode,
+        }),
       });
 
       if (!response.ok) {
@@ -6807,7 +6845,9 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
 
   const canStartSpotify = Boolean(currentTrack && phase === "placing" && canPlayTrack && !isBusy);
   const selectedDevice = spotifyDevices.find((device) => device.id === selectedSpotifyDeviceId);
-  const showSpotifyDetails = !spotifyConnected || !savedDeviceName || spotifyDetailsOpen || Boolean(externalLoginUrl);
+  const hasPlayableSpotifyTarget = jamMode || Boolean(savedDeviceName);
+  const spotifyTargetLabel = jamMode ? "Jam-Modus / aktiver Spotify-Kontext" : savedDeviceName;
+  const showSpotifyDetails = !spotifyConnected || (!hasPlayableSpotifyTarget && !jamMode) || spotifyDetailsOpen || Boolean(externalLoginUrl);
 
   return (
     <Card>
@@ -6817,17 +6857,17 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
             <Badge variant="secondary">Spotify</Badge>
             <h2 style={{ margin: "10px 0 6px" }}>Ein Host-Account fuer den Raum</h2>
             <p style={{ margin: 0, color: colors.muted }}>
-              Der Host verbindet Spotify in der Lobby oder im Spiel und speichert ein Zielgeraet. Der Spotify-Bereich ist nur fuer den Host sichtbar.
+              Der Host verbindet Spotify in der Lobby oder im Spiel. Im Normalmodus wird ein Zielgeraet gespeichert; im Jam-Modus nutzt Trackline den aktiven Spotify/Jam-Kontext.
             </p>
           </div>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Badge variant={spotifyConnected ? "default" : "secondary"}>{spotifyConnected ? "Host Spotify verbunden" : "Nicht verbunden"}</Badge>
-            <Badge variant={savedDeviceName ? "default" : "secondary"}>{savedDeviceName || "Kein Zielgeraet"}</Badge>
+            <Badge variant={jamMode ? "default" : savedDeviceName ? "default" : "secondary"}>{jamMode ? "Jam-Modus" : savedDeviceName || "Kein Zielgeraet"}</Badge>
           </div>
         </div>
 
-        {canManageSpotify && spotifyConnected && savedDeviceName && (
+        {canManageSpotify && spotifyConnected && hasPlayableSpotifyTarget && (
           <div
             style={{
               border: `1px solid ${colors.border}`,
@@ -6844,7 +6884,9 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
             <div>
               <strong>Spotify bereit</strong>
               <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>
-                Zielgeraet: {savedDeviceName}{savedDeviceId ? ` · ${savedDeviceId.slice(0, 6)}…` : ""}
+                {jamMode
+                  ? "Jam-Modus: nutzt den aktuell aktiven Spotify/Jam-Kontext des Host-Accounts."
+                  : <>Zielgeraet: {savedDeviceName}{savedDeviceId ? ` · ${savedDeviceId.slice(0, 6)}…` : ""}</>}
               </p>
             </div>
 
@@ -6859,7 +6901,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
           </div>
         )}
 
-        {canManageSpotify && spotifyConnected && !savedDeviceName && (
+        {canManageSpotify && spotifyConnected && !savedDeviceName && !jamMode && (
           <div
             style={{
               border: "1px solid #f59e0b",
@@ -6995,6 +7037,39 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
           </div>
         )}
 
+        <div
+          style={{
+            border: `1px solid ${jamMode ? colors.primary : colors.border}`,
+            borderRadius: 18,
+            padding: 14,
+            background: jamMode ? "rgba(34,197,94,0.10)" : colors.bg,
+            display: "grid",
+            gap: 10,
+          }}
+        >
+          <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={jamMode}
+              onChange={(event) => setJamMode(Boolean(event.target.checked))}
+              style={{ marginTop: 3 }}
+            />
+            <span>
+              <strong>Spotify Jam-Modus verwenden</strong>
+              <span style={{ display: "block", color: colors.muted, fontSize: 13, marginTop: 4 }}>
+                Für Spotify Jam: Jam vorher in Spotify starten, Mitspieler joinen lassen und kurz prüfen, dass ein manuell gestarteter Song bei allen läuft.
+                Trackline erzwingt dann kein Zielgerät und startet den Song im aktiven Spotify/Jam-Kontext.
+              </span>
+            </span>
+          </label>
+
+          {jamMode && (
+            <p style={{ margin: 0, color: "#bbf7d0", fontSize: 13 }}>
+              Hinweis: Wenn Spotify meldet, dass kein aktives Gerät vorhanden ist, starte in Spotify einmal manuell irgendeinen Song im Jam und drücke danach erneut „Song starten“.
+            </p>
+          )}
+        </div>
+
         <div style={{ display: "grid", gridTemplateColumns: "180px minmax(0, 1fr)", gap: 10, alignItems: "end" }}>
           <label style={{ display: "grid", gap: 8 }}>
             <span style={{ color: colors.muted, fontSize: 14 }}>TimeLimit in Sekunden</span>
@@ -7022,7 +7097,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
             <p style={{ margin: "0 0 8px", color: colors.text, fontWeight: 800 }}>Status</p>
             <p style={{ margin: 0, color: colors.muted }}>{status}</p>
             <p style={{ margin: "6px 0 0", color: colors.muted, fontSize: 12 }}>
-              Raum: {roomCode} | Zielgeraet: {savedDeviceName || selectedDevice?.name || "-"}
+              Raum: {roomCode} | Spotify-Ziel: {spotifyTargetLabel || selectedDevice?.name || "-"}
             </p>
             <p style={{ margin: "6px 0 0", color: colors.muted, fontSize: 12 }}>
               Redirect URI fuer Spotify Dashboard: {getSpotifyServerRedirectUri()}
@@ -7030,7 +7105,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
           </div>
 
           <Button onClick={playCurrentTrack} disabled={!canStartSpotify}>
-            {isBusy ? "Startet..." : `Song ${playLimitSeconds}s starten`}
+            {isBusy ? "Startet..." : jamMode ? `Jam-Song ${playLimitSeconds}s starten` : `Song ${playLimitSeconds}s starten`}
           </Button>
 
           <Button variant="secondary" onClick={pauseSpotify} disabled={isBusy || !spotifyConnected}>
