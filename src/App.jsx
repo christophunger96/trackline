@@ -43,6 +43,12 @@ const SYNC_SOCKET_URL_STORAGE_KEY = "trackline.sync.socketUrl";
 const SYNC_ENABLED_STORAGE_KEY = "trackline.sync.enabled";
 const CLIENT_INSTANCE_ID_STORAGE_KEY = "trackline.clientInstanceId.v1";
 const VIEWER_PLAYER_STORAGE_PREFIX = "trackline.viewerPlayer.v1.";
+const SUPABASE_URL_STORAGE_KEY = "trackline.supabase.url";
+const SUPABASE_ANON_KEY_STORAGE_KEY = "trackline.supabase.anonKey";
+const SUPABASE_ENABLED_STORAGE_KEY = "trackline.supabase.enabled";
+const SUPABASE_AUTH_SESSION_STORAGE_KEY = "trackline.supabase.authSession.v1";
+const DEFAULT_SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || "";
+const DEFAULT_SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || "";
 // Render rollback: VITE_SOCKET_URL must point to the Render server that also handles Spotify.
 const DEFAULT_SYNC_SOCKET_URL = import.meta.env?.VITE_SOCKET_URL || "http://127.0.0.1:3001";
 
@@ -3205,6 +3211,201 @@ function storeViewerPlayerId(roomCode, playerId) {
 }
 
 
+function getInitialSupabaseConfig() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const urlFromLink = params.get("supabaseUrl") ? decodeURIComponent(params.get("supabaseUrl")) : "";
+    const keyFromLink = params.get("supabaseKey") ? decodeURIComponent(params.get("supabaseKey")) : "";
+    const storedUrl = localStorage.getItem(SUPABASE_URL_STORAGE_KEY) || "";
+    const storedKey = localStorage.getItem(SUPABASE_ANON_KEY_STORAGE_KEY) || "";
+    const url = urlFromLink || storedUrl || DEFAULT_SUPABASE_URL;
+    const anonKey = keyFromLink || storedKey || DEFAULT_SUPABASE_ANON_KEY;
+    const enabledFromLink = Boolean(urlFromLink && keyFromLink);
+
+    return {
+      url,
+      anonKey,
+      enabled: enabledFromLink || localStorage.getItem(SUPABASE_ENABLED_STORAGE_KEY) === "true" || Boolean(DEFAULT_SUPABASE_URL && DEFAULT_SUPABASE_ANON_KEY),
+    };
+  } catch {
+    return {
+      url: DEFAULT_SUPABASE_URL,
+      anonKey: DEFAULT_SUPABASE_ANON_KEY,
+      enabled: Boolean(DEFAULT_SUPABASE_URL && DEFAULT_SUPABASE_ANON_KEY),
+    };
+  }
+}
+
+function normalizeSupabaseUrl(url = "") {
+  return String(url || "").trim().replace(/\/+$/, "");
+}
+
+function isSupabaseConfigured(config) {
+  return Boolean(config?.enabled && normalizeSupabaseUrl(config.url) && String(config.anonKey || "").trim());
+}
+
+function getInitialSupabaseAuthSession() {
+  try {
+    const raw = localStorage.getItem(SUPABASE_AUTH_SESSION_STORAGE_KEY);
+
+    if (!raw) return null;
+
+    const session = JSON.parse(raw);
+    const expiresAt = Number(session?.expires_at || 0) * 1000;
+
+    if (!session?.access_token || !session?.user) return null;
+    if (expiresAt && expiresAt < Date.now() - 60_000) return null;
+
+    return session;
+  } catch {
+    return null;
+  }
+}
+
+function getAuthDisplayName(session) {
+  return (
+    String(session?.user?.user_metadata?.display_name || "").trim() ||
+    String(session?.user?.email || "").split("@")[0] ||
+    ""
+  );
+}
+
+function getAuthEmail(session) {
+  return String(session?.user?.email || "").trim();
+}
+
+function getAuthGuestId(session, fallbackGuestId) {
+  const userId = session?.user?.id;
+
+  return userId ? `auth-${userId}` : String(fallbackGuestId || "");
+}
+
+async function supabaseAuthRequest(config, path, options = {}, accessToken = "") {
+  const baseUrl = normalizeSupabaseUrl(config?.url);
+  const anonKey = String(config?.anonKey || "").trim();
+
+  if (!baseUrl || !anonKey) {
+    throw new Error("Supabase URL oder anon public key fehlt.");
+  }
+
+  const response = await fetch(`${baseUrl}/auth/v1${path}`, {
+    ...options,
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${accessToken || anonKey}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!response.ok) {
+    throw new Error(data?.msg || data?.message || data?.error_description || text || `Supabase Auth Fehler ${response.status}`);
+  }
+
+  return data;
+}
+
+async function supabaseRestRequest(config, path, options = {}, accessToken = "") {
+  const baseUrl = normalizeSupabaseUrl(config?.url);
+  const anonKey = String(config?.anonKey || "").trim();
+
+  if (!baseUrl || !anonKey) {
+    throw new Error("Supabase URL oder anon public key fehlt.");
+  }
+
+  const response = await fetch(`${baseUrl}/rest/v1${path}`, {
+    ...options,
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${accessToken || anonKey}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Supabase Fehler ${response.status}`);
+  }
+
+  if (response.status === 204) return null;
+
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function signUpWithSupabase(config, { email, password, displayName }) {
+  return supabaseAuthRequest(config, "/signup", {
+    method: "POST",
+    body: JSON.stringify({
+      email: String(email || "").trim(),
+      password,
+      data: {
+        display_name: String(displayName || "").trim(),
+      },
+    }),
+  });
+}
+
+async function signInWithSupabase(config, { email, password }) {
+  return supabaseAuthRequest(config, "/token?grant_type=password", {
+    method: "POST",
+    body: JSON.stringify({
+      email: String(email || "").trim(),
+      password,
+    }),
+  });
+}
+
+async function signOutWithSupabase(config, session) {
+  if (!session?.access_token) return null;
+
+  return supabaseAuthRequest(
+    config,
+    "/logout",
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+    session.access_token
+  );
+}
+
+async function createOrUpdateAuthProfile(config, session, displayName, fallbackGuestId) {
+  if (!isSupabaseConfigured(config) || !session?.user?.id) return null;
+
+  const safeDisplayName = String(displayName || getAuthDisplayName(session) || "Spieler").trim() || "Spieler";
+  const stableGuestId = getAuthGuestId(session, fallbackGuestId);
+
+  await supabaseRestRequest(config, "/profiles?on_conflict=guest_id", {
+    method: "POST",
+    headers: {
+      Prefer: "resolution=merge-duplicates,return=representation",
+    },
+    body: JSON.stringify({
+      guest_id: stableGuestId,
+      auth_user_id: session.user.id,
+      display_name: safeDisplayName,
+      updated_at: new Date().toISOString(),
+    }),
+  });
+
+  return true;
+}
+
+function mergeAuthNameIntoPlayers(currentPlayers = [], displayName = "") {
+  const safeName = String(displayName || "").trim();
+
+  if (!safeName) return currentPlayers;
+
+  const rest = currentPlayers.slice(1).filter((name) => name !== safeName);
+  return [safeName, ...rest];
+}
+
+
 function getInitialSocketUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -3243,6 +3444,15 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState("Sync nicht verbunden.");
   const [syncClientCount, setSyncClientCount] = useState(1);
   const [roomClients, setRoomClients] = useState([]);
+  const [supabaseConfig, setSupabaseConfig] = useState(() => getInitialSupabaseConfig());
+  const [authSession, setAuthSession] = useState(() => getInitialSupabaseAuthSession());
+  const [authStatus, setAuthStatus] = useState(() =>
+    getInitialSupabaseAuthSession()
+      ? "Angemeldet."
+      : isSupabaseConfigured(getInitialSupabaseConfig())
+        ? "Gastmodus aktiv."
+        : "Supabase Login nicht konfiguriert."
+  );
   const [clientInstanceId] = useState(() => getClientInstanceId());
   const [roomPlaybackTimer, setRoomPlaybackTimer] = useState({
     requestId: null,
@@ -3266,6 +3476,7 @@ export default function App() {
   const activeTimeline = activePlayer ? sortTimeline(activePlayer.timeline) : [];
   const winner = getFinalWinner(gameState.players, gameState.targetScore);
   const activeRoomCode = gameState.room?.code || roomCode;
+  const authDisplayName = getAuthDisplayName(authSession);
 
   const resolvedViewerPlayerId = (() => {
     if (viewerPlayerId === "auto-host") return gameState.room?.hostPlayerId || "spectator";
@@ -3316,6 +3527,29 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(SYNC_ENABLED_STORAGE_KEY, String(syncEnabled));
   }, [syncEnabled]);
+
+  useEffect(() => {
+    localStorage.setItem(SUPABASE_URL_STORAGE_KEY, supabaseConfig.url || "");
+    localStorage.setItem(SUPABASE_ANON_KEY_STORAGE_KEY, supabaseConfig.anonKey || "");
+    localStorage.setItem(SUPABASE_ENABLED_STORAGE_KEY, String(Boolean(supabaseConfig.enabled)));
+  }, [supabaseConfig]);
+
+  useEffect(() => {
+    if (authSession) {
+      localStorage.setItem(SUPABASE_AUTH_SESSION_STORAGE_KEY, JSON.stringify(authSession));
+    } else {
+      localStorage.removeItem(SUPABASE_AUTH_SESSION_STORAGE_KEY);
+    }
+  }, [authSession]);
+
+  useEffect(() => {
+    if (!authDisplayName || gameState.phase !== "lobby") return;
+
+    setPlayerNames((previous) => {
+      const next = mergeAuthNameIntoPlayers(previous, authDisplayName);
+      return JSON.stringify(next) === JSON.stringify(previous) ? previous : next;
+    });
+  }, [authDisplayName, gameState.phase]);
 
   useEffect(() => {
     if (!syncEnabled) {
@@ -3577,6 +3811,83 @@ export default function App() {
     sendGameAction({ type: "NEXT_PLAYER" });
   }
 
+  async function handleAuthSignUp({ email, password, displayName }) {
+    if (!isSupabaseConfigured(supabaseConfig)) {
+      setAuthStatus("Supabase ist nicht aktiv oder nicht konfiguriert.");
+      return;
+    }
+
+    setAuthStatus("Account wird erstellt...");
+
+    try {
+      const session = await signUpWithSupabase(supabaseConfig, { email, password, displayName });
+
+      if (session?.access_token) {
+        const safeName = getAuthDisplayName(session) || displayName || email;
+
+        setAuthSession(session);
+        setPlayerNames((previous) => mergeAuthNameIntoPlayers(previous, safeName));
+        setAuthStatus(`Account erstellt und angemeldet als ${safeName}.`);
+
+        try {
+          await createOrUpdateAuthProfile(supabaseConfig, session, safeName, clientInstanceId);
+        } catch {
+          // Login soll nicht scheitern, nur weil das optionale Profil-Upsert blockiert.
+        }
+      } else {
+        setAuthStatus("Account erstellt. Bitte bestätige ggf. deine E-Mail und melde dich danach an.");
+      }
+    } catch (error) {
+      setAuthStatus(`Registrierung fehlgeschlagen: ${error.message || "Fehler"}`);
+    }
+  }
+
+  async function handleAuthSignIn({ email, password }) {
+    if (!isSupabaseConfigured(supabaseConfig)) {
+      setAuthStatus("Supabase ist nicht aktiv oder nicht konfiguriert.");
+      return;
+    }
+
+    setAuthStatus("Login läuft...");
+
+    try {
+      const session = await signInWithSupabase(supabaseConfig, { email, password });
+      const safeName = getAuthDisplayName(session) || email;
+
+      setAuthSession(session);
+      setPlayerNames((previous) => mergeAuthNameIntoPlayers(previous, safeName));
+      setAuthStatus(`Angemeldet als ${safeName}.`);
+
+      try {
+        await createOrUpdateAuthProfile(supabaseConfig, session, safeName, clientInstanceId);
+      } catch {
+        // Login soll nicht scheitern, nur weil das optionale Profil-Upsert blockiert.
+      }
+    } catch (error) {
+      setAuthStatus(`Login fehlgeschlagen: ${error.message || "Fehler"}`);
+    }
+  }
+
+  async function handleAuthLogout() {
+    try {
+      if (authSession) {
+        await signOutWithSupabase(supabaseConfig, authSession);
+      }
+    } catch {
+      // Lokaler Logout soll trotzdem passieren.
+    }
+
+    setAuthSession(null);
+    setAuthStatus("Abgemeldet. Gastmodus aktiv.");
+  }
+
+  function handleSupabaseConfigChange(patch) {
+    setSupabaseConfig((current) => ({
+      ...current,
+      ...patch,
+    }));
+  }
+
   async function requestRoomSpotifyPlayback(playLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS) {
     const activeRoomCode = gameState.room?.code || roomCode;
     const serverBaseUrl = String(socketUrl || "").trim().replace(/\/+$/, "");
@@ -3754,6 +4065,17 @@ export default function App() {
       <div style={{ maxWidth: gameState.phase === "lobby" ? 1320 : "100%", margin: "0 auto", display: "grid", gap: gameState.phase === "lobby" ? 14 : 8 }}>
         {showAdminPanels ? (
           <HostControlArea onReset={resetGame} isInGame={gameState.phase !== "lobby"}>
+            <AuthPanel
+              session={authSession}
+              status={authStatus}
+              defaultName={authDisplayName || playerNames[0] || ""}
+              config={supabaseConfig}
+              onConfigChange={handleSupabaseConfigChange}
+              onSignUp={handleAuthSignUp}
+              onSignIn={handleAuthSignIn}
+              onLogout={handleAuthLogout}
+            />
+
             <WebsiteShareCard
               room={gameState.room}
               roomCode={roomCode}
@@ -4004,7 +4326,152 @@ export default function App() {
   );
 }
 
+function AuthPanel({ session, status, defaultName, config, onConfigChange, onSignUp, onSignIn, onLogout }) {
+  const [mode, setMode] = useState("signin");
+  const [displayName, setDisplayName] = useState(defaultName || "");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const configured = isSupabaseConfigured(config);
+  const loggedInName = getAuthDisplayName(session);
+  const canSubmit = configured && email.trim() && password.length >= 6 && (mode === "signin" || displayName.trim());
+
+  useEffect(() => {
+    if (defaultName && !displayName.trim()) {
+      setDisplayName(defaultName);
+    }
+  }, [defaultName, displayName]);
+
+  if (session) {
+    return (
+      <Card>
+        <CardContent style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div>
+            <Badge>Login aktiv</Badge>
+            <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5 }}>Angemeldet als {loggedInName || getAuthEmail(session)}</h2>
+            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+              Render-Spielstruktur bleibt aktiv. Der Login liefert nur Profilname und Account-Zuordnung.
+            </p>
+          </div>
+
+          <Button variant="secondary" onClick={onLogout}>
+            Logout
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+          <div>
+            <Badge variant={configured ? "secondary" : "warning"}>{configured ? "Login optional" : "Login nicht konfiguriert"}</Badge>
+            <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5 }}>Profil speichern</h2>
+            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+              Supabase wird hier nur für Login/Profil genutzt. Spotify, Jam, Raum und Socket bleiben auf Render.
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button variant={mode === "signin" ? "primary" : "secondary"} onClick={() => setMode("signin")}>
+              Einloggen
+            </Button>
+            <Button variant={mode === "signup" ? "primary" : "secondary"} onClick={() => setMode("signup")}>
+              Registrieren
+            </Button>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: mode === "signup" ? "minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)" : "minmax(0, 1fr) minmax(0, 1fr)", gap: 10 }}>
+          {mode === "signup" && (
+            <label style={{ display: "grid", gap: 8 }}>
+              <span style={{ color: colors.muted, fontSize: 13 }}>Anzeigename</span>
+              <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="z. B. Christoph" />
+            </label>
+          )}
+
+          <label style={{ display: "grid", gap: 8 }}>
+            <span style={{ color: colors.muted, fontSize: 13 }}>E-Mail</span>
+            <Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" type="email" />
+          </label>
+
+          <label style={{ display: "grid", gap: 8 }}>
+            <span style={{ color: colors.muted, fontSize: 13 }}>Passwort</span>
+            <Input
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="mind. 6 Zeichen"
+              type="password"
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && canSubmit) {
+                  mode === "signin"
+                    ? onSignIn?.({ email, password })
+                    : onSignUp?.({ email, password, displayName });
+                }
+              }}
+            />
+          </label>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ color: colors.muted, fontSize: 12 }}>{status || "Gastmodus aktiv."}</span>
+          <Button
+            onClick={() =>
+              mode === "signin"
+                ? onSignIn?.({ email, password })
+                : onSignUp?.({ email, password, displayName })
+            }
+            disabled={!canSubmit}
+          >
+            {mode === "signin" ? "Einloggen" : "Account erstellen"}
+          </Button>
+        </div>
+
+        {!configured && (
+          <details style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg }}>
+            <summary style={{ cursor: "pointer", fontWeight: 900 }}>Supabase Login-Verbindung eintragen</summary>
+            <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+              <label style={{ display: "grid", gap: 8 }}>
+                <span style={{ color: colors.muted, fontSize: 13 }}>Project URL</span>
+                <Input
+                  value={config?.url || ""}
+                  onChange={(event) => onConfigChange?.({ url: event.target.value })}
+                  placeholder="https://xxxxx.supabase.co"
+                />
+              </label>
+
+              <label style={{ display: "grid", gap: 8 }}>
+                <span style={{ color: colors.muted, fontSize: 13 }}>anon public key</span>
+                <Input
+                  value={config?.anonKey || ""}
+                  onChange={(event) => onConfigChange?.({ anonKey: event.target.value })}
+                  placeholder="eyJhbGciOi..."
+                  type="password"
+                />
+              </label>
+
+              <label style={{ display: "flex", gap: 8, alignItems: "center", color: colors.muted, fontSize: 13 }}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(config?.enabled)}
+                  onChange={(event) => onConfigChange?.({ enabled: event.target.checked })}
+                />
+                Supabase Login aktivieren
+              </label>
+            </div>
+          </details>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+
 function Header({ onReset, isInGame }) {
+  const session = getInitialSupabaseAuthSession();
+
   return (
     <header style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
       <div>
@@ -4012,9 +4479,12 @@ function Header({ onReset, isInGame }) {
         <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>Privates Musik-Timeline-Quiz als Web-Spiel</p>
       </div>
 
-      <Button variant="secondary" onClick={onReset}>
-        {isInGame ? "Spiel beenden" : "Neustart"}
-      </Button>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        {session && <Badge variant="secondary">{getAuthDisplayName(session) || getAuthEmail(session)}</Badge>}
+        <Button variant="secondary" onClick={onReset}>
+          {isInGame ? "Spiel beenden" : "Neustart"}
+        </Button>
+      </div>
     </header>
   );
 }
