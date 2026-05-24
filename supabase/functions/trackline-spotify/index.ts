@@ -107,11 +107,6 @@ function getFunctionBaseUrl(req: Request) {
   const url = new URL(req.url);
   const pathname = url.pathname;
 
-  // Supabase Edge Functions may receive an internal/proxied URL.
-  // Spotify requires the redirect_uri to match the dashboard entry exactly,
-  // so force the public HTTPS protocol for callbacks.
-  url.protocol = "https:";
-
   if (pathname.includes("/spotify/")) {
     url.pathname = pathname.replace(/\/spotify\/.*$/, "");
   } else if (pathname.includes("/room/")) {
@@ -119,7 +114,6 @@ function getFunctionBaseUrl(req: Request) {
   }
 
   url.search = "";
-  url.hash = "";
   return url.toString().replace(/\/+$/, "");
 }
 

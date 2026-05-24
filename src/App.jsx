@@ -4858,6 +4858,7 @@ export default function App() {
           playLimitSeconds,
           track: gameState.currentTrack,
           jamMode: syncedSpotifyJamMode,
+          useActiveContext: syncedSpotifyJamMode,
         }),
       });
 
@@ -6826,6 +6827,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
           playLimitSeconds,
           track: currentTrack,
           jamMode,
+          useActiveContext: jamMode,
         }),
       });
 
@@ -7096,7 +7098,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
               <strong>Spotify Jam-Modus verwenden</strong>
               <span style={{ display: "block", color: colors.muted, fontSize: 13, marginTop: 4 }}>
                 Für Spotify Jam: Jam vorher in Spotify starten, Mitspieler joinen lassen und kurz prüfen, dass ein manuell gestarteter Song bei allen läuft.
-                Trackline erzwingt dann kein Zielgerät und startet den Song im aktiven Spotify/Jam-Kontext.
+                Trackline erzwingt dann kein Zielgerät und startet den Song im aktiven Spotify/Jam-Kontext. Wenn kein Zielgerät gespeichert ist, nutzt die Edge Function ebenfalls automatisch den aktiven Spotify-Kontext.
               </span>
             </span>
           </label>
