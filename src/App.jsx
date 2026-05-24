@@ -3910,6 +3910,7 @@ export default function App() {
         },
         body: JSON.stringify({
           playLimitSeconds,
+          track: gameState.currentTrack,
         }),
       });
 
@@ -5012,6 +5013,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
         },
         body: JSON.stringify({
           playLimitSeconds,
+          track: currentTrack,
         }),
       });
 
