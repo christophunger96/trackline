@@ -4269,7 +4269,6 @@ export default function App() {
               socketUrl={socketUrl}
               currentDisplayName={socketDisplayName}
               onJoinRoom={joinRoomAsPlayer}
-              onSwitchToHost={switchToHostView}
             />
           </div>
         )}
@@ -4547,7 +4546,7 @@ export default function App() {
 }
 
 
-function JoinRoomModeCard({ roomCode, setRoomCode, isPlayerJoinView, isHostSetupView, syncStatus, syncEnabled, socketUrl, currentDisplayName = "Gast", onJoinRoom, onSwitchToHost }) {
+function JoinRoomModeCard({ roomCode, setRoomCode, isPlayerJoinView, isHostSetupView, syncStatus, syncEnabled, socketUrl, currentDisplayName = "Gast", onJoinRoom }) {
   const [joinCode, setJoinCode] = useState(roomCode || "");
 
   useEffect(() => {
@@ -4606,9 +4605,7 @@ function JoinRoomModeCard({ roomCode, setRoomCode, isPlayerJoinView, isHostSetup
           </div>
 
           {!isHostSetupView && (
-            <Button variant="secondary" onClick={onSwitchToHost}>
-              Diesen Browser als Host nutzen
-            </Button>
+            <Badge variant="secondary">Spielerzugang</Badge>
           )}
         </div>
 
@@ -4623,7 +4620,7 @@ function JoinRoomModeCard({ roomCode, setRoomCode, isPlayerJoinView, isHostSetup
   );
 }
 
-function PlayerLobbyWaitingCard({ roomCode, syncStatus, syncEnabled, syncClientCount, players, playerNames = [], roomClients, viewerPlayerId, setViewerPlayerId, viewerRole, clientInstanceId, currentDisplayName = "Gast", onSwitchToHost }) {
+function PlayerLobbyWaitingCard({ roomCode, syncStatus, syncEnabled, syncClientCount, players, playerNames = [], roomClients, viewerPlayerId, setViewerPlayerId, viewerRole, clientInstanceId, currentDisplayName = "Gast" }) {
   const visiblePlayers = buildLobbyDisplayPlayers({
     players,
     playerNames,
@@ -4735,13 +4732,10 @@ function PlayerLobbyWaitingCard({ roomCode, syncStatus, syncEnabled, syncClientC
 
         <Card>
           <CardContent style={{ display: "grid", gap: 10 }}>
-            <Badge variant="secondary">Falsche Ansicht?</Badge>
+            <Badge variant="secondary">Spieleransicht</Badge>
             <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-              Nur der echte Host sollte Setup, Spotify und Startbutton sehen.
+              Du bist als Spieler in diesem Raum. Setup, Spotify und Spielstart bleiben beim Host.
             </p>
-            <Button variant="secondary" onClick={onSwitchToHost}>
-              Host-Ansicht öffnen
-            </Button>
           </CardContent>
         </Card>
       </aside>
