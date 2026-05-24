@@ -3424,6 +3424,18 @@ function getInitialSocketUrl() {
   }
 }
 
+function getInitialSyncEnabled() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get("room")) return true;
+  } catch {
+    // ignore
+  }
+
+  return localStorage.getItem(SYNC_ENABLED_STORAGE_KEY) === "true";
+}
+
 export default function App() {
   const [gameState, dispatch] = useReducer(gameReducer, initialGameState, loadStoredGameState);
 
@@ -3440,7 +3452,7 @@ export default function App() {
   );
   const [viewerPlayerId, setViewerPlayerId] = useState(() => getInitialViewerPlayerId());
   const [socketUrl, setSocketUrl] = useState(() => getInitialSocketUrl());
-  const [syncEnabled, setSyncEnabled] = useState(() => localStorage.getItem(SYNC_ENABLED_STORAGE_KEY) === "true");
+  const [syncEnabled, setSyncEnabled] = useState(() => getInitialSyncEnabled());
   const [syncStatus, setSyncStatus] = useState("Sync nicht verbunden.");
   const [syncClientCount, setSyncClientCount] = useState(1);
   const [roomClients, setRoomClients] = useState([]);
@@ -3505,8 +3517,12 @@ export default function App() {
   })();
   const viewerRole = getViewerRoleFromPlayer(resolvedViewerPlayerId, gameState);
   const viewerPermissions = getViewerPermissions(viewerRole);
-  const showAdminPanels = gameState.phase === "lobby" || viewerRole === "host";
+  const isPlayerJoinView = viewerPlayerId === "auto-player";
+  const isHostSetupView = !isPlayerJoinView && (viewerPlayerId === "auto-host" || viewerRole === "host");
+  const showAdminPanels = gameState.phase === "lobby" ? isHostSetupView : viewerRole === "host";
   const showSpotifyPanel = showAdminPanels;
+  const showLobbyHostView = gameState.phase === "lobby" && isHostSetupView;
+  const showLobbyPlayerView = gameState.phase === "lobby" && !isHostSetupView;
 
   const leaderboard = useMemo(() => {
     return [...gameState.players].sort((a, b) => b.score - a.score || a.wrong - b.wrong);
@@ -3888,6 +3904,49 @@ export default function App() {
     }));
   }
 
+  function updateBrowserRoomUrl(nextCode, nextRole = "player") {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("room", nextCode);
+
+      if (nextRole) {
+        url.searchParams.set("role", nextRole);
+      } else {
+        url.searchParams.delete("role");
+      }
+
+      if (socketUrl) {
+        url.searchParams.set("server", socketUrl);
+      }
+
+      window.history.replaceState({}, "", url.toString());
+    } catch {
+      // URL update is optional.
+    }
+  }
+
+  function joinRoomAsPlayer(nextCode) {
+    const safeCode = String(nextCode || "").trim().toUpperCase().slice(0, 8);
+
+    if (!safeCode) {
+      window.alert("Bitte Raumcode eingeben.");
+      return;
+    }
+
+    setRoomCode(safeCode);
+    setViewerPlayerId("auto-player");
+    storeViewerPlayerId(safeCode, "auto-player");
+    setSyncEnabled(true);
+    setSyncStatus(`Raum ${safeCode} wird verbunden...`);
+    updateBrowserRoomUrl(safeCode, "player");
+  }
+
+  function switchToHostView() {
+    setViewerPlayerId("auto-host");
+    setSyncEnabled(true);
+    updateBrowserRoomUrl(roomCode, "");
+  }
+
   async function requestRoomSpotifyPlayback(playLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS) {
     const activeRoomCode = gameState.room?.code || roomCode;
     const serverBaseUrl = String(socketUrl || "").trim().replace(/\/+$/, "");
@@ -4064,8 +4123,8 @@ export default function App() {
   return (
     <div style={{ minHeight: "100vh", background: colors.bg, color: colors.text, padding: gameState.phase === "lobby" ? 12 : 8, fontFamily: "Inter, system-ui, sans-serif", overflowX: "hidden" }}>
       <div style={{ maxWidth: gameState.phase === "lobby" ? 1320 : "100%", margin: "0 auto", display: "grid", gap: gameState.phase === "lobby" ? 14 : 8 }}>
-        {showAdminPanels ? (
-          <HostControlArea onReset={resetGame} isInGame={gameState.phase !== "lobby"}>
+        {gameState.phase === "lobby" && (
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.15fr) minmax(280px, 0.85fr)", gap: 12, alignItems: "start" }}>
             <AuthPanel
               session={authSession}
               status={authStatus}
@@ -4077,6 +4136,22 @@ export default function App() {
               onLogout={handleAuthLogout}
             />
 
+            <JoinRoomModeCard
+              roomCode={roomCode}
+              setRoomCode={setRoomCode}
+              isPlayerJoinView={isPlayerJoinView}
+              isHostSetupView={isHostSetupView}
+              syncStatus={syncStatus}
+              syncEnabled={syncEnabled}
+              socketUrl={socketUrl}
+              onJoinRoom={joinRoomAsPlayer}
+              onSwitchToHost={switchToHostView}
+            />
+          </div>
+        )}
+
+        {showAdminPanels ? (
+          <HostControlArea onReset={resetGame} isInGame={gameState.phase !== "lobby"}>
             <WebsiteShareCard
               room={gameState.room}
               roomCode={roomCode}
@@ -4136,7 +4211,7 @@ export default function App() {
           gameState.phase === "lobby" && <Header onReset={resetGame} isInGame={false} />
         )}
 
-        {gameState.phase === "lobby" && (
+        {showLobbyHostView && (
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.35fr) minmax(280px, 0.65fr)", gap: 24 }}>
             <main style={{ display: "grid", gap: 16, minWidth: 0 }}>
               <LobbyCard
@@ -4166,6 +4241,23 @@ export default function App() {
               <RulesCard />
             </aside>
           </div>
+        )}
+
+        {showLobbyPlayerView && (
+          <PlayerLobbyWaitingCard
+            roomCode={activeRoomCode}
+            syncStatus={syncStatus}
+            syncEnabled={syncEnabled}
+            syncClientCount={syncClientCount}
+            players={gameState.players}
+            playerNames={playerNames}
+            roomClients={roomClients}
+            viewerPlayerId={viewerPlayerId}
+            setViewerPlayerId={setViewerPlayerId}
+            viewerRole={viewerRole}
+            clientInstanceId={clientInstanceId}
+            onSwitchToHost={switchToHostView}
+          />
         )}
 
         {gameState.phase !== "lobby" && gameState.players.length > 0 && (
@@ -4323,6 +4415,184 @@ export default function App() {
         )}
 
       </div>
+    </div>
+  );
+}
+
+
+function JoinRoomModeCard({ roomCode, setRoomCode, isPlayerJoinView, isHostSetupView, syncStatus, syncEnabled, socketUrl, onJoinRoom, onSwitchToHost }) {
+  const [joinCode, setJoinCode] = useState(roomCode || "");
+
+  useEffect(() => {
+    if (roomCode && !joinCode.trim()) setJoinCode(roomCode);
+  }, [roomCode, joinCode]);
+
+  const safeJoinCode = String(joinCode || "").trim().toUpperCase().slice(0, 8);
+
+  return (
+    <Card>
+      <CardContent style={{ display: "grid", gap: 12 }}>
+        <div>
+          <Badge variant={isPlayerJoinView ? "secondary" : "default"}>
+            {isPlayerJoinView ? "Spieler-Ansicht" : "Host-Ansicht"}
+          </Badge>
+          <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5 }}>Raum betreten oder hosten</h2>
+          <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+            Host sieht Setup, Spotify und Start. Spieler sehen nur die reduzierte Ansicht mit ihrem Zug und dem Spielstand.
+          </p>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 8, alignItems: "end" }}>
+          <label style={{ display: "grid", gap: 8 }}>
+            <span style={{ color: colors.muted, fontSize: 13 }}>Raumcode</span>
+            <Input
+              value={joinCode}
+              onChange={(event) => {
+                const next = event.target.value.toUpperCase().slice(0, 8);
+                setJoinCode(next);
+                if (isHostSetupView) setRoomCode?.(next);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") onJoinRoom?.(safeJoinCode);
+              }}
+              placeholder="ABC123"
+            />
+          </label>
+
+          <Button onClick={() => onJoinRoom?.(safeJoinCode)} disabled={!safeJoinCode}>
+            Beitreten
+          </Button>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ color: colors.muted, fontSize: 12 }}>
+            {syncEnabled ? syncStatus : "Sync ist noch aus. Beim Beitreten wird er aktiviert."}
+          </div>
+
+          {!isHostSetupView && (
+            <Button variant="secondary" onClick={onSwitchToHost}>
+              Diesen Browser als Host nutzen
+            </Button>
+          )}
+        </div>
+
+        <details style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg }}>
+          <summary style={{ cursor: "pointer", fontWeight: 900 }}>Technische Verbindung</summary>
+          <p style={{ margin: "8px 0 0", color: colors.muted, fontSize: 12, wordBreak: "break-all" }}>
+            Render/Socket: {socketUrl || "-"}
+          </p>
+        </details>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PlayerLobbyWaitingCard({ roomCode, syncStatus, syncEnabled, syncClientCount, players, playerNames = [], roomClients, viewerPlayerId, setViewerPlayerId, viewerRole, clientInstanceId, onSwitchToHost }) {
+  const visiblePlayers = Array.isArray(players) && players.length
+    ? players
+    : playerNames.map((name, index) => ({
+        id: `lobby-${index}-${String(name).toLowerCase().replace(/\s+/g, "-")}`,
+        name,
+        score: 0,
+        timeline: [],
+      }));
+
+  const claimedNames = new Set(
+    (roomClients || [])
+      .filter((client) => client.clientInstanceId && client.clientInstanceId !== clientInstanceId)
+      .map((client) => client.playerName)
+      .filter(Boolean)
+  );
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(280px, 0.8fr)", gap: 18, alignItems: "start" }}>
+      <main style={{ minWidth: 0 }}>
+        <Card>
+          <CardContent style={{ display: "grid", gap: 16 }}>
+            <div
+              style={{
+                borderRadius: 24,
+                padding: 18,
+                background: cardTheme.table,
+                border: `1px solid ${colors.border}`,
+                display: "grid",
+                gap: 8,
+              }}
+            >
+              <Badge variant="secondary">Spieler-Lobby</Badge>
+              <h2 style={{ margin: "4px 0 0", fontSize: 30, letterSpacing: -0.8 }}>Du bist im Raum {roomCode}</h2>
+              <p style={{ margin: 0, color: colors.muted }}>
+                Warte, bis der Host die Runde startet. Du siehst hier nur die nötigen Spielerinfos.
+              </p>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+              <InfoTile label="Raum" value={roomCode || "-"} />
+              <InfoTile label="Verbindung" value={syncEnabled ? "aktiv" : "aus"} />
+              <InfoTile label="Clients" value={`${syncClientCount || 1}`} />
+            </div>
+
+            <div style={{ border: `1px solid ${colors.border}`, borderRadius: 18, padding: 14, background: colors.bg }}>
+              <strong>Status</strong>
+              <p style={{ margin: "6px 0 0", color: colors.muted }}>{syncStatus}</p>
+            </div>
+
+            <div style={{ display: "grid", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                <strong>Spieler im Raum</strong>
+                <Badge variant="secondary">{visiblePlayers.length}</Badge>
+              </div>
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {visiblePlayers.map((player, index) => (
+                  <span
+                    key={player.id || player.name}
+                    style={{
+                      border: `1px solid ${index === 0 ? colors.primary : colors.border}`,
+                      borderRadius: 999,
+                      background: index === 0 ? "rgba(126,87,255,0.18)" : colors.chip,
+                      color: colors.text,
+                      padding: "8px 12px",
+                      fontWeight: 850,
+                    }}
+                  >
+                    {index === 0 ? "Host · " : ""}
+                    {player.name}
+                    {claimedNames.has(player.name) ? " · verbunden" : ""}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </main>
+
+      <aside style={{ display: "grid", gap: 12, minWidth: 0 }}>
+        <LocalRoleCard
+          viewerPlayerId={viewerPlayerId}
+          setViewerPlayerId={setViewerPlayerId}
+          viewerRole={viewerRole}
+          permissions={getViewerPermissions(viewerRole)}
+          players={visiblePlayers}
+          roomClients={roomClients}
+          clientInstanceId={clientInstanceId}
+          roomCode={roomCode}
+        />
+
+        <RulesCard />
+
+        <Card>
+          <CardContent style={{ display: "grid", gap: 10 }}>
+            <Badge variant="secondary">Falsche Ansicht?</Badge>
+            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+              Nur der echte Host sollte Setup, Spotify und Startbutton sehen.
+            </p>
+            <Button variant="secondary" onClick={onSwitchToHost}>
+              Host-Ansicht öffnen
+            </Button>
+          </CardContent>
+        </Card>
+      </aside>
     </div>
   );
 }
