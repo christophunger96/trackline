@@ -3341,6 +3341,29 @@ function mergePresenceNamesIntoPlayers(currentPlayers = [], namesToAdd = [], pre
   return result;
 }
 
+function buildLobbyDisplayPlayers({ players = [], playerNames = [], roomClients = [], currentDisplayName = "", includeLocal = false }) {
+  const namesFromPlayers = Array.isArray(players) ? players.map((player) => player?.name) : [];
+  const namesFromPlayerNames = Array.isArray(playerNames) ? playerNames : [];
+  const namesFromClients = Array.isArray(roomClients) ? roomClients.map((client) => client?.playerName) : [];
+  const localName = includeLocal ? [currentDisplayName] : [];
+
+  return dedupeNames([
+    ...namesFromPlayers,
+    ...namesFromPlayerNames,
+    ...namesFromClients,
+    ...localName,
+  ])
+    .filter((name) => name.toLowerCase() !== "spieler")
+    .filter((name) => name.toLowerCase() !== "gast")
+    .map((name, index) => ({
+      id: `display-${index}-${name.toLowerCase().replace(/[^a-z0-9]+/gi, "-")}`,
+      name,
+      score: 0,
+      timeline: [],
+      isDisplayOnly: true,
+    }));
+}
+
 async function supabaseAuthRequest(config, path, options = {}, accessToken = "") {
   const baseUrl = normalizeSupabaseUrl(config?.url);
   const anonKey = String(config?.anonKey || "").trim();
@@ -3634,14 +3657,15 @@ export default function App() {
   }, [guestName]);
 
   useEffect(() => {
-    if (gameState.phase !== "lobby" || !showLobbyHostView) return;
+    if (gameState.phase !== "lobby") return;
 
     const joinedNames = (roomClients || [])
       .map((client) => normalizePlayerName(client.playerName))
       .filter(Boolean);
 
     setPlayerNames((previous) => {
-      const next = mergePresenceNamesIntoPlayers(previous, joinedNames, localDisplayName);
+      const preferredName = showLobbyHostView ? localDisplayName : "";
+      const next = mergePresenceNamesIntoPlayers(previous, joinedNames, preferredName);
       return JSON.stringify(next) === JSON.stringify(previous) ? previous : next;
     });
   }, [localDisplayName, roomClients, gameState.phase, showLobbyHostView]);
@@ -4027,8 +4051,16 @@ export default function App() {
     setViewerPlayerId("auto-player");
     storeViewerPlayerId(safeCode, "auto-player");
     setSyncEnabled(true);
-    setSyncStatus(`Raum ${safeCode} wird verbunden...`);
+    setSyncStatus(`Du trittst Raum ${safeCode} als ${socketDisplayName || "Gast"} bei...`);
     updateBrowserRoomUrl(safeCode, "player");
+
+    window.setTimeout(() => {
+      setSyncStatus((current) =>
+        String(current || "").includes(`Raum ${safeCode}`) || String(current || "").includes(`trittst Raum ${safeCode}`)
+          ? `Raum ${safeCode} verbunden. Du bist als ${socketDisplayName || "Gast"} sichtbar.`
+          : current
+      );
+    }, 1200);
   }
 
   function switchToHostView() {
@@ -4310,6 +4342,8 @@ export default function App() {
                 playerName={playerName}
                 setPlayerName={setPlayerName}
                 playerNames={playerNames}
+                roomClients={roomClients}
+                currentDisplayName={socketDisplayName}
                 addPlayer={addPlayer}
                 removePlayer={removePlayer}
                 startGame={startGame}
@@ -4564,7 +4598,11 @@ function JoinRoomModeCard({ roomCode, setRoomCode, isPlayerJoinView, isHostSetup
 
         <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ color: colors.muted, fontSize: 12 }}>
-            {syncEnabled ? syncStatus : "Sync ist noch aus. Beim Beitreten wird er aktiviert."}
+            {isPlayerJoinView && syncEnabled
+              ? `Verbunden als ${currentDisplayName || "Gast"}.`
+              : syncEnabled
+                ? syncStatus
+                : "Sync ist noch aus. Beim Beitreten wird er aktiviert."}
           </div>
 
           {!isHostSetupView && (
@@ -4586,14 +4624,13 @@ function JoinRoomModeCard({ roomCode, setRoomCode, isPlayerJoinView, isHostSetup
 }
 
 function PlayerLobbyWaitingCard({ roomCode, syncStatus, syncEnabled, syncClientCount, players, playerNames = [], roomClients, viewerPlayerId, setViewerPlayerId, viewerRole, clientInstanceId, currentDisplayName = "Gast", onSwitchToHost }) {
-  const visiblePlayers = Array.isArray(players) && players.length
-    ? players
-    : playerNames.map((name, index) => ({
-        id: `lobby-${index}-${String(name).toLowerCase().replace(/\s+/g, "-")}`,
-        name,
-        score: 0,
-        timeline: [],
-      }));
+  const visiblePlayers = buildLobbyDisplayPlayers({
+    players,
+    playerNames,
+    roomClients,
+    currentDisplayName,
+    includeLocal: true,
+  });
 
   const claimedNames = new Set(
     (roomClients || [])
@@ -4632,7 +4669,9 @@ function PlayerLobbyWaitingCard({ roomCode, syncStatus, syncEnabled, syncClientC
 
             <div style={{ border: `1px solid ${colors.border}`, borderRadius: 18, padding: 14, background: colors.bg }}>
               <strong>Status</strong>
-              <p style={{ margin: "6px 0 0", color: colors.muted }}>{syncStatus}</p>
+              <p style={{ margin: "6px 0 0", color: colors.muted }}>
+                {syncEnabled ? `Verbunden als ${currentDisplayName || "Gast"}. Warte auf den Host.` : syncStatus}
+              </p>
             </div>
 
             <div style={{ display: "grid", gap: 10 }}>
@@ -4642,6 +4681,21 @@ function PlayerLobbyWaitingCard({ roomCode, syncStatus, syncEnabled, syncClientC
               </div>
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {visiblePlayers.length === 0 && (
+                  <span
+                    style={{
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: 999,
+                      background: colors.chip,
+                      color: colors.text,
+                      padding: "8px 12px",
+                      fontWeight: 850,
+                    }}
+                  >
+                    {currentDisplayName || "Du"}
+                  </span>
+                )}
+
                 {visiblePlayers.map((player, index) => (
                   <span
                     key={player.id || player.name}
@@ -5695,6 +5749,8 @@ function LobbyCard({
   playerName,
   setPlayerName,
   playerNames,
+  roomClients = [],
+  currentDisplayName = "",
   addPlayer,
   removePlayer,
   startGame,
@@ -5758,6 +5814,39 @@ function LobbyCard({
           </p>
         </div>
 
+        <div style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 12, background: colors.bg, display: "grid", gap: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <strong>Aktuell sichtbare Namen</strong>
+            <Badge variant="secondary">{Math.max(playerNames.length, roomClients.length, currentDisplayName ? 1 : 0)}</Badge>
+          </div>
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {buildLobbyDisplayPlayers({
+              playerNames,
+              roomClients,
+              currentDisplayName,
+              includeLocal: true,
+            }).map((player) => (
+              <span
+                key={player.id}
+                style={{
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 999,
+                  background: colors.chip,
+                  padding: "7px 10px",
+                  fontWeight: 850,
+                }}
+              >
+                {player.name}
+              </span>
+            ))}
+          </div>
+
+          <p style={{ margin: 0, color: colors.muted, fontSize: 12 }}>
+            Diese Anzeige ist nur die Live-Präsenz. Für den Spielstart zählt die Startliste darunter.
+          </p>
+        </div>
+
         <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12 }}>
           <Input
             value={playerName}
@@ -5777,7 +5866,7 @@ function LobbyCard({
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {playerNames.length === 0 && (
               <span style={{ color: colors.muted, fontSize: 13 }}>
-                Noch keine Spieler. Logge dich ein, vergib einen Gastnamen oder füge manuell Namen hinzu.
+                Noch keine Spieler in der Startliste. Verbundene Gast-/Login-Namen erscheinen oben; du kannst sie bei Bedarf manuell ergänzen.
               </span>
             )}
 
