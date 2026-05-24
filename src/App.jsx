@@ -1244,6 +1244,7 @@ const initialGameState = {
   targetScore: 10,
   maxTurns: 0,
   playLimitSeconds: DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS,
+  spotifyJamMode: false,
   difficulty: "normal",
   gameMode: "solo",
   turnNumber: 1,
@@ -1824,6 +1825,7 @@ function gameReducer(state, action) {
         targetScore: Number(action.targetScore || state.targetScore || 10),
         maxTurns: Number(action.maxTurns ?? state.maxTurns ?? 0),
         playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || state.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS))),
+        spotifyJamMode: Boolean(state.spotifyJamMode),
         difficulty: action.difficulty || state.difficulty || "normal",
         gameMode: state.gameMode || action.gameMode || "solo",
         gameLog: [
@@ -1855,6 +1857,7 @@ function gameReducer(state, action) {
         targetScore: Number(action.targetScore || 10),
         maxTurns: Number(action.maxTurns || 0),
         playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS))),
+        spotifyJamMode: Boolean(state.spotifyJamMode || action.spotifyJamMode),
         difficulty: action.difficulty || "normal",
         gameMode: action.gameMode || "solo",
         gameLog: [
@@ -2247,6 +2250,28 @@ function gameReducer(state, action) {
       );
     }
 
+    case "SPOTIFY_JAM_MODE_SET": {
+      const enabled = Boolean(action.enabled);
+
+      return addEvent(
+        {
+          ...state,
+          spotifyJamMode: enabled,
+          gameLog: [
+            {
+              id: createId("log"),
+              text: enabled
+                ? "Spotify Jam-Modus wurde aktiviert."
+                : "Spotify Jam-Modus wurde deaktiviert.",
+            },
+            ...state.gameLog,
+          ].slice(0, 12),
+        },
+        "SPOTIFY_JAM_MODE_SET",
+        enabled ? "Jam-Modus aktiviert" : "Jam-Modus deaktiviert"
+      );
+    }
+
     case "TRACK_PLAY_REQUESTED": {
       if (!["placing", "challenge"].includes(state.phase) || !state.currentTrack) return state;
 
@@ -2259,6 +2284,7 @@ function gameReducer(state, action) {
         trackId: state.currentTrack.id,
         hiddenLabel: "Verdeckter Song",
         playLimitSeconds: Number(action.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS),
+        spotifyJamMode: Boolean(state.spotifyJamMode),
         createdAt: new Date().toLocaleTimeString(),
       };
 
@@ -4348,6 +4374,7 @@ export default function App() {
   const winner = getFinalWinner(gameState.players, gameState.targetScore);
   const activeRoomCode = gameState.room?.code || roomCode;
   const spotifyHelperUrl = getSupabaseSpotifyFunctionUrl(supabaseConfig) || socketUrl;
+  const syncedSpotifyJamMode = Boolean(gameState.spotifyJamMode || spotifyJamMode);
 
   const resolvedViewerPlayerId = (() => {
     if (viewerPlayerId === "auto-host") return gameState.room?.hostPlayerId || "spectator";
@@ -4386,8 +4413,19 @@ export default function App() {
   }, [gameState]);
 
   useEffect(() => {
-    localStorage.setItem(SPOTIFY_JAM_MODE_STORAGE_KEY, spotifyJamMode ? "true" : "false");
-  }, [spotifyJamMode]);
+    localStorage.setItem(SPOTIFY_JAM_MODE_STORAGE_KEY, syncedSpotifyJamMode ? "true" : "false");
+
+    if (spotifyJamMode !== syncedSpotifyJamMode) {
+      setSpotifyJamMode(syncedSpotifyJamMode);
+    }
+  }, [syncedSpotifyJamMode]);
+
+  function handleSpotifyJamModeChange(enabled) {
+    const nextEnabled = Boolean(enabled);
+
+    setSpotifyJamMode(nextEnabled);
+    sendGameAction({ type: "SPOTIFY_JAM_MODE_SET", enabled: nextEnabled });
+  }
 
   useEffect(() => {
     return () => {
@@ -4785,7 +4823,7 @@ export default function App() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            jamMode: spotifyJamMode,
+            jamMode: syncedSpotifyJamMode,
           }),
         });
       } catch {
@@ -4819,7 +4857,7 @@ export default function App() {
         body: JSON.stringify({
           playLimitSeconds,
           track: gameState.currentTrack,
-          jamMode: spotifyJamMode,
+          jamMode: syncedSpotifyJamMode,
         }),
       });
 
@@ -5261,8 +5299,8 @@ export default function App() {
                 roomCode={gameState.room?.code || roomCode}
                 spotifyAuthServerUrl={spotifyHelperUrl}
                 roundPlayLimitSeconds={gameState.playLimitSeconds}
-                jamMode={spotifyJamMode}
-                setJamMode={setSpotifyJamMode}
+                jamMode={syncedSpotifyJamMode}
+                setJamMode={handleSpotifyJamModeChange}
                 onPlaybackRequested={() =>
                   sendGameAction({
                     type: "TRACK_PLAY_REQUESTED",
