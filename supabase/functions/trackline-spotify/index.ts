@@ -188,21 +188,56 @@ async function getRoomSpotify(admin: ReturnType<typeof createClient>, roomCode: 
 }
 
 async function saveRoomSpotify(admin: ReturnType<typeof createClient>, roomCode: string, patch: Record<string, unknown>) {
-  const { error } = await admin
-    .from("room_spotify")
-    .upsert(
-      {
-        room_code: roomCode,
-        ...patch,
-        updated_at: new Date().toISOString(),
-      },
-      {
+  const payload = {
+    ...patch,
+    updated_at: new Date().toISOString(),
+  };
+
+  const hasInsertRequiredClientId = Boolean(
+    payload.client_id ||
+    payload.clientId ||
+    patch.client_id ||
+    patch.clientId
+  );
+
+  if (hasInsertRequiredClientId) {
+    const normalizedPayload = {
+      room_code: roomCode,
+      ...payload,
+      client_id: String(payload.client_id || payload.clientId || ""),
+    };
+
+    delete (normalizedPayload as Record<string, unknown>).clientId;
+
+    const { error } = await admin
+      .from("room_spotify")
+      .upsert(normalizedPayload, {
         onConflict: "room_code",
-      },
-    );
+      });
+
+    if (error) {
+      throw new Error(error.message || JSON.stringify(error));
+    }
+
+    return;
+  }
+
+  // For device saves and token refreshes we must update the existing row.
+  // A plain upsert without client_id can violate the NOT NULL constraint before
+  // Postgres resolves the ON CONFLICT path.
+  const { data, error } = await admin
+    .from("room_spotify")
+    .update(payload)
+    .eq("room_code", roomCode)
+    .select("room_code")
+    .maybeSingle();
 
   if (error) {
     throw new Error(error.message || JSON.stringify(error));
+  }
+
+  if (!data) {
+    throw new Error("Spotify ist für diesen Raum noch nicht verbunden. Bitte Spotify Host-Login zuerst abschließen.");
   }
 }
 
