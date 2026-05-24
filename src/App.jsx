@@ -43,6 +43,7 @@ const SYNC_SOCKET_URL_STORAGE_KEY = "trackline.sync.socketUrl";
 const SYNC_ENABLED_STORAGE_KEY = "trackline.sync.enabled";
 const CLIENT_INSTANCE_ID_STORAGE_KEY = "trackline.clientInstanceId.v1";
 const VIEWER_PLAYER_STORAGE_PREFIX = "trackline.viewerPlayer.v1.";
+const GUEST_NAME_STORAGE_KEY = "trackline.guestName.v1";
 const SUPABASE_URL_STORAGE_KEY = "trackline.supabase.url";
 const SUPABASE_ANON_KEY_STORAGE_KEY = "trackline.supabase.anonKey";
 const SUPABASE_ENABLED_STORAGE_KEY = "trackline.supabase.enabled";
@@ -3280,6 +3281,66 @@ function getAuthGuestId(session, fallbackGuestId) {
   return userId ? `auth-${userId}` : String(fallbackGuestId || "");
 }
 
+function normalizePlayerName(value = "") {
+  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 32);
+}
+
+function getInitialGuestName() {
+  try {
+    return normalizePlayerName(localStorage.getItem(GUEST_NAME_STORAGE_KEY) || "");
+  } catch {
+    return "";
+  }
+}
+
+function getLocalDisplayName(authName = "", guestName = "", fallback = "") {
+  return normalizePlayerName(authName) || normalizePlayerName(guestName) || normalizePlayerName(fallback);
+}
+
+function dedupeNames(names = []) {
+  const seen = new Set();
+  const result = [];
+
+  names.forEach((name) => {
+    const safeName = normalizePlayerName(name);
+    const key = safeName.toLowerCase();
+
+    if (!safeName || seen.has(key)) return;
+
+    seen.add(key);
+    result.push(safeName);
+  });
+
+  return result;
+}
+
+function mergePreferredNameIntoPlayers(currentPlayers = [], preferredName = "") {
+  const safeName = normalizePlayerName(preferredName);
+
+  if (!safeName) return dedupeNames(currentPlayers);
+
+  const rest = dedupeNames(currentPlayers).filter((name) => name.toLowerCase() !== safeName.toLowerCase());
+  return [safeName, ...rest];
+}
+
+function mergePresenceNamesIntoPlayers(currentPlayers = [], namesToAdd = [], preferredName = "") {
+  const preferred = normalizePlayerName(preferredName);
+  const existing = dedupeNames(currentPlayers);
+  const result = preferred ? mergePreferredNameIntoPlayers(existing, preferred) : existing;
+
+  namesToAdd.forEach((name) => {
+    const safeName = normalizePlayerName(name);
+    if (!safeName) return;
+    if (safeName.toLowerCase() === "spieler") return;
+    if (safeName.toLowerCase() === "gast") return;
+    if (result.some((existingName) => existingName.toLowerCase() === safeName.toLowerCase())) return;
+
+    result.push(safeName);
+  });
+
+  return result;
+}
+
 async function supabaseAuthRequest(config, path, options = {}, accessToken = "") {
   const baseUrl = normalizeSupabaseUrl(config?.url);
   const anonKey = String(config?.anonKey || "").trim();
@@ -3397,12 +3458,7 @@ async function createOrUpdateAuthProfile(config, session, displayName, fallbackG
 }
 
 function mergeAuthNameIntoPlayers(currentPlayers = [], displayName = "") {
-  const safeName = String(displayName || "").trim();
-
-  if (!safeName) return currentPlayers;
-
-  const rest = currentPlayers.slice(1).filter((name) => name !== safeName);
-  return [safeName, ...rest];
+  return mergePreferredNameIntoPlayers(currentPlayers, displayName);
 }
 
 
@@ -3440,7 +3496,8 @@ export default function App() {
   const [gameState, dispatch] = useReducer(gameReducer, initialGameState, loadStoredGameState);
 
   const [playerName, setPlayerName] = useState("");
-  const [playerNames, setPlayerNames] = useState(["Christoph", "Alex"]);
+  const [playerNames, setPlayerNames] = useState([]);
+  const [guestName, setGuestName] = useState(() => getInitialGuestName());
   const [customTracks, setCustomTracks] = useState(() => loadStoredCustomTracks());
   const [selectedPreset, setSelectedPreset] = useState("all");
   const [selectedDifficulty, setSelectedDifficulty] = useState("normal");
@@ -3489,6 +3546,9 @@ export default function App() {
   const winner = getFinalWinner(gameState.players, gameState.targetScore);
   const activeRoomCode = gameState.room?.code || roomCode;
   const authDisplayName = getAuthDisplayName(authSession);
+  const guestDisplayName = normalizePlayerName(guestName);
+  const localDisplayName = getLocalDisplayName(authDisplayName, guestDisplayName);
+  const socketDisplayName = localDisplayName || "Gast";
 
   const resolvedViewerPlayerId = (() => {
     if (viewerPlayerId === "auto-host") return gameState.room?.hostPlayerId || "spectator";
@@ -3505,6 +3565,17 @@ export default function App() {
           .map((client) => client.playerId)
           .filter(Boolean)
       );
+
+      const matchingLocalPlayer = localDisplayName
+        ? gameState.players.find(
+            (player) =>
+              player.id !== gameState.room?.hostPlayerId &&
+              player.name?.toLowerCase() === localDisplayName.toLowerCase() &&
+              !claimedByOther.has(player.id)
+          )
+        : null;
+
+      if (matchingLocalPlayer) return matchingLocalPlayer.id;
 
       return (
         gameState.players.find((player) => player.id !== gameState.room?.hostPlayerId && !claimedByOther.has(player.id))?.id ||
@@ -3559,13 +3630,21 @@ export default function App() {
   }, [authSession]);
 
   useEffect(() => {
-    if (!authDisplayName || gameState.phase !== "lobby") return;
+    localStorage.setItem(GUEST_NAME_STORAGE_KEY, guestName || "");
+  }, [guestName]);
+
+  useEffect(() => {
+    if (gameState.phase !== "lobby" || !showLobbyHostView) return;
+
+    const joinedNames = (roomClients || [])
+      .map((client) => normalizePlayerName(client.playerName))
+      .filter(Boolean);
 
     setPlayerNames((previous) => {
-      const next = mergeAuthNameIntoPlayers(previous, authDisplayName);
+      const next = mergePresenceNamesIntoPlayers(previous, joinedNames, localDisplayName);
       return JSON.stringify(next) === JSON.stringify(previous) ? previous : next;
     });
-  }, [authDisplayName, gameState.phase]);
+  }, [localDisplayName, roomClients, gameState.phase, showLobbyHostView]);
 
   useEffect(() => {
     if (!syncEnabled) {
@@ -3591,7 +3670,7 @@ export default function App() {
       setSyncStatus(`Sync verbunden: ${socket.id}`);
       socket.emit("room:join", {
         roomCode: activeRoomCode,
-        playerName: playerNames[0] || "Spieler",
+        playerName: socketDisplayName,
         clientInstanceId,
       });
     });
@@ -3656,7 +3735,18 @@ export default function App() {
         socketRef.current = null;
       }
     };
-  }, [syncEnabled, socketUrl, roomCode, gameState.room?.code, playerNames[0], clientInstanceId]);
+  }, [syncEnabled, socketUrl, roomCode, gameState.room?.code, socketDisplayName, clientInstanceId]);
+
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!syncEnabled || !socket?.connected) return;
+
+    socket.emit("room:join", {
+      roomCode: activeRoomCode,
+      playerName: socketDisplayName,
+      clientInstanceId,
+    });
+  }, [syncEnabled, activeRoomCode, socketDisplayName, clientInstanceId]);
 
   useEffect(() => {
     const socket = socketRef.current;
@@ -3670,10 +3760,10 @@ export default function App() {
     socket.emit("room:claimPlayer", {
       roomCode: activeRoomCode,
       playerId: resolvedViewerPlayerId,
-      playerName: claimedPlayer?.name || playerNames[0] || "Spieler",
+      playerName: claimedPlayer?.name || socketDisplayName,
       clientInstanceId,
     });
-  }, [syncEnabled, viewerPlayerId, resolvedViewerPlayerId, gameState.room?.code, roomCode, gameState.players, playerNames, clientInstanceId]);
+  }, [syncEnabled, viewerPlayerId, resolvedViewerPlayerId, gameState.room?.code, roomCode, gameState.players, socketDisplayName, clientInstanceId]);
 
   useEffect(() => {
     if (!resolvedViewerPlayerId || resolvedViewerPlayerId === "spectator" || resolvedViewerPlayerId.startsWith("auto-")) return;
@@ -3991,7 +4081,7 @@ export default function App() {
     const actionWithActor = {
       ...action,
       actorPlayerId,
-      actorName: actorPlayer?.name || playerNames[0] || "Spieler",
+      actorName: actorPlayer?.name || socketDisplayName,
     };
 
 
@@ -4007,17 +4097,15 @@ export default function App() {
   }
 
   function addPlayer() {
-    const name = playerName.trim();
+    const name = normalizePlayerName(playerName);
 
-    if (!name || playerNames.includes(name)) return;
+    if (!name || playerNames.some((existingName) => existingName.toLowerCase() === name.toLowerCase())) return;
 
     setPlayerNames([...playerNames, name]);
     setPlayerName("");
   }
 
   function removePlayer(name) {
-    if (playerNames.length <= 1) return;
-
     setPlayerNames(playerNames.filter((player) => player !== name));
   }
 
@@ -4082,7 +4170,7 @@ export default function App() {
   function startGame(settings) {
     sendGameAction({
       type: "START_GAME",
-      playerNames,
+      playerNames: playerNames.length ? playerNames : [socketDisplayName],
       deck: availableDeck,
       roomCode,
       targetScore: settings.targetScore,
@@ -4128,7 +4216,10 @@ export default function App() {
             <AuthPanel
               session={authSession}
               status={authStatus}
-              defaultName={authDisplayName || playerNames[0] || ""}
+              defaultName={authDisplayName || guestDisplayName || playerNames[0] || ""}
+              guestName={guestName}
+              currentDisplayName={socketDisplayName}
+              onGuestNameChange={setGuestName}
               config={supabaseConfig}
               onConfigChange={handleSupabaseConfigChange}
               onSignUp={handleAuthSignUp}
@@ -4144,6 +4235,7 @@ export default function App() {
               syncStatus={syncStatus}
               syncEnabled={syncEnabled}
               socketUrl={socketUrl}
+              currentDisplayName={socketDisplayName}
               onJoinRoom={joinRoomAsPlayer}
               onSwitchToHost={switchToHostView}
             />
@@ -4256,6 +4348,7 @@ export default function App() {
             setViewerPlayerId={setViewerPlayerId}
             viewerRole={viewerRole}
             clientInstanceId={clientInstanceId}
+            currentDisplayName={socketDisplayName}
             onSwitchToHost={switchToHostView}
           />
         )}
@@ -4420,7 +4513,7 @@ export default function App() {
 }
 
 
-function JoinRoomModeCard({ roomCode, setRoomCode, isPlayerJoinView, isHostSetupView, syncStatus, syncEnabled, socketUrl, onJoinRoom, onSwitchToHost }) {
+function JoinRoomModeCard({ roomCode, setRoomCode, isPlayerJoinView, isHostSetupView, syncStatus, syncEnabled, socketUrl, currentDisplayName = "Gast", onJoinRoom, onSwitchToHost }) {
   const [joinCode, setJoinCode] = useState(roomCode || "");
 
   useEffect(() => {
@@ -4440,6 +4533,11 @@ function JoinRoomModeCard({ roomCode, setRoomCode, isPlayerJoinView, isHostSetup
           <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
             Host sieht Setup, Spotify und Start. Spieler sehen nur die reduzierte Ansicht mit ihrem Zug und dem Spielstand.
           </p>
+        </div>
+
+        <div style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg, display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ color: colors.muted, fontSize: 13 }}>Du trittst bei als</span>
+          <strong>{currentDisplayName || "Gast"}</strong>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 8, alignItems: "end" }}>
@@ -4487,7 +4585,7 @@ function JoinRoomModeCard({ roomCode, setRoomCode, isPlayerJoinView, isHostSetup
   );
 }
 
-function PlayerLobbyWaitingCard({ roomCode, syncStatus, syncEnabled, syncClientCount, players, playerNames = [], roomClients, viewerPlayerId, setViewerPlayerId, viewerRole, clientInstanceId, onSwitchToHost }) {
+function PlayerLobbyWaitingCard({ roomCode, syncStatus, syncEnabled, syncClientCount, players, playerNames = [], roomClients, viewerPlayerId, setViewerPlayerId, viewerRole, clientInstanceId, currentDisplayName = "Gast", onSwitchToHost }) {
   const visiblePlayers = Array.isArray(players) && players.length
     ? players
     : playerNames.map((name, index) => ({
@@ -4522,7 +4620,7 @@ function PlayerLobbyWaitingCard({ roomCode, syncStatus, syncEnabled, syncClientC
               <Badge variant="secondary">Spieler-Lobby</Badge>
               <h2 style={{ margin: "4px 0 0", fontSize: 30, letterSpacing: -0.8 }}>Du bist im Raum {roomCode}</h2>
               <p style={{ margin: 0, color: colors.muted }}>
-                Warte, bis der Host die Runde startet. Du siehst hier nur die nötigen Spielerinfos.
+                Warte, bis der Host die Runde startet. Du bist als <strong>{currentDisplayName || "Gast"}</strong> im Raum sichtbar.
               </p>
             </div>
 
@@ -4597,7 +4695,7 @@ function PlayerLobbyWaitingCard({ roomCode, syncStatus, syncEnabled, syncClientC
   );
 }
 
-function AuthPanel({ session, status, defaultName, config, onConfigChange, onSignUp, onSignIn, onLogout }) {
+function AuthPanel({ session, status, defaultName, guestName = "", currentDisplayName = "Gast", onGuestNameChange, config, onConfigChange, onSignUp, onSignIn, onLogout }) {
   const [mode, setMode] = useState("signin");
   const [displayName, setDisplayName] = useState(defaultName || "");
   const [email, setEmail] = useState("");
@@ -4625,9 +4723,12 @@ function AuthPanel({ session, status, defaultName, config, onConfigChange, onSig
             </p>
           </div>
 
-          <Button variant="secondary" onClick={onLogout}>
-            Logout
-          </Button>
+          <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
+            <Badge variant="secondary">Spielname: {currentDisplayName}</Badge>
+            <Button variant="secondary" onClick={onLogout}>
+              Logout
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );
@@ -4659,7 +4760,7 @@ function AuthPanel({ session, status, defaultName, config, onConfigChange, onSig
           {mode === "signup" && (
             <label style={{ display: "grid", gap: 8 }}>
               <span style={{ color: colors.muted, fontSize: 13 }}>Anzeigename</span>
-              <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="z. B. Christoph" />
+              <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="z. B. Mia" />
             </label>
           )}
 
@@ -4698,6 +4799,24 @@ function AuthPanel({ session, status, defaultName, config, onConfigChange, onSig
           >
             {mode === "signin" ? "Einloggen" : "Account erstellen"}
           </Button>
+        </div>
+
+        <div style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 12, background: colors.bg, display: "grid", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <div>
+              <strong>Ohne Login als Gast spielen</strong>
+              <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 12 }}>
+                Dieser Name wird für Lobby, Raumbeitritt und Spielerzuordnung verwendet.
+              </p>
+            </div>
+            <Badge variant="secondary">Aktuell: {currentDisplayName}</Badge>
+          </div>
+
+          <Input
+            value={guestName}
+            onChange={(event) => onGuestNameChange?.(normalizePlayerName(event.target.value))}
+            placeholder="Gastname eingeben"
+          />
         </div>
 
         {!configured && (
@@ -5635,7 +5754,7 @@ function LobbyCard({
           <Badge variant="secondary">Lobby</Badge>
           <h2 style={{ fontSize: 30, margin: "4px 0 0", letterSpacing: -0.8 }}>Runde vorbereiten</h2>
           <p style={{ color: colors.muted, margin: 0 }}>
-            Spieler hinzufügen, Ziel festlegen und dann die erste verdeckte Karte ziehen.
+            Spieler melden sich mit Profil- oder Gastnamen an. Der Host kann zusätzlich manuell Namen ergänzen.
           </p>
         </div>
 
@@ -5656,6 +5775,12 @@ function LobbyCard({
           </div>
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {playerNames.length === 0 && (
+              <span style={{ color: colors.muted, fontSize: 13 }}>
+                Noch keine Spieler. Logge dich ein, vergib einen Gastnamen oder füge manuell Namen hinzu.
+              </span>
+            )}
+
             {playerNames.map((name, index) => (
               <button
                 key={name}
