@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { io } from "socket.io-client";
 
 const colors = {
   bg: "#020617",
@@ -42,20 +43,13 @@ const SYNC_SOCKET_URL_STORAGE_KEY = "trackline.sync.socketUrl";
 const SYNC_ENABLED_STORAGE_KEY = "trackline.sync.enabled";
 const CLIENT_INSTANCE_ID_STORAGE_KEY = "trackline.clientInstanceId.v1";
 const VIEWER_PLAYER_STORAGE_PREFIX = "trackline.viewerPlayer.v1.";
-const DEFAULT_SYNC_SOCKET_URL = import.meta.env?.VITE_SOCKET_URL || "nicht mehr nötig, nur Legacy-Fallback";
-const SUPABASE_URL_STORAGE_KEY = "trackline.supabase.url";
-const SUPABASE_ANON_KEY_STORAGE_KEY = "trackline.supabase.anonKey";
-const SUPABASE_ENABLED_STORAGE_KEY = "trackline.supabase.enabled";
-const SUPABASE_SAVED_RESULTS_STORAGE_KEY = "trackline.supabase.savedResults.v1";
-const SUPABASE_AUTH_SESSION_STORAGE_KEY = "trackline.supabase.authSession.v1";
-const DEFAULT_SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || "";
-const DEFAULT_SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || "";
+// Render rollback: VITE_SOCKET_URL must point to the Render server that also handles Spotify.
+const DEFAULT_SYNC_SOCKET_URL = import.meta.env?.VITE_SOCKET_URL || "http://127.0.0.1:3001";
 
 const SPOTIFY_CLIENT_ID_STORAGE_KEY = "trackline.spotify.clientId";
 const DEFAULT_SPOTIFY_CLIENT_ID = "eb70ba4d164248d8810e52caae6b40cb";
 const SPOTIFY_CODE_VERIFIER_STORAGE_KEY = "trackline.spotify.codeVerifier";
 const SPOTIFY_TOKEN_STORAGE_KEY = "trackline.spotify.token";
-const SPOTIFY_JAM_MODE_STORAGE_KEY = "trackline.spotify.jamMode.v1";
 const SPOTIFY_SCOPES = [
   "streaming",
   "user-read-email",
@@ -65,7 +59,6 @@ const SPOTIFY_SCOPES = [
 ].join(" ");
 
 const SPOTIFY_PLAY_EVENT_NAME = "trackline.spotify.playCurrent";
-const SPOTIFY_CANONICAL_REDIRECT_URI = "https://cdjgxdffyqnsuxdxuplf.functions.supabase.co/trackline-spotify/spotify/callback";
 const DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS = 20;
 const PLAY_LIMIT_OPTIONS = [10, 20, 30];
 const DIFFICULTY_OPTIONS = [
@@ -922,202 +915,6 @@ const ERA_BALANCE_EXPANSION_TRACKS = [
   { id: "b790", title: "Texas Hold 'Em", artist: "Beyoncé", year: 2024, genre: "Country Pop" },
 ];
 
-const SONGPOOL_800_EXPANSION_TRACKS = [
-  { id: "e8001", title: "Only You", artist: "The Platters", year: 1955, genre: "Doo-wop" },
-  { id: "e8002", title: "Mr. Sandman", artist: "The Chordettes", year: 1954, genre: "Vocal Pop" },
-  { id: "e8003", title: "Sh-Boom", artist: "The Chords", year: 1954, genre: "Doo-wop" },
-  { id: "e8004", title: "Earth Angel", artist: "The Penguins", year: 1954, genre: "Doo-wop" },
-  { id: "e8005", title: "Sixteen Tons", artist: "Tennessee Ernie Ford", year: 1955, genre: "Country" },
-  { id: "e8006", title: "Come Go with Me", artist: "The Del-Vikings", year: 1957, genre: "Doo-wop" },
-  { id: "e8007", title: "Poetry in Motion", artist: "Johnny Tillotson", year: 1960, genre: "Pop" },
-  { id: "e8008", title: "Telstar", artist: "The Tornados", year: 1962, genre: "Instrumental" },
-  { id: "e8009", title: "Rhythm of the Rain", artist: "The Cascades", year: 1962, genre: "Pop" },
-  { id: "e8010", title: "Walk Like a Man", artist: "The Four Seasons", year: 1963, genre: "Pop" },
-  { id: "e8011", title: "Da Doo Ron Ron", artist: "The Crystals", year: 1963, genre: "Girl Group" },
-  { id: "e8012", title: "Wipe Out", artist: "The Surfaris", year: 1963, genre: "Surf Rock" },
-  { id: "e8013", title: "Surfin' Bird", artist: "The Trashmen", year: 1963, genre: "Surf Rock" },
-  { id: "e8014", title: "California Sun", artist: "The Rivieras", year: 1964, genre: "Surf Rock" },
-  { id: "e8015", title: "Baby Love", artist: "The Supremes", year: 1964, genre: "Motown" },
-  { id: "e8016", title: "The Girl from Ipanema", artist: "Stan Getz & João Gilberto", year: 1964, genre: "Bossa Nova" },
-  { id: "e8017", title: "You Really Got Me", artist: "The Kinks", year: 1964, genre: "Rock" },
-  { id: "e8018", title: "Needles and Pins", artist: "The Searchers", year: 1964, genre: "Beat" },
-  { id: "e8019", title: "She's Not There", artist: "The Zombies", year: 1964, genre: "Rock" },
-  { id: "e8020", title: "Downtown", artist: "Petula Clark", year: 1964, genre: "Pop" },
-  { id: "e8021", title: "Stop! In the Name of Love", artist: "The Supremes", year: 1965, genre: "Motown" },
-  { id: "e8022", title: "The Tracks of My Tears", artist: "Smokey Robinson & The Miracles", year: 1965, genre: "Motown" },
-  { id: "e8023", title: "I Got You Babe", artist: "Sonny & Cher", year: 1965, genre: "Pop" },
-  { id: "e8024", title: "Do You Believe in Magic", artist: "The Lovin' Spoonful", year: 1965, genre: "Folk Rock" },
-  { id: "e8025", title: "All Right Now", artist: "Free", year: 1970, genre: "Rock" },
-  { id: "e8026", title: "ABC", artist: "The Jackson 5", year: 1970, genre: "Motown" },
-  { id: "e8027", title: "O-o-h Child", artist: "Five Stairsteps", year: 1970, genre: "Soul" },
-  { id: "e8028", title: "Love Grows", artist: "Edison Lighthouse", year: 1970, genre: "Pop" },
-  { id: "e8029", title: "Black Magic Woman", artist: "Santana", year: 1970, genre: "Latin Rock" },
-  { id: "e8030", title: "Mr. Bojangles", artist: "Nitty Gritty Dirt Band", year: 1970, genre: "Country Rock" },
-  { id: "e8031", title: "Knock Three Times", artist: "Tony Orlando & Dawn", year: 1970, genre: "Pop" },
-  { id: "e8032", title: "Joy to the World", artist: "Three Dog Night", year: 1971, genre: "Rock" },
-  { id: "e8033", title: "Have You Ever Seen the Rain", artist: "Creedence Clearwater Revival", year: 1971, genre: "Rock" },
-  { id: "e8034", title: "Riders on the Storm", artist: "The Doors", year: 1971, genre: "Rock" },
-  { id: "e8035", title: "I Am... I Said", artist: "Neil Diamond", year: 1971, genre: "Pop" },
-  { id: "e8036", title: "What's Going On", artist: "Marvin Gaye", year: 1971, genre: "Soul" },
-  { id: "e8037", title: "Brand New Key", artist: "Melanie", year: 1971, genre: "Folk Pop" },
-  { id: "e8038", title: "Family Affair", artist: "Sly & The Family Stone", year: 1971, genre: "Funk" },
-  { id: "e8039", title: "Long Cool Woman", artist: "The Hollies", year: 1972, genre: "Rock" },
-  { id: "e8040", title: "I Can See Clearly Now", artist: "Johnny Nash", year: 1972, genre: "Reggae Pop" },
-  { id: "e8041", title: "Papa Was a Rollin' Stone", artist: "The Temptations", year: 1972, genre: "Soul" },
-  { id: "e8042", title: "You're So Vain", artist: "Carly Simon", year: 1972, genre: "Pop Rock" },
-  { id: "e8043", title: "Could It Be I'm Falling in Love", artist: "The Spinners", year: 1972, genre: "Soul" },
-  { id: "e8044", title: "Angie", artist: "The Rolling Stones", year: 1973, genre: "Rock" },
-  { id: "e8045", title: "Free Bird", artist: "Lynyrd Skynyrd", year: 1973, genre: "Southern Rock" },
-  { id: "e8046", title: "Midnight Train to Georgia", artist: "Gladys Knight & The Pips", year: 1973, genre: "Soul" },
-  { id: "e8047", title: "Brother Louie", artist: "Stories", year: 1973, genre: "Pop" },
-  { id: "e8048", title: "Love Train", artist: "The O'Jays", year: 1973, genre: "Soul" },
-  { id: "e8049", title: "Goodbye Yellow Brick Road", artist: "Elton John", year: 1973, genre: "Pop Rock" },
-  { id: "e8050", title: "Love Is a Battlefield", artist: "Pat Benatar", year: 1983, genre: "Rock" },
-  { id: "e8051", title: "Atomic", artist: "Blondie", year: 1980, genre: "New Wave" },
-  { id: "e8052", title: "Funkytown", artist: "Lipps Inc.", year: 1980, genre: "Disco" },
-  { id: "e8053", title: "Whip It", artist: "Devo", year: 1980, genre: "New Wave" },
-  { id: "e8054", title: "You Shook Me All Night Long", artist: "AC/DC", year: 1980, genre: "Rock" },
-  { id: "e8055", title: "Babooshka", artist: "Kate Bush", year: 1980, genre: "Art Pop" },
-  { id: "e8056", title: "Don't Stand So Close to Me", artist: "The Police", year: 1980, genre: "New Wave" },
-  { id: "e8057", title: "Vienna", artist: "Ultravox", year: 1980, genre: "Synthpop" },
-  { id: "e8058", title: "In the Air Tonight", artist: "Phil Collins", year: 1981, genre: "Pop Rock" },
-  { id: "e8059", title: "Bette Davis Eyes", artist: "Kim Carnes", year: 1981, genre: "Pop" },
-  { id: "e8060", title: "Our Lips Are Sealed", artist: "The Go-Go's", year: 1981, genre: "New Wave" },
-  { id: "e8061", title: "I Love Rock 'n' Roll", artist: "Joan Jett & The Blackhearts", year: 1981, genre: "Rock" },
-  { id: "e8062", title: "Under Pressure", artist: "Queen & David Bowie", year: 1981, genre: "Rock" },
-  { id: "e8063", title: "Do You Really Want to Hurt Me", artist: "Culture Club", year: 1982, genre: "New Wave" },
-  { id: "e8064", title: "1999", artist: "Prince", year: 1982, genre: "Funk" },
-  { id: "e8065", title: "I Ran", artist: "A Flock of Seagulls", year: 1982, genre: "New Wave" },
-  { id: "e8066", title: "Jack & Diane", artist: "John Mellencamp", year: 1982, genre: "Rock" },
-  { id: "e8067", title: "Gloria", artist: "Laura Branigan", year: 1982, genre: "Pop" },
-  { id: "e8068", title: "Electric Avenue", artist: "Eddy Grant", year: 1982, genre: "Reggae Pop" },
-  { id: "e8069", title: "Relax", artist: "Frankie Goes to Hollywood", year: 1983, genre: "Synthpop" },
-  { id: "e8070", title: "Let's Dance", artist: "David Bowie", year: 1983, genre: "Pop Rock" },
-  { id: "e8071", title: "Owner of a Lonely Heart", artist: "Yes", year: 1983, genre: "Rock" },
-  { id: "e8072", title: "When Doves Cry", artist: "Prince", year: 1984, genre: "Funk" },
-  { id: "e8073", title: "Like a Virgin", artist: "Madonna", year: 1984, genre: "Pop" },
-  { id: "e8074", title: "The Reflex", artist: "Duran Duran", year: 1984, genre: "New Wave" },
-  { id: "e8075", title: "Shout", artist: "Tears for Fears", year: 1984, genre: "Synthpop" },
-  { id: "e8076", title: "Dancing in the Dark", artist: "Bruce Springsteen", year: 1984, genre: "Rock" },
-  { id: "e8077", title: "Self Control", artist: "Laura Branigan", year: 1984, genre: "Pop" },
-  { id: "e8078", title: "You're the Inspiration", artist: "Chicago", year: 1984, genre: "Rock Ballad" },
-  { id: "e8079", title: "Sweet Dreams", artist: "La Bouche", year: 1995, genre: "Eurodance" },
-  { id: "e8080", title: "Nothing Compares 2 U", artist: "Sinéad O'Connor", year: 1990, genre: "Pop Ballad" },
-  { id: "e8081", title: "The Power", artist: "Snap!", year: 1990, genre: "Eurodance" },
-  { id: "e8082", title: "It Must Have Been Love", artist: "Roxette", year: 1990, genre: "Pop Ballad" },
-  { id: "e8083", title: "Unbelievable", artist: "EMF", year: 1990, genre: "Alternative" },
-  { id: "e8084", title: "More Than Words", artist: "Extreme", year: 1991, genre: "Acoustic Rock" },
-  { id: "e8085", title: "Set Adrift on Memory Bliss", artist: "P.M. Dawn", year: 1991, genre: "Hip-Hop" },
-  { id: "e8086", title: "One", artist: "U2", year: 1991, genre: "Rock" },
-  { id: "e8087", title: "Would I Lie to You?", artist: "Charles & Eddie", year: 1992, genre: "Soul" },
-  { id: "e8088", title: "Connected", artist: "Stereo MC's", year: 1992, genre: "Hip-Hop" },
-  { id: "e8089", title: "Friday I'm in Love", artist: "The Cure", year: 1992, genre: "Alternative" },
-  { id: "e8090", title: "Ordinary World", artist: "Duran Duran", year: 1992, genre: "Pop Rock" },
-  { id: "e8091", title: "No Rain", artist: "Blind Melon", year: 1992, genre: "Alternative" },
-  { id: "e8092", title: "Dreams", artist: "Gabrielle", year: 1993, genre: "Pop" },
-  { id: "e8093", title: "Two Princes", artist: "Spin Doctors", year: 1993, genre: "Rock" },
-  { id: "e8094", title: "Informer", artist: "Snow", year: 1993, genre: "Reggae Pop" },
-  { id: "e8095", title: "Regulate", artist: "Warren G", year: 1994, genre: "Hip-Hop" },
-  { id: "e8096", title: "Return to Innocence", artist: "Enigma", year: 1994, genre: "New Age Pop" },
-  { id: "e8097", title: "Always", artist: "Bon Jovi", year: 1994, genre: "Rock Ballad" },
-  { id: "e8098", title: "Common People", artist: "Pulp", year: 1995, genre: "Britpop" },
-  { id: "e8099", title: "Missing", artist: "Everything But The Girl", year: 1995, genre: "Dance" },
-  { id: "e8100", title: "Bitter Sweet Symphony", artist: "The Verve", year: 1997, genre: "Britpop" },
-  { id: "e8101", title: "Blue", artist: "Eiffel 65", year: 1998, genre: "Eurodance" },
-  { id: "e8102", title: "Flat Beat", artist: "Mr. Oizo", year: 1999, genre: "Electronic" },
-  { id: "e8103", title: "Stan", artist: "Eminem", year: 2000, genre: "Hip-Hop" },
-  { id: "e8104", title: "The Real Slim Shady", artist: "Eminem", year: 2000, genre: "Hip-Hop" },
-  { id: "e8105", title: "Music", artist: "Madonna", year: 2000, genre: "Pop" },
-  { id: "e8106", title: "Teenage Dirtbag", artist: "Wheatus", year: 2000, genre: "Pop Rock" },
-  { id: "e8107", title: "It Wasn't Me", artist: "Shaggy", year: 2000, genre: "Reggae Pop" },
-  { id: "e8108", title: "Get the Party Started", artist: "Pink", year: 2001, genre: "Pop" },
-  { id: "e8109", title: "A Thousand Miles", artist: "Vanessa Carlton", year: 2002, genre: "Pop" },
-  { id: "e8110", title: "Dilemma", artist: "Nelly feat. Kelly Rowland", year: 2002, genre: "R&B" },
-  { id: "e8111", title: "Crazy in Love", artist: "Beyoncé feat. Jay-Z", year: 2003, genre: "R&B" },
-  { id: "e8112", title: "Don't Cha", artist: "The Pussycat Dolls", year: 2005, genre: "Pop" },
-  { id: "e8113", title: "I Bet You Look Good on the Dancefloor", artist: "Arctic Monkeys", year: 2005, genre: "Indie Rock" },
-  { id: "e8114", title: "Maneater", artist: "Nelly Furtado", year: 2006, genre: "Pop" },
-  { id: "e8115", title: "1973", artist: "James Blunt", year: 2007, genre: "Pop" },
-  { id: "e8116", title: "Sweet Disposition", artist: "The Temper Trap", year: 2008, genre: "Indie" },
-  { id: "e8117", title: "You've Got the Love", artist: "Florence + The Machine", year: 2009, genre: "Indie" },
-  { id: "e8118", title: "We No Speak Americano", artist: "Yolanda Be Cool & DCUP", year: 2010, genre: "Dance" },
-  { id: "e8119", title: "Just the Way You Are", artist: "Bruno Mars", year: 2010, genre: "Pop" },
-  { id: "e8120", title: "Only Girl", artist: "Rihanna", year: 2010, genre: "Dance Pop" },
-  { id: "e8121", title: "Wonderful Life", artist: "Hurts", year: 2010, genre: "Synthpop" },
-  { id: "e8122", title: "Moves Like Jagger", artist: "Maroon 5 feat. Christina Aguilera", year: 2011, genre: "Pop" },
-  { id: "e8123", title: "Video Games", artist: "Lana Del Rey", year: 2011, genre: "Indie Pop" },
-  { id: "e8124", title: "Little Talks", artist: "Of Monsters and Men", year: 2011, genre: "Indie" },
-  { id: "e8125", title: "Titanium", artist: "David Guetta feat. Sia", year: 2011, genre: "Dance" },
-  { id: "e8126", title: "Feel This Moment", artist: "Pitbull feat. Christina Aguilera", year: 2012, genre: "Pop" },
-  { id: "e8127", title: "I Love It", artist: "Icona Pop", year: 2012, genre: "Dance Pop" },
-  { id: "e8128", title: "Blurred Lines", artist: "Robin Thicke feat. T.I. & Pharrell", year: 2013, genre: "Pop" },
-  { id: "e8129", title: "Pompeii", artist: "Bastille", year: 2013, genre: "Indie Pop" },
-  { id: "e8130", title: "Lean On", artist: "Major Lazer & DJ Snake feat. MØ", year: 2015, genre: "Dance" },
-  { id: "e8131", title: "Faded", artist: "Alan Walker", year: 2015, genre: "EDM" },
-  { id: "e8132", title: "This Is What You Came For", artist: "Calvin Harris feat. Rihanna", year: 2016, genre: "Dance" },
-  { id: "e8133", title: "Castle on the Hill", artist: "Ed Sheeran", year: 2017, genre: "Pop" },
-  { id: "e8134", title: "Feel It Still", artist: "Portugal. The Man", year: 2017, genre: "Indie Pop" },
-  { id: "e8135", title: "One Kiss", artist: "Calvin Harris & Dua Lipa", year: 2018, genre: "Dance" },
-  { id: "e8136", title: "No Tears Left to Cry", artist: "Ariana Grande", year: 2018, genre: "Pop" },
-  { id: "e8137", title: "Sweet but Psycho", artist: "Ava Max", year: 2018, genre: "Pop" },
-  { id: "e8138", title: "Señorita", artist: "Shawn Mendes & Camila Cabello", year: 2019, genre: "Pop" },
-  { id: "e8139", title: "Physical", artist: "Dua Lipa", year: 2020, genre: "Dance Pop" },
-  { id: "e8140", title: "Beggin'", artist: "Måneskin", year: 2021, genre: "Rock" },
-  { id: "e8141", title: "I'm Good", artist: "David Guetta & Bebe Rexha", year: 2022, genre: "Dance" },
-  { id: "e8142", title: "Made You Look", artist: "Meghan Trainor", year: 2022, genre: "Pop" },
-  { id: "e8143", title: "What Was I Made For?", artist: "Billie Eilish", year: 2023, genre: "Soundtrack" },
-  { id: "e8144", title: "Cruel Summer", artist: "Taylor Swift", year: 2019, genre: "Pop" },
-  { id: "e8145", title: "Training Season", artist: "Dua Lipa", year: 2024, genre: "Dance Pop" },
-  { id: "e8146", title: "Too Sweet", artist: "Hozier", year: 2024, genre: "Soul" },
-  { id: "e8147", title: "Birds of a Feather", artist: "Billie Eilish", year: 2024, genre: "Pop" },
-  { id: "e8148", title: "A Bar Song", artist: "Shaboozey", year: 2024, genre: "Country Pop" },
-  { id: "e8149", title: "Stargazing", artist: "Myles Smith", year: 2024, genre: "Folk Pop" },
-  { id: "e8150", title: "The Door", artist: "Teddy Swims", year: 2024, genre: "Soul Pop" },
-  { id: "e8151", title: "I Had Some Help", artist: "Post Malone feat. Morgan Wallen", year: 2024, genre: "Country Pop" },
-  { id: "e8152", title: "360", artist: "Charli XCX", year: 2024, genre: "Electropop" },
-  { id: "e8153", title: "Apple", artist: "Charli XCX", year: 2024, genre: "Electropop" },
-  { id: "e8154", title: "Houdini", artist: "Eminem", year: 2024, genre: "Hip-Hop" },
-  { id: "e8155", title: "Beautiful Day", artist: "U2", year: 2000, genre: "Rock" },
-  { id: "e8156", title: "Kryptonite", artist: "3 Doors Down", year: 2000, genre: "Rock" },
-  { id: "e8157", title: "Hanging by a Moment", artist: "Lifehouse", year: 2000, genre: "Rock" },
-  { id: "e8158", title: "Survivor", artist: "Destiny's Child", year: 2001, genre: "R&B" },
-  { id: "e8159", title: "Smooth Criminal", artist: "Alien Ant Farm", year: 2001, genre: "Rock" },
-  { id: "e8160", title: "Island in the Sun", artist: "Weezer", year: 2001, genre: "Alternative" },
-  { id: "e8161", title: "Hash Pipe", artist: "Weezer", year: 2001, genre: "Alternative" },
-  { id: "e8162", title: "Because I Got High", artist: "Afroman", year: 2001, genre: "Hip-Hop" },
-  { id: "e8163", title: "Family Affair", artist: "Mary J. Blige", year: 2001, genre: "R&B" },
-  { id: "e8164", title: "A Woman's Worth", artist: "Alicia Keys", year: 2001, genre: "R&B" },
-  { id: "e8165", title: "Fell in Love with a Girl", artist: "The White Stripes", year: 2001, genre: "Garage Rock" },
-  { id: "e8166", title: "Just Like a Pill", artist: "Pink", year: 2001, genre: "Pop Rock" },
-  { id: "e8167", title: "Here to Stay", artist: "Korn", year: 2002, genre: "Nu Metal" },
-  { id: "e8168", title: "Can't Stop", artist: "Red Hot Chili Peppers", year: 2002, genre: "Alternative" },
-  { id: "e8169", title: "Sweet Nothing", artist: "Calvin Harris feat. Florence Welch", year: 2012, genre: "Dance" },
-  { id: "e8170", title: "Breezeblocks", artist: "alt-J", year: 2012, genre: "Indie" },
-  { id: "e8171", title: "Tessellate", artist: "alt-J", year: 2012, genre: "Indie" },
-  { id: "e8172", title: "Riptide", artist: "Vance Joy", year: 2013, genre: "Folk Pop" },
-  { id: "e8173", title: "Home", artist: "Edward Sharpe & The Magnetic Zeros", year: 2010, genre: "Indie Folk" },
-  { id: "e8174", title: "Midnight City", artist: "M83", year: 2011, genre: "Synthpop" },
-  { id: "e8175", title: "Pursuit of Happiness", artist: "Kid Cudi", year: 2010, genre: "Hip-Hop" },
-  { id: "e8176", title: "No Hands", artist: "Waka Flocka Flame", year: 2010, genre: "Hip-Hop" },
-  { id: "e8177", title: "Bottoms Up", artist: "Trey Songz feat. Nicki Minaj", year: 2010, genre: "R&B" },
-  { id: "e8178", title: "Super Bass", artist: "Nicki Minaj", year: 2011, genre: "Pop Rap" },
-  { id: "e8179", title: "Starships", artist: "Nicki Minaj", year: 2012, genre: "Pop Rap" },
-  { id: "e8180", title: "Turn Me On", artist: "David Guetta feat. Nicki Minaj", year: 2011, genre: "Dance" },
-  { id: "e8181", title: "Domino", artist: "Jessie J", year: 2011, genre: "Pop" },
-  { id: "e8182", title: "Price Tag", artist: "Jessie J feat. B.o.B", year: 2011, genre: "Pop" },
-  { id: "e8183", title: "Glad You Came", artist: "The Wanted", year: 2011, genre: "Pop" },
-  { id: "e8184", title: "What Makes You Beautiful", artist: "One Direction", year: 2011, genre: "Pop" },
-  { id: "e8185", title: "Live While We're Young", artist: "One Direction", year: 2012, genre: "Pop" },
-  { id: "e8186", title: "Little Things", artist: "One Direction", year: 2012, genre: "Pop" },
-  { id: "e8187", title: "Hallucinate", artist: "Dua Lipa", year: 2020, genre: "Dance Pop" },
-  { id: "e8188", title: "Break My Heart", artist: "Dua Lipa", year: 2020, genre: "Dance Pop" },
-  { id: "e8189", title: "Fever", artist: "Dua Lipa & Angèle", year: 2020, genre: "Dance Pop" },
-];
-
-
-
-
-
 
 function createInitialJokerDuelState() {
   return {
@@ -1245,7 +1042,6 @@ const initialGameState = {
   targetScore: 10,
   maxTurns: 0,
   playLimitSeconds: DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS,
-  spotifyJamMode: false,
   difficulty: "normal",
   gameMode: "solo",
   turnNumber: 1,
@@ -1826,7 +1622,6 @@ function gameReducer(state, action) {
         targetScore: Number(action.targetScore || state.targetScore || 10),
         maxTurns: Number(action.maxTurns ?? state.maxTurns ?? 0),
         playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || state.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS))),
-        spotifyJamMode: Boolean(state.spotifyJamMode),
         difficulty: action.difficulty || state.difficulty || "normal",
         gameMode: state.gameMode || action.gameMode || "solo",
         gameLog: [
@@ -1858,7 +1653,6 @@ function gameReducer(state, action) {
         targetScore: Number(action.targetScore || 10),
         maxTurns: Number(action.maxTurns || 0),
         playLimitSeconds: Math.max(1, Math.min(120, Number(action.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS))),
-        spotifyJamMode: Boolean(state.spotifyJamMode || action.spotifyJamMode),
         difficulty: action.difficulty || "normal",
         gameMode: action.gameMode || "solo",
         gameLog: [
@@ -2251,28 +2045,6 @@ function gameReducer(state, action) {
       );
     }
 
-    case "SPOTIFY_JAM_MODE_SET": {
-      const enabled = Boolean(action.enabled);
-
-      return addEvent(
-        {
-          ...state,
-          spotifyJamMode: enabled,
-          gameLog: [
-            {
-              id: createId("log"),
-              text: enabled
-                ? "Spotify Jam-Modus wurde aktiviert."
-                : "Spotify Jam-Modus wurde deaktiviert.",
-            },
-            ...state.gameLog,
-          ].slice(0, 12),
-        },
-        "SPOTIFY_JAM_MODE_SET",
-        enabled ? "Jam-Modus aktiviert" : "Jam-Modus deaktiviert"
-      );
-    }
-
     case "TRACK_PLAY_REQUESTED": {
       if (!["placing", "challenge"].includes(state.phase) || !state.currentTrack) return state;
 
@@ -2285,7 +2057,6 @@ function gameReducer(state, action) {
         trackId: state.currentTrack.id,
         hiddenLabel: "Verdeckter Song",
         playLimitSeconds: Number(action.playLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS),
-        spotifyJamMode: Boolean(state.spotifyJamMode),
         createdAt: new Date().toLocaleTimeString(),
       };
 
@@ -3434,895 +3205,6 @@ function storeViewerPlayerId(roomCode, playerId) {
 }
 
 
-
-function getInitialSupabaseConfig() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    const urlFromLink = params.get("supabaseUrl") ? decodeURIComponent(params.get("supabaseUrl")) : "";
-    const keyFromLink = params.get("supabaseKey") ? decodeURIComponent(params.get("supabaseKey")) : "";
-    const storedUrl = localStorage.getItem(SUPABASE_URL_STORAGE_KEY) || "";
-    const storedKey = localStorage.getItem(SUPABASE_ANON_KEY_STORAGE_KEY) || "";
-    const url = urlFromLink || storedUrl || DEFAULT_SUPABASE_URL;
-    const anonKey = keyFromLink || storedKey || DEFAULT_SUPABASE_ANON_KEY;
-    const enabledFromLink = Boolean(urlFromLink && keyFromLink);
-
-    return {
-      url,
-      anonKey,
-      enabled: enabledFromLink || localStorage.getItem(SUPABASE_ENABLED_STORAGE_KEY) === "true" || Boolean(DEFAULT_SUPABASE_URL && DEFAULT_SUPABASE_ANON_KEY),
-    };
-  } catch {
-    return {
-      url: DEFAULT_SUPABASE_URL,
-      anonKey: DEFAULT_SUPABASE_ANON_KEY,
-      enabled: Boolean(DEFAULT_SUPABASE_URL && DEFAULT_SUPABASE_ANON_KEY),
-    };
-  }
-}
-
-function normalizeSupabaseUrl(url = "") {
-  return String(url || "").trim().replace(/\/+$/, "");
-}
-
-
-function getSupabaseSpotifyFunctionUrl(config) {
-  const supabaseUrl = normalizeSupabaseUrl(config?.url);
-
-  if (!supabaseUrl) return "";
-
-  try {
-    const url = new URL(supabaseUrl);
-    const host = url.host.replace(".supabase.co", ".functions.supabase.co");
-
-    return `${url.protocol}//${host}/trackline-spotify`;
-  } catch {
-    return "";
-  }
-}
-
-function normalizeLegacySpotifyHelperUrl(url = "") {
-  const value = String(url || "").trim().replace(/\/+$/, "");
-
-  if (!/^https?:\/\//i.test(value)) return "";
-  if (value.includes("nicht mehr nötig")) return "";
-
-  return value;
-}
-
-function getSpotifyHelperUrl(config, legacyUrl = "") {
-  const legacySpotifyUrl = normalizeLegacySpotifyHelperUrl(legacyUrl);
-
-  // Important: If a Legacy/Render helper is configured, prefer it for Spotify.
-  // This restores the old working Spotify/Jam structure while Supabase still
-  // handles lobby, game sync and stats.
-  if (legacySpotifyUrl) return legacySpotifyUrl;
-
-  return getSupabaseSpotifyFunctionUrl(config);
-}
-
-function getSpotifyHelperBackendLabel(config, legacyUrl = "") {
-  return normalizeLegacySpotifyHelperUrl(legacyUrl)
-    ? "Legacy/Render Spotify Helper"
-    : getSupabaseSpotifyFunctionUrl(config)
-      ? "Supabase Edge Spotify Helper"
-      : "Kein Spotify Helper";
-}
-
-function isSupabaseConfigured(config) {
-  return Boolean(config?.enabled && normalizeSupabaseUrl(config.url) && String(config.anonKey || "").trim());
-}
-
-async function supabaseRestRequest(config, path, options = {}) {
-  const baseUrl = normalizeSupabaseUrl(config?.url);
-  const anonKey = String(config?.anonKey || "").trim();
-
-  if (!baseUrl || !anonKey) {
-    throw new Error("Supabase URL oder anon public key fehlt.");
-  }
-
-  const response = await fetch(`${baseUrl}/rest/v1${path}`, {
-    ...options,
-    headers: {
-      apikey: anonKey,
-      Authorization: `Bearer ${anonKey}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `Supabase Fehler ${response.status}`);
-  }
-
-  if (response.status === 204) return null;
-
-  const text = await response.text();
-  return text ? JSON.parse(text) : null;
-}
-
-
-function getInitialSupabaseAuthSession() {
-  try {
-    const raw = localStorage.getItem(SUPABASE_AUTH_SESSION_STORAGE_KEY);
-
-    if (!raw) return null;
-
-    const session = JSON.parse(raw);
-    const expiresAt = Number(session?.expires_at || 0) * 1000;
-
-    if (!session?.access_token || !session?.user) return null;
-    if (expiresAt && expiresAt < Date.now() - 60_000) return null;
-
-    return session;
-  } catch {
-    return null;
-  }
-}
-
-function getAuthDisplayName(session) {
-  return (
-    String(session?.user?.user_metadata?.display_name || "").trim() ||
-    String(session?.user?.email || "").split("@")[0] ||
-    ""
-  );
-}
-
-function getAuthEmail(session) {
-  return String(session?.user?.email || "").trim();
-}
-
-function getAuthGuestId(session, fallbackGuestId) {
-  const userId = session?.user?.id;
-
-  return userId ? `auth-${userId}` : String(fallbackGuestId || "");
-}
-
-async function supabaseAuthRequest(config, path, options = {}, accessToken = "") {
-  const baseUrl = normalizeSupabaseUrl(config?.url);
-  const anonKey = String(config?.anonKey || "").trim();
-
-  if (!baseUrl || !anonKey) {
-    throw new Error("Supabase URL oder anon public key fehlt.");
-  }
-
-  const response = await fetch(`${baseUrl}/auth/v1${path}`, {
-    ...options,
-    headers: {
-      apikey: anonKey,
-      Authorization: `Bearer ${accessToken || anonKey}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  });
-
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
-
-  if (!response.ok) {
-    throw new Error(data?.msg || data?.message || data?.error_description || text || `Supabase Auth Fehler ${response.status}`);
-  }
-
-  return data;
-}
-
-async function signUpWithSupabase(config, { email, password, displayName }) {
-  return supabaseAuthRequest(config, "/signup", {
-    method: "POST",
-    body: JSON.stringify({
-      email: String(email || "").trim(),
-      password,
-      data: {
-        display_name: String(displayName || "").trim(),
-      },
-    }),
-  });
-}
-
-async function signInWithSupabase(config, { email, password }) {
-  return supabaseAuthRequest(config, "/token?grant_type=password", {
-    method: "POST",
-    body: JSON.stringify({
-      email: String(email || "").trim(),
-      password,
-    }),
-  });
-}
-
-async function signOutWithSupabase(config, session) {
-  if (!session?.access_token) return null;
-
-  return supabaseAuthRequest(
-    config,
-    "/logout",
-    {
-      method: "POST",
-      body: JSON.stringify({}),
-    },
-    session.access_token
-  );
-}
-
-async function createOrUpdateAuthProfile(config, session, displayName, fallbackGuestId) {
-  if (!isSupabaseConfigured(config) || !session?.user?.id) return null;
-
-  const safeDisplayName = String(displayName || getAuthDisplayName(session) || "Spieler").trim() || "Spieler";
-  const stableGuestId = getAuthGuestId(session, fallbackGuestId);
-
-  await supabaseRestRequest(config, "/profiles?on_conflict=guest_id", {
-    method: "POST",
-    headers: {
-      Prefer: "resolution=merge-duplicates,return=representation",
-    },
-    body: JSON.stringify({
-      guest_id: stableGuestId,
-      auth_user_id: session.user.id,
-      display_name: safeDisplayName,
-      updated_at: new Date().toISOString(),
-    }),
-  });
-
-  const data = await supabaseRestRequest(
-    config,
-    `/profiles?select=id,guest_id,auth_user_id,display_name&guest_id=eq.${encodeURIComponent(stableGuestId)}&limit=1`,
-    {
-      method: "GET",
-    }
-  );
-
-  return Array.isArray(data) ? data[0] || null : null;
-}
-
-async function testSupabaseConnection(config) {
-  const data = await supabaseRestRequest(config, "/rooms?select=code&limit=1", {
-    method: "GET",
-  });
-
-  return Array.isArray(data) ? data.length : 0;
-}
-
-async function registerSupabaseRoomEntry(config, { mode, roomCode, name, clientInstanceId, authSession }) {
-  if (!isSupabaseConfigured(config)) {
-    return {
-      skipped: true,
-      message: "Supabase ist noch nicht aktiviert.",
-    };
-  }
-
-  const displayName = String(name || getAuthDisplayName(authSession) || "Spieler").trim() || "Spieler";
-  const normalizedRoomCode = String(roomCode || "").trim().toUpperCase();
-  const rawGuestId = String(clientInstanceId || createId("guest"));
-  const guestId = getAuthGuestId(authSession, rawGuestId);
-  const profile = authSession?.user?.id ? await createOrUpdateAuthProfile(config, authSession, displayName, rawGuestId) : null;
-
-  if (!authSession?.user?.id) {
-    await supabaseRestRequest(config, "/profiles?on_conflict=guest_id", {
-      method: "POST",
-      headers: {
-        Prefer: "resolution=merge-duplicates,return=minimal",
-      },
-      body: JSON.stringify({
-        guest_id: guestId,
-        display_name: displayName,
-        updated_at: new Date().toISOString(),
-      }),
-    });
-  }
-
-  await supabaseRestRequest(config, "/rooms?on_conflict=code", {
-    method: "POST",
-    headers: {
-      Prefer: "resolution=merge-duplicates,return=minimal",
-    },
-    body: JSON.stringify({
-      code: normalizedRoomCode,
-      host_profile_id: mode === "create" && profile?.id ? profile.id : null,
-      host_guest_id: mode === "create" ? guestId : null,
-      status: "lobby",
-      last_seen_at: new Date().toISOString(),
-      metadata: {
-        source: "trackline-phase9-auth",
-      },
-    }),
-  });
-
-  await supabaseRestRequest(config, "/room_players?on_conflict=room_code,guest_id", {
-    method: "POST",
-    headers: {
-      Prefer: "resolution=merge-duplicates,return=minimal",
-    },
-    body: JSON.stringify({
-      room_code: normalizedRoomCode,
-      profile_id: profile?.id || null,
-      guest_id: guestId,
-      display_name: displayName,
-      is_host: mode === "create",
-      last_seen_at: new Date().toISOString(),
-      metadata: {
-        client_instance_id: rawGuestId,
-        auth_user_id: authSession?.user?.id || null,
-      },
-    }),
-  });
-
-  return {
-    skipped: false,
-    message: authSession?.user?.id
-      ? mode === "create"
-        ? "Supabase-Raum mit Login-Profil registriert."
-        : "Supabase-Beitritt mit Login-Profil registriert."
-      : mode === "create"
-        ? "Supabase-Raum registriert."
-        : "Supabase-Beitritt registriert.",
-  };
-}
-
-
-async function fetchSupabaseRoomPlayers(config, roomCode) {
-  if (!isSupabaseConfigured(config)) return [];
-
-  const normalizedRoomCode = encodeURIComponent(String(roomCode || "").trim().toUpperCase());
-
-  if (!normalizedRoomCode) return [];
-
-  const data = await supabaseRestRequest(
-    config,
-    `/room_players?select=display_name,is_host,guest_id,profile_id,last_seen_at,joined_at&room_code=eq.${normalizedRoomCode}&order=is_host.desc,joined_at.asc`,
-    {
-      method: "GET",
-    }
-  );
-
-  return (Array.isArray(data) ? data : [])
-    .map((player) => ({
-      displayName: String(player.display_name || "").trim(),
-      isHost: Boolean(player.is_host),
-      guestId: player.guest_id || "",
-      profileId: player.profile_id || "",
-      lastSeenAt: player.last_seen_at || "",
-      joinedAt: player.joined_at || "",
-    }))
-    .filter((player) => player.displayName);
-}
-
-function getUniqueDisplayNamesFromSupabasePlayers(players = []) {
-  const seen = new Set();
-  const names = [];
-
-  for (const player of players) {
-    const name = String(player.displayName || "").trim();
-
-    if (!name || seen.has(name)) continue;
-
-    seen.add(name);
-    names.push(name);
-  }
-
-  return names;
-}
-
-function mergePlayerNamesWithSupabase(currentNames = [], supabasePlayers = []) {
-  const supabaseNames = getUniqueDisplayNamesFromSupabasePlayers(supabasePlayers);
-  const merged = [];
-  const seen = new Set();
-
-  for (const name of supabaseNames) {
-    if (!seen.has(name)) {
-      seen.add(name);
-      merged.push(name);
-    }
-  }
-
-  for (const name of currentNames) {
-    if (!name || seen.has(name)) continue;
-
-    seen.add(name);
-    merged.push(name);
-  }
-
-  return merged.length ? merged : currentNames;
-}
-
-function areNameListsEqual(left = [], right = []) {
-  if (left.length !== right.length) return false;
-
-  return left.every((name, index) => name === right[index]);
-}
-
-
-function getSavedSupabaseResultKeys() {
-  try {
-    return JSON.parse(localStorage.getItem(SUPABASE_SAVED_RESULTS_STORAGE_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function markSupabaseResultSaved(resultKey) {
-  try {
-    const keys = getSavedSupabaseResultKeys();
-    const nextKeys = Array.from(new Set([resultKey, ...keys])).slice(0, 80);
-    localStorage.setItem(SUPABASE_SAVED_RESULTS_STORAGE_KEY, JSON.stringify(nextKeys));
-  } catch {
-    // ignore
-  }
-}
-
-function isSupabaseResultSaved(resultKey) {
-  return getSavedSupabaseResultKeys().includes(resultKey);
-}
-
-function getFinishedEvent(gameState) {
-  return (gameState.eventHistory || []).find((event) => event.type === "GAME_FINISHED") || null;
-}
-
-function getGameResultKey(roomCode, gameState) {
-  const finishedEvent = getFinishedEvent(gameState);
-  const eventId = finishedEvent?.id || `${gameState.turnNumber}-${gameState.players?.map((player) => `${player.name}:${player.score}`).join("|")}`;
-
-  return `${String(roomCode || gameState.room?.code || "ROOM").toUpperCase()}::${eventId}`;
-}
-
-function countEventsForPlayer(gameState, playerName, eventTypes = []) {
-  const name = String(playerName || "");
-  const wantedTypes = new Set(eventTypes);
-
-  return (gameState.eventHistory || []).filter((event) => {
-    if (wantedTypes.size && !wantedTypes.has(event.type)) return false;
-
-    return String(event.details || "").includes(name);
-  }).length;
-}
-
-function buildSupabaseGameSummary(gameState, leaderboard, roomPlayers = []) {
-  const winner = leaderboard[0] || null;
-  const finishedEvent = getFinishedEvent(gameState);
-  const playedTracks = gameState.playedTrackHistory || [];
-
-  return {
-    room: gameState.room,
-    finished_event_id: finishedEvent?.id || null,
-    turn_number: gameState.turnNumber,
-    game_mode: gameState.gameMode || "solo",
-    difficulty: gameState.difficulty || "normal",
-    target_score: gameState.targetScore,
-    max_turns: gameState.maxTurns,
-    play_limit_seconds: gameState.playLimitSeconds,
-    winner_name: winner?.name || "",
-    players: leaderboard.map((player) => ({
-      id: player.id,
-      name: player.name,
-      score: player.score,
-      correct: player.correct,
-      wrong: player.wrong,
-      jokers: getPlayerJokers(player),
-      team_members: player.teamMembers || [],
-    })),
-    room_players: roomPlayers,
-    played_tracks: playedTracks.slice(0, 80),
-    event_summary: (gameState.eventHistory || []).slice(0, 40).map((event) => ({
-      type: event.type,
-      details: event.details || "",
-      turn_number: event.turnNumber,
-    })),
-  };
-}
-
-async function fetchExistingPlayerStats(config, guestIds = []) {
-  const uniqueGuestIds = Array.from(new Set(guestIds.filter(Boolean)));
-
-  if (!uniqueGuestIds.length) return new Map();
-
-  const encodedList = uniqueGuestIds.map((guestId) => `"${String(guestId).replace(/"/g, '\\"')}"`).join(",");
-  const data = await supabaseRestRequest(config, `/player_stats?select=*&guest_id=in.(${encodedList})`, {
-    method: "GET",
-  });
-
-  return new Map((Array.isArray(data) ? data : []).map((row) => [row.guest_id, row]));
-}
-
-function getRoomPlayerForDisplayName(roomPlayers, displayName) {
-  const wantedName = String(displayName || "").trim();
-
-  return (roomPlayers || []).find((player) => String(player.displayName || "").trim() === wantedName) || null;
-}
-
-function buildPlayerStatPatch(existing = {}, player, gameState, roomPlayer, winnerName) {
-  const isWinner = player.name === winnerName;
-  const guestId = roomPlayer?.guestId || `name-${normalizeTrackText(player.name) || createId("guest")}`;
-  const playedChallengeEvents = countEventsForPlayer(gameState, player.name, ["JOKER_THROWN", "JOKER_DUEL_WINNER", "TRACK_REVEALED"]);
-  const swapJokersUsed = countEventsForPlayer(gameState, player.name, ["TRACK_SWAPPED"]);
-  const secureJokersUsed = countEventsForPlayer(gameState, player.name, ["TRACK_AUTO_CARD_JOKER"]);
-  const earnedJokers = countEventsForPlayer(gameState, player.name, ["JOKER_EARNED"]);
-
-  return {
-    guest_id: guestId,
-    display_name: player.name,
-    games_played: Number(existing.games_played || 0) + 1,
-    wins: Number(existing.wins || 0) + (isWinner ? 1 : 0),
-    cards_won: Number(existing.cards_won || 0) + Number(player.score || 0),
-    correct_placements: Number(existing.correct_placements || 0) + Number(player.correct || 0),
-    wrong_placements: Number(existing.wrong_placements || 0) + Number(player.wrong || 0),
-    challenge_jokers_used: Number(existing.challenge_jokers_used || 0) + playedChallengeEvents,
-    challenge_jokers_won: Number(existing.challenge_jokers_won || 0) + countEventsForPlayer(gameState, player.name, ["JOKER_DUEL_WINNER"]),
-    swap_jokers_used: Number(existing.swap_jokers_used || 0) + swapJokersUsed,
-    secure_card_jokers_used: Number(existing.secure_card_jokers_used || 0) + secureJokersUsed,
-    earned_jokers: Number(existing.earned_jokers || 0) + earnedJokers,
-    team_games: Number(existing.team_games || 0) + (gameState.gameMode === "teams" ? 1 : 0),
-    updated_at: new Date().toISOString(),
-  };
-}
-
-async function saveSupabaseGameStats(config, gameState, roomCode, roomPlayers = []) {
-  if (!isSupabaseConfigured(config)) {
-    return {
-      skipped: true,
-      message: "Supabase nicht aktiv.",
-    };
-  }
-
-  if (gameState.phase !== "finished") {
-    return {
-      skipped: true,
-      message: "Spiel ist noch nicht beendet.",
-    };
-  }
-
-  const normalizedRoomCode = String(roomCode || gameState.room?.code || "").trim().toUpperCase();
-  const leaderboard = [...(gameState.players || [])].sort((a, b) => b.score - a.score || a.wrong - b.wrong);
-  const winner = leaderboard[0] || null;
-  const summary = buildSupabaseGameSummary(gameState, leaderboard, roomPlayers);
-
-  await supabaseRestRequest(config, "/game_results", {
-    method: "POST",
-    headers: {
-      Prefer: "return=minimal",
-    },
-    body: JSON.stringify({
-      room_code: normalizedRoomCode,
-      game_mode: gameState.gameMode || "solo",
-      winner_name: winner?.name || "",
-      target_score: gameState.targetScore || null,
-      started_at: null,
-      finished_at: new Date().toISOString(),
-      summary,
-    }),
-  });
-
-  const roomPlayerGuestIds = leaderboard
-    .map((player) => getRoomPlayerForDisplayName(roomPlayers, player.name)?.guestId)
-    .filter(Boolean);
-  const existingStats = await fetchExistingPlayerStats(config, roomPlayerGuestIds);
-  const statRows = leaderboard.map((player) => {
-    const roomPlayer = getRoomPlayerForDisplayName(roomPlayers, player.name);
-    const guestId = roomPlayer?.guestId || `name-${normalizeTrackText(player.name)}`;
-    const existing = existingStats.get(guestId) || {};
-
-    return buildPlayerStatPatch(existing, player, gameState, roomPlayer, winner?.name || "");
-  });
-
-  for (const row of statRows) {
-    await supabaseRestRequest(config, "/player_stats?on_conflict=guest_id", {
-      method: "POST",
-      headers: {
-        Prefer: "resolution=merge-duplicates,return=minimal",
-      },
-      body: JSON.stringify(row),
-    });
-  }
-
-  await supabaseRestRequest(config, `/rooms?code=eq.${encodeURIComponent(normalizedRoomCode)}`, {
-    method: "PATCH",
-    headers: {
-      Prefer: "return=minimal",
-    },
-    body: JSON.stringify({
-      status: "finished",
-      updated_at: new Date().toISOString(),
-      last_seen_at: new Date().toISOString(),
-    }),
-  });
-
-  return {
-    skipped: false,
-    message: `Statistiken gespeichert: ${leaderboard.length} Spieler.`,
-  };
-}
-
-
-async function fetchSupabasePlayerStats(config, limit = 100) {
-  if (!isSupabaseConfigured(config)) return [];
-
-  const data = await supabaseRestRequest(
-    config,
-    `/player_stats?select=*&order=wins.desc,games_played.desc,cards_won.desc&limit=${Number(limit) || 100}`,
-    {
-      method: "GET",
-    }
-  );
-
-  return Array.isArray(data) ? data : [];
-}
-
-async function fetchSupabaseGameResults(config, limit = 30) {
-  if (!isSupabaseConfigured(config)) return [];
-
-  const data = await supabaseRestRequest(
-    config,
-    `/game_results?select=*&order=finished_at.desc&limit=${Number(limit) || 30}`,
-    {
-      method: "GET",
-    }
-  );
-
-  return Array.isArray(data) ? data : [];
-}
-
-function getStatsAccuracy(row) {
-  const correct = Number(row?.correct_placements || 0);
-  const wrong = Number(row?.wrong_placements || 0);
-  const total = correct + wrong;
-
-  if (!total) return 0;
-
-  return Math.round((correct / total) * 100);
-}
-
-function formatStatsDate(value) {
-  if (!value) return "-";
-
-  try {
-    return new Date(value).toLocaleString();
-  } catch {
-    return String(value);
-  }
-}
-
-
-function createSupabaseSyncedState(state, action = {}) {
-  return {
-    ...state,
-    syncMeta: {
-      version: Date.now(),
-      actionType: action.type || "UNKNOWN",
-      actorPlayerId: action.actorPlayerId || null,
-      actorName: action.actorName || "",
-      updatedAt: new Date().toISOString(),
-    },
-  };
-}
-
-function createTrackCatalogById(tracks = []) {
-  const catalog = new Map();
-
-  for (const track of tracks) {
-    if (track?.id && !catalog.has(track.id)) {
-      catalog.set(track.id, track);
-    }
-  }
-
-  return catalog;
-}
-
-function compactTrackForSync(track, trackCatalogById) {
-  if (!track || typeof track !== "object") return track;
-  if (track.__trackRef) return track;
-  if (track.id && trackCatalogById?.has?.(track.id)) {
-    return {
-      __trackRef: track.id,
-    };
-  }
-
-  return track;
-}
-
-function expandTrackFromSync(track, trackCatalogById) {
-  if (!track || typeof track !== "object") return track;
-
-  if (track.__trackRef) {
-    return trackCatalogById?.get?.(track.__trackRef) || track;
-  }
-
-  return track;
-}
-
-function compactTrackArrayForSync(tracks = [], trackCatalogById) {
-  return Array.isArray(tracks) ? tracks.map((track) => compactTrackForSync(track, trackCatalogById)) : tracks;
-}
-
-function expandTrackArrayFromSync(tracks = [], trackCatalogById) {
-  return Array.isArray(tracks) ? tracks.map((track) => expandTrackFromSync(track, trackCatalogById)) : tracks;
-}
-
-function compactTimelineForSync(timeline = [], trackCatalogById) {
-  return Array.isArray(timeline) ? timeline.map((track) => compactTrackForSync(track, trackCatalogById)) : timeline;
-}
-
-function expandTimelineFromSync(timeline = [], trackCatalogById) {
-  return Array.isArray(timeline) ? timeline.map((track) => expandTrackFromSync(track, trackCatalogById)) : timeline;
-}
-
-function compactPlayedTrackEntryForSync(entry, trackCatalogById) {
-  if (!entry || typeof entry !== "object") return entry;
-
-  return {
-    ...entry,
-    track: compactTrackForSync(entry.track, trackCatalogById),
-  };
-}
-
-function expandPlayedTrackEntryFromSync(entry, trackCatalogById) {
-  if (!entry || typeof entry !== "object") return entry;
-
-  return {
-    ...entry,
-    track: expandTrackFromSync(entry.track, trackCatalogById),
-  };
-}
-
-function compactGameStateForSync(state, trackCatalogById) {
-  if (!state || typeof state !== "object") return state;
-
-  return {
-    ...state,
-    currentTrack: compactTrackForSync(state.currentTrack, trackCatalogById),
-    deck: compactTrackArrayForSync(state.deck, trackCatalogById),
-    discardedTracks: compactTrackArrayForSync(state.discardedTracks, trackCatalogById),
-    playedTrackHistory: Array.isArray(state.playedTrackHistory)
-      ? state.playedTrackHistory.map((entry) => compactPlayedTrackEntryForSync(entry, trackCatalogById))
-      : state.playedTrackHistory,
-    players: Array.isArray(state.players)
-      ? state.players.map((player) => ({
-          ...player,
-          timeline: compactTimelineForSync(player.timeline, trackCatalogById),
-        }))
-      : state.players,
-    lastResult: state.lastResult?.track
-      ? {
-          ...state.lastResult,
-          track: compactTrackForSync(state.lastResult.track, trackCatalogById),
-        }
-      : state.lastResult,
-    syncMeta: {
-      ...(state.syncMeta || {}),
-      compactTrackRefs: true,
-    },
-  };
-}
-
-function expandGameStateFromSync(state, trackCatalogById) {
-  if (!state || typeof state !== "object") return state;
-  if (!state.syncMeta?.compactTrackRefs) return state;
-
-  return {
-    ...state,
-    currentTrack: expandTrackFromSync(state.currentTrack, trackCatalogById),
-    deck: expandTrackArrayFromSync(state.deck, trackCatalogById),
-    discardedTracks: expandTrackArrayFromSync(state.discardedTracks, trackCatalogById),
-    playedTrackHistory: Array.isArray(state.playedTrackHistory)
-      ? state.playedTrackHistory.map((entry) => expandPlayedTrackEntryFromSync(entry, trackCatalogById))
-      : state.playedTrackHistory,
-    players: Array.isArray(state.players)
-      ? state.players.map((player) => ({
-          ...player,
-          timeline: expandTimelineFromSync(player.timeline, trackCatalogById),
-        }))
-      : state.players,
-    lastResult: state.lastResult?.track
-      ? {
-          ...state.lastResult,
-          track: expandTrackFromSync(state.lastResult.track, trackCatalogById),
-        }
-      : state.lastResult,
-  };
-}
-
-function getGameStateSyncVersion(state) {
-  return String(state?.syncMeta?.version || "");
-}
-
-function getNumericSyncVersion(version) {
-  const numericVersion = Number(version);
-
-  return Number.isFinite(numericVersion) ? numericVersion : 0;
-}
-
-function isRemoteSyncVersionNewer(remoteVersion, localVersion) {
-  if (!remoteVersion) return false;
-  if (!localVersion) return true;
-
-  const remoteNumeric = getNumericSyncVersion(remoteVersion);
-  const localNumeric = getNumericSyncVersion(localVersion);
-
-  if (remoteNumeric && localNumeric) return remoteNumeric > localNumeric;
-
-  return remoteVersion !== localVersion;
-}
-
-async function upsertSupabaseGameState(config, roomCode, nextState, action = {}, trackCatalogById = null) {
-  if (!isSupabaseConfigured(config)) {
-    return {
-      skipped: true,
-      message: "Supabase nicht aktiv.",
-    };
-  }
-
-  const normalizedRoomCode = String(roomCode || nextState?.room?.code || "").trim().toUpperCase();
-
-  if (!normalizedRoomCode) {
-    throw new Error("Raumcode fehlt.");
-  }
-
-  const syncedState = nextState?.syncMeta?.version ? nextState : createSupabaseSyncedState(nextState, action);
-  const stateForSync = compactGameStateForSync(syncedState, trackCatalogById);
-
-  await supabaseRestRequest(config, "/game_states?on_conflict=room_code", {
-    method: "POST",
-    headers: {
-      Prefer: "resolution=merge-duplicates,return=minimal",
-    },
-    body: JSON.stringify({
-      room_code: normalizedRoomCode,
-      state: stateForSync,
-      updated_at: new Date().toISOString(),
-    }),
-  });
-
-  await supabaseRestRequest(config, `/rooms?code=eq.${encodeURIComponent(normalizedRoomCode)}`, {
-    method: "PATCH",
-    headers: {
-      Prefer: "return=minimal",
-    },
-    body: JSON.stringify({
-      status: syncedState.phase || "lobby",
-      updated_at: new Date().toISOString(),
-      last_seen_at: new Date().toISOString(),
-    }),
-  });
-
-  return {
-    skipped: false,
-    state: syncedState,
-    message: `Supabase GameState gespeichert: ${action.type || "Aktion"}.`,
-  };
-}
-
-async function fetchSupabaseGameState(config, roomCode, trackCatalogById = null) {
-  if (!isSupabaseConfigured(config)) return null;
-
-  const normalizedRoomCode = String(roomCode || "").trim().toUpperCase();
-
-  if (!normalizedRoomCode) return null;
-
-  const data = await supabaseRestRequest(
-    config,
-    `/game_states?select=state,updated_at&room_code=eq.${encodeURIComponent(normalizedRoomCode)}&limit=1`,
-    {
-      method: "GET",
-    }
-  );
-
-  const row = Array.isArray(data) ? data[0] : null;
-
-  return row?.state ? expandGameStateFromSync(row.state, trackCatalogById) : null;
-}
-
-async function clearSupabaseGameState(config, roomCode) {
-  if (!isSupabaseConfigured(config)) return;
-
-  const normalizedRoomCode = String(roomCode || "").trim().toUpperCase();
-
-  if (!normalizedRoomCode) return;
-
-  await supabaseRestRequest(config, `/game_states?room_code=eq.${encodeURIComponent(normalizedRoomCode)}`, {
-    method: "DELETE",
-    headers: {
-      Prefer: "return=minimal",
-    },
-  });
-}
-
-
 function getInitialSocketUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -4346,7 +3228,6 @@ export default function App() {
 
   const [playerName, setPlayerName] = useState("");
   const [playerNames, setPlayerNames] = useState(["Christoph", "Alex"]);
-  const [showStartScreen, setShowStartScreen] = useState(true);
   const [customTracks, setCustomTracks] = useState(() => loadStoredCustomTracks());
   const [selectedPreset, setSelectedPreset] = useState("all");
   const [selectedDifficulty, setSelectedDifficulty] = useState("normal");
@@ -4358,18 +3239,6 @@ export default function App() {
   );
   const [viewerPlayerId, setViewerPlayerId] = useState(() => getInitialViewerPlayerId());
   const [socketUrl, setSocketUrl] = useState(() => getInitialSocketUrl());
-  const [supabaseConfig, setSupabaseConfig] = useState(() => getInitialSupabaseConfig());
-  const [supabaseStatus, setSupabaseStatus] = useState(() =>
-    isSupabaseConfigured(getInitialSupabaseConfig()) ? "Supabase vorbereitet." : "Supabase noch nicht aktiv."
-  );
-  const [supabaseRoomPlayers, setSupabaseRoomPlayers] = useState([]);
-  const [supabaseStatsStatus, setSupabaseStatsStatus] = useState("Noch keine Statistik gespeichert.");
-  const [authSession, setAuthSession] = useState(() => getInitialSupabaseAuthSession());
-  const [authStatus, setAuthStatus] = useState(() => (getInitialSupabaseAuthSession() ? "Angemeldet." : "Gastmodus aktiv."));
-  const [showStatsPage, setShowStatsPage] = useState(false);
-  const [statsPageStatus, setStatsPageStatus] = useState("Statistiken noch nicht geladen.");
-  const [playerStatsRows, setPlayerStatsRows] = useState([]);
-  const [gameResultRows, setGameResultRows] = useState([]);
   const [syncEnabled, setSyncEnabled] = useState(() => localStorage.getItem(SYNC_ENABLED_STORAGE_KEY) === "true");
   const [syncStatus, setSyncStatus] = useState("Sync nicht verbunden.");
   const [syncClientCount, setSyncClientCount] = useState(1);
@@ -4382,45 +3251,40 @@ export default function App() {
     remainingSeconds: 0,
     endsAt: 0,
   });
-  const [spotifyJamMode, setSpotifyJamMode] = useState(() => localStorage.getItem(SPOTIFY_JAM_MODE_STORAGE_KEY) === "true");
   const [activeJokerBusy, setActiveJokerBusy] = useState(false);
   const [activeJokerFeedback, setActiveJokerFeedback] = useState(null);
 
+  const socketRef = useRef(null);
   const lastRemoteStateRef = useRef("");
   const lastEmittedStateRef = useRef("");
-  const currentGameStateRef = useRef(gameState);
-  const pendingSupabaseWriteTimeoutRef = useRef(null);
-  const latestPendingSupabaseWriteRef = useRef(null);
-  const roomSpotifyAutoPauseTimeoutRef = useRef(null);
 
-  const fullDeck = useMemo(() => dedupeTrackDeck([...BASE_TRACK_DECK, ...THEME_TRACK_DECK, ...CATEGORY_EXPANSION_TRACKS, ...VINTAGE_EXPANSION_TRACKS, ...ERA_BALANCE_EXPANSION_TRACKS, ...SONGPOOL_800_EXPANSION_TRACKS, ...customTracks]), [customTracks]);
+  const fullDeck = useMemo(() => dedupeTrackDeck([...BASE_TRACK_DECK, ...THEME_TRACK_DECK, ...CATEGORY_EXPANSION_TRACKS, ...VINTAGE_EXPANSION_TRACKS, ...ERA_BALANCE_EXPANSION_TRACKS, ...customTracks]), [customTracks]);
   const presetDeck = useMemo(() => dedupeTrackDeck(filterDeckByPreset(fullDeck, selectedPreset)), [fullDeck, selectedPreset]);
   const availableDeck = useMemo(() => dedupeTrackDeck(filterDeckByDifficulty(presetDeck, selectedDifficulty)), [presetDeck, selectedDifficulty]);
-  const trackCatalogById = useMemo(() => createTrackCatalogById(fullDeck), [fullDeck]);
 
   const activePlayer = gameState.players[gameState.activePlayerIndex];
   const activeTimeline = activePlayer ? sortTimeline(activePlayer.timeline) : [];
   const winner = getFinalWinner(gameState.players, gameState.targetScore);
   const activeRoomCode = gameState.room?.code || roomCode;
-  const spotifyHelperUrl = getSpotifyHelperUrl(supabaseConfig, socketUrl);
-  const spotifyHelperBackendLabel = getSpotifyHelperBackendLabel(supabaseConfig, socketUrl);
-  const syncedSpotifyJamMode = Boolean(gameState.spotifyJamMode || spotifyJamMode);
 
   const resolvedViewerPlayerId = (() => {
     if (viewerPlayerId === "auto-host") return gameState.room?.hostPlayerId || "spectator";
 
     if (viewerPlayerId === "auto-player") {
-      const localName = playerNames[0];
-      const playerByName = gameState.players.find((player) => player.name === localName && player.id !== gameState.room?.hostPlayerId);
-
-      if (playerByName) return playerByName.id;
-
       const storedPlayerId = getStoredViewerPlayerId(activeRoomCode);
       const storedPlayer = gameState.players.find((player) => player.id === storedPlayerId);
 
       if (storedPlayer && storedPlayer.id !== gameState.room?.hostPlayerId) return storedPlayer.id;
 
+      const claimedByOther = new Set(
+        roomClients
+          .filter((client) => client.clientInstanceId && client.clientInstanceId !== clientInstanceId)
+          .map((client) => client.playerId)
+          .filter(Boolean)
+      );
+
       return (
+        gameState.players.find((player) => player.id !== gameState.room?.hostPlayerId && !claimedByOther.has(player.id))?.id ||
         gameState.players.find((player) => player.id !== gameState.room?.hostPlayerId)?.id ||
         "spectator"
       );
@@ -4430,44 +3294,12 @@ export default function App() {
   })();
   const viewerRole = getViewerRoleFromPlayer(resolvedViewerPlayerId, gameState);
   const viewerPermissions = getViewerPermissions(viewerRole);
-  const isSetupHost = viewerRole === "host" || viewerPlayerId === "auto-host";
-  const showAdminPanels = isSetupHost;
+  const showAdminPanels = gameState.phase === "lobby" || viewerRole === "host";
   const showSpotifyPanel = showAdminPanels;
 
   const leaderboard = useMemo(() => {
     return [...gameState.players].sort((a, b) => b.score - a.score || a.wrong - b.wrong);
   }, [gameState.players]);
-
-  useEffect(() => {
-    currentGameStateRef.current = gameState;
-  }, [gameState]);
-
-  useEffect(() => {
-    localStorage.setItem(SPOTIFY_JAM_MODE_STORAGE_KEY, syncedSpotifyJamMode ? "true" : "false");
-
-    if (spotifyJamMode !== syncedSpotifyJamMode) {
-      setSpotifyJamMode(syncedSpotifyJamMode);
-    }
-  }, [syncedSpotifyJamMode]);
-
-  function handleSpotifyJamModeChange(enabled) {
-    const nextEnabled = Boolean(enabled);
-
-    setSpotifyJamMode(nextEnabled);
-    sendGameAction({ type: "SPOTIFY_JAM_MODE_SET", enabled: nextEnabled });
-  }
-
-  useEffect(() => {
-    return () => {
-      if (pendingSupabaseWriteTimeoutRef.current) {
-        window.clearTimeout(pendingSupabaseWriteTimeoutRef.current);
-      }
-
-      if (roomSpotifyAutoPauseTimeoutRef.current) {
-        window.clearTimeout(roomSpotifyAutoPauseTimeoutRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     localStorage.setItem(CUSTOM_TRACKS_STORAGE_KEY, JSON.stringify(customTracks));
@@ -4482,206 +3314,116 @@ export default function App() {
   }, [socketUrl]);
 
   useEffect(() => {
-    localStorage.setItem(SUPABASE_URL_STORAGE_KEY, supabaseConfig.url || "");
-    localStorage.setItem(SUPABASE_ANON_KEY_STORAGE_KEY, supabaseConfig.anonKey || "");
-    localStorage.setItem(SUPABASE_ENABLED_STORAGE_KEY, String(Boolean(supabaseConfig.enabled)));
-  }, [supabaseConfig]);
-
-  useEffect(() => {
     localStorage.setItem(SYNC_ENABLED_STORAGE_KEY, String(syncEnabled));
   }, [syncEnabled]);
 
-
   useEffect(() => {
-    if (!isSupabaseConfigured(supabaseConfig) || gameState.phase !== "lobby" || showStartScreen) {
-      setSupabaseRoomPlayers([]);
-      return undefined;
-    }
-
-    let cancelled = false;
-    const activeCode = String(gameState.room?.code || roomCode || "").trim().toUpperCase();
-
-    async function loadSupabaseLobbyPlayers({ quiet = false } = {}) {
-      if (!activeCode) return;
-
-      try {
-        const players = await fetchSupabaseRoomPlayers(supabaseConfig, activeCode);
-
-        if (cancelled) return;
-
-        setSupabaseRoomPlayers(players);
-        setSyncClientCount(Math.max(1, players.length));
-
-        const mergedNames = mergePlayerNamesWithSupabase(playerNames, players);
-
-        if (!areNameListsEqual(playerNames, mergedNames)) {
-          setPlayerNames(mergedNames);
-        }
-
-        if (!quiet) {
-          setSupabaseStatus(`Supabase Lobby: ${players.length} Spieler gefunden.`);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setSupabaseStatus(`Supabase Lobby konnte nicht geladen werden: ${error.message || "Fehler"}`);
-        }
+    if (!syncEnabled) {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
       }
-    }
 
-    loadSupabaseLobbyPlayers();
-
-    const intervalId = window.setInterval(() => {
-      loadSupabaseLobbyPlayers({ quiet: true });
-    }, 2500);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [
-    supabaseConfig.enabled,
-    supabaseConfig.url,
-    supabaseConfig.anonKey,
-    gameState.phase,
-    gameState.room?.code,
-    roomCode,
-    showStartScreen,
-    playerNames,
-  ]);
-
-
-  useEffect(() => {
-    if (!isSupabaseConfigured(supabaseConfig)) return;
-    if (gameState.phase !== "finished") return;
-    if (!isSetupHost) return;
-
-    const resultKey = getGameResultKey(activeRoomCode, gameState);
-
-    if (isSupabaseResultSaved(resultKey)) {
-      setSupabaseStatsStatus("Statistik für dieses Spiel wurde bereits gespeichert.");
+      setSyncStatus("Sync deaktiviert.");
+      setSyncClientCount(1);
       return;
     }
 
-    let cancelled = false;
+    const activeRoomCode = gameState.room?.code || roomCode;
+    const socket = io(socketUrl, {
+      transports: ["websocket", "polling"],
+    });
 
-    async function persistFinishedGame() {
-      setSupabaseStatsStatus("Speichere Spielstatistik in Supabase...");
+    socketRef.current = socket;
+    setSyncStatus("Sync verbindet...");
 
-      try {
-        const result = await saveSupabaseGameStats(supabaseConfig, gameState, activeRoomCode, supabaseRoomPlayers);
+    socket.on("connect", () => {
+      setSyncStatus(`Sync verbunden: ${socket.id}`);
+      socket.emit("room:join", {
+        roomCode: activeRoomCode,
+        playerName: playerNames[0] || "Spieler",
+        clientInstanceId,
+      });
+    });
 
-        if (cancelled) return;
+    socket.on("connect_error", (error) => {
+      setSyncStatus(`Sync Fehler: ${error.message}`);
+    });
 
-        markSupabaseResultSaved(resultKey);
-        setSupabaseStatsStatus(result.message || "Spielstatistik gespeichert.");
-      } catch (error) {
-        if (!cancelled) {
-          setSupabaseStatsStatus(`Statistik konnte nicht gespeichert werden: ${error.message || "Fehler"}`);
-        }
+    socket.on("disconnect", () => {
+      setSyncStatus("Sync getrennt.");
+      setSyncClientCount(1);
+    });
+
+    socket.on("room:joined", ({ roomCode: joinedRoomCode, gameState: remoteGameState, clientCount, clients }) => {
+      setSyncStatus(`Raum ${joinedRoomCode} verbunden.`);
+      setSyncClientCount(clientCount || 1);
+      setRoomClients(Array.isArray(clients) ? clients : []);
+
+      if (remoteGameState && remoteGameState.phase !== "lobby") {
+        const serializedRemoteState = JSON.stringify(remoteGameState);
+        lastRemoteStateRef.current = serializedRemoteState;
+        lastEmittedStateRef.current = serializedRemoteState;
+        dispatch({ type: "SERVER_STATE_RECEIVED", gameState: remoteGameState });
       }
-    }
+    });
 
-    persistFinishedGame();
+    socket.on("room:state", ({ gameState: remoteGameState, clientCount, clients }) => {
+      setSyncClientCount(clientCount || 1);
+      if (Array.isArray(clients)) setRoomClients(clients);
+
+      if (!remoteGameState) return;
+
+      const serializedRemoteState = JSON.stringify(remoteGameState);
+      if (serializedRemoteState === lastEmittedStateRef.current) return;
+
+      lastRemoteStateRef.current = serializedRemoteState;
+      lastEmittedStateRef.current = serializedRemoteState;
+      dispatch({ type: "SERVER_STATE_RECEIVED", gameState: remoteGameState });
+    });
+
+    socket.on("room:presence", ({ clientCount, clients }) => {
+      setSyncClientCount(clientCount || 1);
+      setRoomClients(Array.isArray(clients) ? clients : []);
+    });
+
+    socket.on("room:claimResult", ({ ok, playerId, playerName, message }) => {
+      if (ok) {
+        setSyncStatus(`${playerName || "Spieler"} verbunden.`);
+        storeViewerPlayerId(activeRoomCode, playerId);
+      } else {
+        setSyncStatus(`Namensauswahl abgelehnt: ${message}`);
+      }
+    });
+
+    socket.on("room:error", ({ message }) => {
+      setSyncStatus(`Sync Aktion abgelehnt: ${message}`);
+    });
 
     return () => {
-      cancelled = true;
+      socket.disconnect();
+      if (socketRef.current === socket) {
+        socketRef.current = null;
+      }
     };
-  }, [
-    supabaseConfig.enabled,
-    supabaseConfig.url,
-    supabaseConfig.anonKey,
-    gameState.phase,
-    gameState.eventHistory,
-    gameState.players,
-    activeRoomCode,
-    isSetupHost,
-    supabaseRoomPlayers,
-  ]);
+  }, [syncEnabled, socketUrl, roomCode, gameState.room?.code, playerNames[0], clientInstanceId]);
 
   useEffect(() => {
-    if (!syncEnabled) {
-      setSyncStatus("Supabase Sync deaktiviert.");
-      setSyncClientCount(1);
-      return undefined;
-    }
+    const socket = socketRef.current;
+    if (!syncEnabled || !socket?.connected) return;
+    if (viewerPlayerId === "auto-host") return;
+    if (!resolvedViewerPlayerId || resolvedViewerPlayerId === "spectator") return;
 
-    if (!isSupabaseConfigured(supabaseConfig)) {
-      setSyncStatus("Supabase Sync wartet auf Konfiguration.");
-      return undefined;
-    }
+    const activeRoomCode = gameState.room?.code || roomCode;
+    const claimedPlayer = gameState.players.find((player) => player.id === resolvedViewerPlayerId);
 
-    let cancelled = false;
-    const activeCode = String(gameState.room?.code || roomCode || "").trim().toUpperCase();
-
-    async function loadSupabaseGameState({ quiet = false } = {}) {
-      if (!activeCode) return;
-
-      try {
-        const remoteState = await fetchSupabaseGameState(supabaseConfig, activeCode, trackCatalogById);
-
-        if (cancelled || !remoteState) {
-          if (!quiet && !cancelled) setSyncStatus(`Supabase Sync bereit: Raum ${activeCode}`);
-          return;
-        }
-
-        const remoteVersion = getGameStateSyncVersion(remoteState);
-        const localVersion = getGameStateSyncVersion(currentGameStateRef.current);
-
-        if (remoteVersion && remoteVersion !== localVersion && remoteVersion !== lastRemoteStateRef.current) {
-          if (!isRemoteSyncVersionNewer(remoteVersion, localVersion)) {
-            if (!quiet) setSyncStatus(`Lokaler Spielstand ist aktueller als Supabase: ${activeCode}`);
-            return;
-          }
-
-          lastRemoteStateRef.current = remoteVersion;
-          lastEmittedStateRef.current = remoteVersion;
-          dispatch({ type: "SERVER_STATE_RECEIVED", gameState: remoteState });
-
-          if (!quiet) setSyncStatus(`Supabase Sync aktualisiert: ${activeCode}`);
-          return;
-        }
-
-        if (!remoteVersion) {
-          const serializedRemoteState = JSON.stringify(remoteState);
-          const serializedLocalState = JSON.stringify(currentGameStateRef.current);
-
-          if (serializedRemoteState !== serializedLocalState && serializedRemoteState !== lastRemoteStateRef.current) {
-            lastRemoteStateRef.current = serializedRemoteState;
-            lastEmittedStateRef.current = serializedRemoteState;
-            dispatch({ type: "SERVER_STATE_RECEIVED", gameState: remoteState });
-
-            if (!quiet) setSyncStatus(`Supabase Sync aktualisiert: ${activeCode}`);
-            return;
-          }
-        }
-
-        if (!quiet) setSyncStatus(`Supabase Sync verbunden: ${activeCode}`);
-      } catch (error) {
-        if (!cancelled) {
-          setSyncStatus(`Supabase Sync Fehler: ${error.message || "Fehler"}`);
-        }
-      }
-    }
-
-    loadSupabaseGameState();
-
-    const intervalId = window.setInterval(() => {
-      loadSupabaseGameState({ quiet: true });
-    }, 1200);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [
-    syncEnabled,
-    supabaseConfig.enabled,
-    supabaseConfig.url,
-    supabaseConfig.anonKey,
-    roomCode,
-    gameState.room?.code,
-    trackCatalogById,
-  ]);
+    socket.emit("room:claimPlayer", {
+      roomCode: activeRoomCode,
+      playerId: resolvedViewerPlayerId,
+      playerName: claimedPlayer?.name || playerNames[0] || "Spieler",
+      clientInstanceId,
+    });
+  }, [syncEnabled, viewerPlayerId, resolvedViewerPlayerId, gameState.room?.code, roomCode, gameState.players, playerNames, clientInstanceId]);
 
   useEffect(() => {
     if (!resolvedViewerPlayerId || resolvedViewerPlayerId === "spectator" || resolvedViewerPlayerId.startsWith("auto-")) return;
@@ -4691,11 +3433,13 @@ export default function App() {
 
 
   useEffect(() => {
-    // Supabase is the source of truth for resume/reconnect.
-    // Avoid writing the full 1000-song gameState to localStorage on every reveal/next-player action,
-    // because JSON.stringify + localStorage.setItem blocks the UI thread.
-    localStorage.removeItem(GAME_STATE_STORAGE_KEY);
-  }, [activeRoomCode]);
+    if (gameState.phase === "lobby") {
+      localStorage.removeItem(GAME_STATE_STORAGE_KEY);
+      return;
+    }
+
+    localStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify(gameState));
+  }, [gameState]);
 
   useEffect(() => {
     const latestRequest = gameState.playbackRequests?.[0];
@@ -4833,43 +3577,12 @@ export default function App() {
     sendGameAction({ type: "NEXT_PLAYER" });
   }
 
-  function scheduleRoomSpotifyAutoPause(playLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS) {
-    const activeRoomCode = gameState.room?.code || roomCode;
-    const serverBaseUrl = String(spotifyHelperUrl || "").trim().replace(/\/+$/, "");
-    const limitedSeconds = Math.max(1, Math.min(120, Math.round(Number(playLimitSeconds) || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS)));
-
-    if (roomSpotifyAutoPauseTimeoutRef.current) {
-      window.clearTimeout(roomSpotifyAutoPauseTimeoutRef.current);
-      roomSpotifyAutoPauseTimeoutRef.current = null;
-    }
-
-    if (!serverBaseUrl || !activeRoomCode) return;
-
-    roomSpotifyAutoPauseTimeoutRef.current = window.setTimeout(async () => {
-      try {
-        await fetch(`${serverBaseUrl}/room/${encodeURIComponent(activeRoomCode)}/spotify/pause`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            jamMode: false,
-          }),
-        });
-      } catch {
-        // The visible countdown/game flow should continue even if Spotify pause fails.
-      } finally {
-        roomSpotifyAutoPauseTimeoutRef.current = null;
-      }
-    }, limitedSeconds * 1000 + 250);
-  }
-
   async function requestRoomSpotifyPlayback(playLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS) {
     const activeRoomCode = gameState.room?.code || roomCode;
-    const serverBaseUrl = String(spotifyHelperUrl || "").trim().replace(/\/+$/, "");
+    const serverBaseUrl = String(socketUrl || "").trim().replace(/\/+$/, "");
 
     if (!serverBaseUrl) {
-      window.alert("Supabase Spotify Function fehlt. Prüfe Supabase-Konfiguration oder deploye die Edge Function.");
+      window.alert("Socket Server URL fehlt. Der Host muss die Server-URL setzen.");
       return;
     }
 
@@ -4886,9 +3599,6 @@ export default function App() {
         },
         body: JSON.stringify({
           playLimitSeconds,
-          track: gameState.currentTrack,
-          jamMode: false,
-          useActiveContext: false,
         }),
       });
 
@@ -4896,53 +3606,15 @@ export default function App() {
         throw new Error(await response.text());
       }
 
-      scheduleRoomSpotifyAutoPause(playLimitSeconds);
-
       return true;
     } catch (error) {
       window.alert(error.message || "Spotify Wiedergabe konnte nicht gestartet werden.");
       return false;
     }
   }
-  function queueSupabaseGameStateWrite(syncedState, actionWithActor) {
-    latestPendingSupabaseWriteRef.current = {
-      syncedState,
-      actionWithActor,
-      roomCode: activeRoomCode,
-      trackCatalogById,
-    };
 
-    if (pendingSupabaseWriteTimeoutRef.current) {
-      window.clearTimeout(pendingSupabaseWriteTimeoutRef.current);
-    }
-
-    setSyncStatus(`Aktion ausgeführt, speichere ${actionWithActor.type}...`);
-
-    pendingSupabaseWriteTimeoutRef.current = window.setTimeout(async () => {
-      const pendingWrite = latestPendingSupabaseWriteRef.current;
-
-      pendingSupabaseWriteTimeoutRef.current = null;
-
-      if (!pendingWrite) return;
-
-      try {
-        await upsertSupabaseGameState(
-          supabaseConfig,
-          pendingWrite.roomCode,
-          pendingWrite.syncedState,
-          pendingWrite.actionWithActor,
-          pendingWrite.trackCatalogById
-        );
-        setSyncStatus(`Supabase Sync gespeichert: ${pendingWrite.actionWithActor.type}`);
-      } catch (error) {
-        setSyncStatus(`Supabase Sync speichern fehlgeschlagen: ${error.message || "Fehler"}`);
-      }
-    }, 25);
-  }
-
-
-
-  async function sendGameAction(action) {
+  function sendGameAction(action) {
+    const socket = socketRef.current;
     const actorPlayerId = resolvedViewerPlayerId || null;
     const actorPlayer = gameState.players.find((player) => player.id === actorPlayerId);
     const actionWithActor = {
@@ -4951,181 +3623,16 @@ export default function App() {
       actorName: actorPlayer?.name || playerNames[0] || "Spieler",
     };
 
-    const nextState = gameReducer(gameState, actionWithActor);
-    const syncedState = createSupabaseSyncedState(nextState, actionWithActor);
-    const nextStateVersion = getGameStateSyncVersion(syncedState) || String(Date.now());
 
-    lastRemoteStateRef.current = nextStateVersion;
-    lastEmittedStateRef.current = nextStateVersion;
-    dispatch({ type: "SERVER_STATE_RECEIVED", gameState: syncedState });
-
-    if (!syncEnabled || !isSupabaseConfigured(supabaseConfig)) {
-      setSyncStatus("Aktion lokal ausgeführt. Supabase Sync ist nicht aktiv.");
+    if (syncEnabled && socket?.connected) {
+      socket.emit("room:event", {
+        roomCode: activeRoomCode,
+        action: actionWithActor,
+      });
       return;
     }
 
-    queueSupabaseGameStateWrite(syncedState, actionWithActor);
-  }
-
-  function updateSupabaseConfig(patch) {
-    setSupabaseConfig((previous) => ({
-      ...previous,
-      ...patch,
-    }));
-  }
-
-  async function handleTestSupabaseConnection() {
-    if (!isSupabaseConfigured(supabaseConfig)) {
-      setSupabaseStatus("Supabase URL oder anon public key fehlt.");
-      return;
-    }
-
-    setSupabaseStatus("Supabase Verbindung wird geprüft...");
-
-    try {
-      await testSupabaseConnection(supabaseConfig);
-      setSupabaseStatus("Supabase verbunden. Schema erreichbar.");
-    } catch (error) {
-      setSupabaseStatus(`Supabase nicht bereit: ${error.message || "Fehler"}`);
-    }
-  }
-
-  async function loadStatsPageData() {
-    if (!isSupabaseConfigured(supabaseConfig)) {
-      setStatsPageStatus("Supabase ist nicht aktiv oder nicht konfiguriert.");
-      setPlayerStatsRows([]);
-      setGameResultRows([]);
-      return;
-    }
-
-    setStatsPageStatus("Lade Statistiken aus Supabase...");
-
-    try {
-      const [players, results] = await Promise.all([
-        fetchSupabasePlayerStats(supabaseConfig, 100),
-        fetchSupabaseGameResults(supabaseConfig, 30),
-      ]);
-
-      setPlayerStatsRows(players);
-      setGameResultRows(results);
-      setStatsPageStatus(`${players.length} Spielerstatistiken · ${results.length} Spiele geladen.`);
-    } catch (error) {
-      setStatsPageStatus(`Statistiken konnten nicht geladen werden: ${error.message || "Fehler"}`);
-    }
-  }
-
-  function openStatsPage() {
-    setShowStatsPage(true);
-    loadStatsPageData();
-  }
-
-
-  async function handleAuthSignUp({ email, password, displayName }) {
-    if (!isSupabaseConfigured(supabaseConfig)) {
-      setAuthStatus("Supabase ist nicht aktiv oder nicht konfiguriert.");
-      return;
-    }
-
-    setAuthStatus("Account wird erstellt...");
-
-    try {
-      const session = await signUpWithSupabase(supabaseConfig, { email, password, displayName });
-
-      if (session?.access_token) {
-        setAuthSession(session);
-        await createOrUpdateAuthProfile(supabaseConfig, session, displayName, clientInstanceId);
-        setPlayerNames([getAuthDisplayName(session) || displayName || email]);
-        setAuthStatus("Account erstellt und angemeldet.");
-      } else {
-        setAuthStatus("Account erstellt. Bitte bestätige ggf. deine E-Mail und melde dich danach an.");
-      }
-    } catch (error) {
-      setAuthStatus(`Registrierung fehlgeschlagen: ${error.message || "Fehler"}`);
-    }
-  }
-
-  async function handleAuthSignIn({ email, password }) {
-    if (!isSupabaseConfigured(supabaseConfig)) {
-      setAuthStatus("Supabase ist nicht aktiv oder nicht konfiguriert.");
-      return;
-    }
-
-    setAuthStatus("Login läuft...");
-
-    try {
-      const session = await signInWithSupabase(supabaseConfig, { email, password });
-      const displayName = getAuthDisplayName(session) || email;
-
-      setAuthSession(session);
-      await createOrUpdateAuthProfile(supabaseConfig, session, displayName, clientInstanceId);
-      setPlayerNames([displayName]);
-      setAuthStatus(`Angemeldet als ${displayName}.`);
-    } catch (error) {
-      setAuthStatus(`Login fehlgeschlagen: ${error.message || "Fehler"}`);
-    }
-  }
-
-  async function handleAuthLogout() {
-    try {
-      if (authSession) {
-        await signOutWithSupabase(supabaseConfig, authSession);
-      }
-    } catch {
-      // local logout should still happen
-    }
-
-    setAuthSession(null);
-    setAuthStatus("Abgemeldet. Gastmodus aktiv.");
-  }
-
-  async function applyStartSetup({ mode, name, roomCode: nextRoomCode }) {
-    const safeName = String(name || getAuthDisplayName(authSession) || "").trim() || "Spieler";
-    const safeRoomCode = String(nextRoomCode || createRoomCode()).trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || createRoomCode();
-
-    setRoomCode(safeRoomCode);
-    setPlayerName("");
-    setPlayerNames((previous) => {
-      if (mode === "create") return [safeName];
-
-      return [safeName];
-    });
-    setViewerPlayerId(mode === "create" ? "auto-host" : "auto-player");
-    setSyncEnabled(true);
-
-    if (isSupabaseConfigured(supabaseConfig)) {
-      setSupabaseStatus("Supabase Raum wird vorbereitet...");
-
-      try {
-        const result = await registerSupabaseRoomEntry(supabaseConfig, {
-          mode,
-          roomCode: safeRoomCode,
-          name: safeName,
-          clientInstanceId,
-          authSession,
-        });
-        setSupabaseStatus(result.message);
-      } catch (error) {
-        setSupabaseStatus(`Supabase Vorbereitung fehlgeschlagen: ${error.message || "Fehler"}`);
-      }
-    }
-
-    setShowStartScreen(false);
-
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.set("room", safeRoomCode);
-      url.searchParams.set("role", mode === "create" ? "host" : "player");
-      url.searchParams.set("server", socketUrl);
-      window.history.replaceState(null, "", url.toString());
-    } catch {
-      // ignore URL update
-    }
-  }
-
-  function backToStartScreen() {
-    if (gameState.phase !== "lobby") return;
-
-    setShowStartScreen(true);
+    dispatch(actionWithActor);
   }
 
   function addPlayer() {
@@ -5229,18 +3736,8 @@ export default function App() {
     });
   }
 
-  async function resetGame() {
+  function resetGame() {
     localStorage.removeItem(GAME_STATE_STORAGE_KEY);
-
-    if (isSupabaseConfigured(supabaseConfig)) {
-      try {
-        await clearSupabaseGameState(supabaseConfig, activeRoomCode);
-      } catch {
-        // local reset should still work even if remote clearing fails
-      }
-    }
-
-    setShowStartScreen(true);
     sendGameAction({ type: "RESET_GAME" });
   }
 
@@ -5252,54 +3749,17 @@ export default function App() {
     width: "100%",
   };
 
-  if (showStatsPage) {
-    return (
-      <StatsPage
-        config={supabaseConfig}
-        status={statsPageStatus}
-        playerStats={playerStatsRows}
-        gameResults={gameResultRows}
-        onBack={() => setShowStatsPage(false)}
-        onRefresh={loadStatsPageData}
-      />
-    );
-  }
-
-  if (gameState.phase === "lobby" && showStartScreen) {
-    return (
-      <StartScreen
-        initialRoomCode={roomCode}
-        initialName={getAuthDisplayName(authSession) || playerNames[0] || ""}
-        socketUrl={socketUrl}
-        syncStatus={syncStatus}
-        supabaseConfig={supabaseConfig}
-        supabaseStatus={supabaseStatus}
-        supabaseStatsStatus={supabaseStatsStatus}
-        authSession={authSession}
-        authStatus={authStatus}
-        onAuthSignUp={handleAuthSignUp}
-        onAuthSignIn={handleAuthSignIn}
-        onAuthLogout={handleAuthLogout}
-        onSupabaseConfigChange={updateSupabaseConfig}
-        onTestSupabase={handleTestSupabaseConnection}
-        onOpenStatsPage={openStatsPage}
-        onEnter={applyStartSetup}
-      />
-    );
-  }
-
   return (
     <div style={{ minHeight: "100vh", background: colors.bg, color: colors.text, padding: gameState.phase === "lobby" ? 12 : 8, fontFamily: "Inter, system-ui, sans-serif", overflowX: "hidden" }}>
       <div style={{ maxWidth: gameState.phase === "lobby" ? 1320 : "100%", margin: "0 auto", display: "grid", gap: gameState.phase === "lobby" ? 14 : 8 }}>
         {showAdminPanels ? (
-          <HostControlArea onReset={resetGame} onOpenStatsPage={openStatsPage} authSession={authSession} authStatus={authStatus} onAuthLogout={handleAuthLogout} isInGame={gameState.phase !== "lobby"}>
+          <HostControlArea onReset={resetGame} isInGame={gameState.phase !== "lobby"}>
             <WebsiteShareCard
               room={gameState.room}
               roomCode={roomCode}
               playerNames={playerNames}
               socketUrl={socketUrl}
               syncClientCount={syncClientCount}
-              supabaseConfig={supabaseConfig}
             />
 
             <MultiplayerSyncCard
@@ -5312,15 +3772,6 @@ export default function App() {
               syncClientCount={syncClientCount}
             />
 
-            <SupabaseFoundationCard
-              config={supabaseConfig}
-              status={supabaseStatus}
-              statsStatus={supabaseStatsStatus}
-              onChange={updateSupabaseConfig}
-              onTest={handleTestSupabaseConnection}
-              defaultOpen={false}
-            />
-
             {showSpotifyPanel && (
               <SpotifyPlayerCard
                 currentTrack={gameState.currentTrack}
@@ -5328,11 +3779,8 @@ export default function App() {
                 canPlayTrack={viewerPermissions.canPlayTrack}
                 canManageSpotify={showAdminPanels}
                 roomCode={gameState.room?.code || roomCode}
-                spotifyAuthServerUrl={spotifyHelperUrl}
-                spotifyHelperBackendLabel={spotifyHelperBackendLabel}
+                spotifyAuthServerUrl={socketUrl}
                 roundPlayLimitSeconds={gameState.playLimitSeconds}
-                jamMode={syncedSpotifyJamMode}
-                setJamMode={handleSpotifyJamModeChange}
                 onPlaybackRequested={() =>
                   sendGameAction({
                     type: "TRACK_PLAY_REQUESTED",
@@ -5365,20 +3813,16 @@ export default function App() {
           gameState.phase === "lobby" && <Header onReset={resetGame} isInGame={false} />
         )}
 
-        {gameState.phase === "lobby" && isSetupHost && (
+        {gameState.phase === "lobby" && (
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.35fr) minmax(280px, 0.65fr)", gap: 24 }}>
             <main style={{ display: "grid", gap: 16, minWidth: 0 }}>
               <LobbyCard
                 playerName={playerName}
                 setPlayerName={setPlayerName}
                 playerNames={playerNames}
-                supabaseRoomPlayers={supabaseRoomPlayers}
-                supabaseEnabled={isSupabaseConfigured(supabaseConfig)}
                 addPlayer={addPlayer}
                 removePlayer={removePlayer}
                 startGame={startGame}
-                backToStartScreen={backToStartScreen}
-                onOpenStatsPage={openStatsPage}
                 availableDeck={availableDeck}
                 fullDeck={fullDeck}
                 selectedPreset={selectedPreset}
@@ -5399,18 +3843,6 @@ export default function App() {
               <RulesCard />
             </aside>
           </div>
-        )}
-
-        {gameState.phase === "lobby" && !isSetupHost && (
-          <PlayerLobbyWaitingView
-            roomCode={roomCode}
-            playerName={playerNames[0] || "Spieler"}
-            supabaseRoomPlayers={supabaseRoomPlayers}
-            syncStatus={syncStatus}
-            supabaseStatus={supabaseStatus}
-            onBack={() => setShowStartScreen(true)}
-            onOpenStatsPage={openStatsPage}
-          />
         )}
 
         {gameState.phase !== "lobby" && gameState.players.length > 0 && (
@@ -5538,17 +3970,11 @@ export default function App() {
                   )}
 
                   {gameState.phase === "finished" && (
-                    <>
-                      <FinishedPanel
-                        leaderboard={leaderboard}
-                        onNewRound={startNewRound}
-                        canNewRound={viewerPermissions.canHostControl}
-                      />
-
-                      {isSupabaseConfigured(supabaseConfig) && (
-                        <SupabaseStatsSavedNotice status={supabaseStatsStatus} />
-                      )}
-                    </>
+                    <FinishedPanel
+                      leaderboard={leaderboard}
+                      onNewRound={startNewRound}
+                      canNewRound={viewerPermissions.canHostControl}
+                    />
                   )}
                 </CardContent>
               </Card>
@@ -5578,675 +4004,7 @@ export default function App() {
   );
 }
 
-
-
-
-
-
-function StatsPage({ config, status, playerStats = [], gameResults = [], onBack, onRefresh }) {
-  const totalGames = gameResults.length;
-  const totalCards = playerStats.reduce((sum, row) => sum + Number(row.cards_won || 0), 0);
-  const totalWins = playerStats.reduce((sum, row) => sum + Number(row.wins || 0), 0);
-  const topPlayer = playerStats[0] || null;
-
-  return (
-    <div style={{ minHeight: "100vh", background: colors.bg, color: colors.text, fontFamily: "Inter, system-ui, sans-serif", padding: 18 }}>
-      <div style={{ maxWidth: 1180, margin: "0 auto", display: "grid", gap: 16 }}>
-        <header style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <div>
-            <Badge variant={isSupabaseConfigured(config) ? "default" : "secondary"}>Profil & Statistiken</Badge>
-            <h1 style={{ margin: "8px 0 4px", fontSize: 38, letterSpacing: -1 }}>Trackline Statistiken</h1>
-            <p style={{ margin: 0, color: colors.muted }}>
-              Persönliche Werte, letzte Spiele und Joker-Auswertung aus Supabase.
-            </p>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Button variant="secondary" onClick={onRefresh}>
-              Aktualisieren
-            </Button>
-            <Button variant="secondary" onClick={onBack}>
-              Zurück
-            </Button>
-          </div>
-        </header>
-
-        <Card>
-          <CardContent style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 }}>
-            <InfoTile label="Geladene Spiele" value={`${totalGames}`} />
-            <InfoTile label="Spielerprofile" value={`${playerStats.length}`} />
-            <InfoTile label="Karten gesamt" value={`${totalCards}`} />
-            <InfoTile label="Top-Spieler" value={topPlayer?.display_name || "-"} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent style={{ display: "grid", gap: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <strong>Status</strong>
-              <Badge variant="secondary">{isSupabaseConfigured(config) ? "Supabase aktiv" : "Supabase fehlt"}</Badge>
-            </div>
-            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>{status}</p>
-          </CardContent>
-        </Card>
-
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.4fr) minmax(320px, 0.6fr)", gap: 16 }}>
-          <Card>
-            <CardContent style={{ display: "grid", gap: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                <h2 style={{ margin: 0 }}>Spieler-Ranking</h2>
-                <Badge variant="secondary">nach Siegen</Badge>
-              </div>
-
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
-                  <thead>
-                    <tr style={{ color: colors.muted, fontSize: 12, textAlign: "left" }}>
-                      <th style={{ padding: "8px 6px" }}>#</th>
-                      <th style={{ padding: "8px 6px" }}>Spieler</th>
-                      <th style={{ padding: "8px 6px" }}>Spiele</th>
-                      <th style={{ padding: "8px 6px" }}>Siege</th>
-                      <th style={{ padding: "8px 6px" }}>Karten</th>
-                      <th style={{ padding: "8px 6px" }}>Quote</th>
-                      <th style={{ padding: "8px 6px" }}>Joker</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {playerStats.length === 0 && (
-                      <tr>
-                        <td colSpan={7} style={{ padding: 12, color: colors.muted }}>
-                          Noch keine Spielerstatistiken vorhanden.
-                        </td>
-                      </tr>
-                    )}
-
-                    {playerStats.map((row, index) => (
-                      <tr key={row.id || row.guest_id || row.display_name} style={{ borderTop: `1px solid ${colors.border}` }}>
-                        <td style={{ padding: "10px 6px", fontWeight: 900 }}>{index + 1}</td>
-                        <td style={{ padding: "10px 6px", fontWeight: 900 }}>{row.display_name}</td>
-                        <td style={{ padding: "10px 6px" }}>{row.games_played || 0}</td>
-                        <td style={{ padding: "10px 6px" }}>{row.wins || 0}</td>
-                        <td style={{ padding: "10px 6px" }}>{row.cards_won || 0}</td>
-                        <td style={{ padding: "10px 6px" }}>{getStatsAccuracy(row)}%</td>
-                        <td style={{ padding: "10px 6px", color: colors.muted, fontSize: 12 }}>
-                          🃏 +{row.earned_jokers || 0} · 🔄 {row.swap_jokers_used || 0} · 🛡️ {row.secure_card_jokers_used || 0}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent style={{ display: "grid", gap: 12 }}>
-              <h2 style={{ margin: 0 }}>Joker-Übersicht</h2>
-
-              {playerStats.slice(0, 8).map((row) => (
-                <div
-                  key={`joker-${row.id || row.guest_id || row.display_name}`}
-                  style={{
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: 14,
-                    padding: 10,
-                    background: colors.bg,
-                    display: "grid",
-                    gap: 5,
-                  }}
-                >
-                  <strong>{row.display_name}</strong>
-                  <span style={{ color: colors.muted, fontSize: 12 }}>
-                    Challenge: {row.challenge_jokers_used || 0} genutzt · {row.challenge_jokers_won || 0} gewonnen
-                  </span>
-                  <span style={{ color: colors.muted, fontSize: 12 }}>
-                    Tauschen: {row.swap_jokers_used || 0} · Karte sichern: {row.secure_card_jokers_used || 0} · verdient: {row.earned_jokers || 0}
-                  </span>
-                </div>
-              ))}
-
-              {playerStats.length === 0 && <p style={{ margin: 0, color: colors.muted }}>Noch keine Joker-Statistiken.</p>}
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardContent style={{ display: "grid", gap: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-              <h2 style={{ margin: 0 }}>Letzte Spiele</h2>
-              <Badge variant="secondary">{gameResults.length}</Badge>
-            </div>
-
-            <div style={{ display: "grid", gap: 8 }}>
-              {gameResults.length === 0 && <p style={{ margin: 0, color: colors.muted }}>Noch keine gespeicherten Spiele.</p>}
-
-              {gameResults.map((result) => {
-                const playerSummary = Array.isArray(result.summary?.players) ? result.summary.players : [];
-
-                return (
-                  <div
-                    key={result.id}
-                    style={{
-                      border: `1px solid ${colors.border}`,
-                      borderRadius: 16,
-                      padding: 12,
-                      background: colors.bg,
-                      display: "grid",
-                      gap: 8,
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                      <strong>Raum {result.room_code || "-"} · Gewinner: {result.winner_name || "-"}</strong>
-                      <Badge variant="secondary">{formatStatsDate(result.finished_at)}</Badge>
-                    </div>
-
-                    <p style={{ margin: 0, color: colors.muted, fontSize: 12 }}>
-                      Modus: {result.game_mode || "-"} · Ziel: {result.target_score || "-"} Karten
-                    </p>
-
-                    {playerSummary.length > 0 && (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {playerSummary.slice(0, 8).map((player) => (
-                          <span
-                            key={`${result.id}-${player.name}`}
-                            style={{
-                              border: `1px solid ${colors.border}`,
-                              borderRadius: 999,
-                              padding: "5px 8px",
-                              color: colors.muted,
-                              fontSize: 12,
-                            }}
-                          >
-                            {player.name}: {player.score}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function SupabaseStatsSavedNotice({ status }) {
-  return (
-    <div
-      style={{
-        border: `1px solid ${colors.border}`,
-        borderRadius: 18,
-        padding: 12,
-        background: "rgba(126,87,255,0.10)",
-        display: "flex",
-        justifyContent: "space-between",
-        gap: 12,
-        alignItems: "center",
-        flexWrap: "wrap",
-      }}
-    >
-      <div>
-        <strong>Supabase-Statistiken</strong>
-        <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>{status || "Warte auf Speicherung..."}</p>
-      </div>
-
-      <Badge variant="secondary">Phase 4</Badge>
-    </div>
-  );
-}
-
-function PlayerLobbyWaitingView({ roomCode, playerName, supabaseRoomPlayers = [], syncStatus, supabaseStatus, onBack, onOpenStatsPage }) {
-  return (
-    <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gap: 16 }}>
-      <Card>
-        <CardContent style={{ display: "grid", gap: 16 }}>
-          <div
-            style={{
-              borderRadius: 24,
-              padding: 18,
-              background: cardTheme.table,
-              border: `1px solid ${colors.border}`,
-              display: "grid",
-              gap: 8,
-            }}
-          >
-            <Badge variant="secondary">Spieler-Lobby</Badge>
-            <h2 style={{ fontSize: 32, margin: "4px 0 0", letterSpacing: -0.8 }}>Du bist im Raum {roomCode}</h2>
-            <p style={{ color: colors.muted, margin: 0 }}>
-              {playerName} ist beigetreten. Warte, bis der Host die Runde vorbereitet und startet.
-            </p>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
-            <InfoTile label="Raum" value={roomCode || "-"} />
-            <InfoTile label="Sync" value={syncStatus || "-"} />
-            <InfoTile label="Supabase" value={supabaseStatus || "-"} />
-          </div>
-
-          <div style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 12, background: colors.bg, display: "grid", gap: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-              <strong>Spieler im Raum</strong>
-              <Badge variant="secondary">{supabaseRoomPlayers.length}</Badge>
-            </div>
-
-            {supabaseRoomPlayers.length === 0 ? (
-              <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>Noch keine Supabase-Spielerliste geladen.</p>
-            ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {supabaseRoomPlayers.map((player) => (
-                  <span
-                    key={`${player.guestId}-${player.displayName}`}
-                    style={{
-                      border: `1px solid ${player.isHost ? colors.primary : colors.border}`,
-                      borderRadius: 999,
-                      padding: "8px 11px",
-                      background: player.isHost ? "rgba(126,87,255,0.18)" : colors.chip,
-                      fontWeight: 850,
-                    }}
-                  >
-                    {player.isHost ? "Host · " : ""}
-                    {player.displayName}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Button variant="secondary" onClick={onOpenStatsPage}>
-              Statistiken
-            </Button>
-            <Button variant="secondary" onClick={onBack}>
-              Zurück zur Startseite
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-
-function AuthPanel({ session, status, defaultName, onSignUp, onSignIn, onLogout }) {
-  const [mode, setMode] = useState("signin");
-  const [displayName, setDisplayName] = useState(defaultName || "");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  const loggedInName = getAuthDisplayName(session);
-  const canSubmit = email.trim() && password.length >= 6 && (mode === "signin" || displayName.trim());
-
-  useEffect(() => {
-    if (defaultName && !displayName.trim()) {
-      setDisplayName(defaultName);
-    }
-  }, [defaultName]);
-
-  if (session) {
-    return (
-      <Card>
-        <CardContent style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <div>
-            <Badge>Login aktiv</Badge>
-            <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5 }}>Angemeldet als {loggedInName || getAuthEmail(session)}</h2>
-            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-              Räume und Statistiken werden mit deinem Profil verknüpft.
-            </p>
-          </div>
-
-          <Button variant="secondary" onClick={onLogout}>
-            Logout
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardContent style={{ display: "grid", gap: 12 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
-          <div>
-            <Badge variant="secondary">Login optional</Badge>
-            <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5 }}>Profil speichern</h2>
-            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-              Mit Login bleiben deine Statistiken langfristig deinem Profil zugeordnet. Ohne Login kannst du weiter als Gast spielen.
-            </p>
-          </div>
-
-          <div style={{ display: "flex", gap: 8 }}>
-            <Button variant={mode === "signin" ? "primary" : "secondary"} onClick={() => setMode("signin")}>
-              Einloggen
-            </Button>
-            <Button variant={mode === "signup" ? "primary" : "secondary"} onClick={() => setMode("signup")}>
-              Registrieren
-            </Button>
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: mode === "signup" ? "minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)" : "minmax(0, 1fr) minmax(0, 1fr)", gap: 10 }}>
-          {mode === "signup" && (
-            <label style={{ display: "grid", gap: 8 }}>
-              <span style={{ color: colors.muted, fontSize: 13 }}>Anzeigename</span>
-              <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="z. B. Christoph" />
-            </label>
-          )}
-
-          <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: colors.muted, fontSize: 13 }}>E-Mail</span>
-            <Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" type="email" />
-          </label>
-
-          <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: colors.muted, fontSize: 13 }}>Passwort</span>
-            <Input
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="mind. 6 Zeichen"
-              type="password"
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && canSubmit) {
-                  mode === "signin"
-                    ? onSignIn?.({ email, password })
-                    : onSignUp?.({ email, password, displayName });
-                }
-              }}
-            />
-          </label>
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ color: colors.muted, fontSize: 12 }}>{status || "Gastmodus aktiv."}</span>
-          <Button
-            onClick={() =>
-              mode === "signin"
-                ? onSignIn?.({ email, password })
-                : onSignUp?.({ email, password, displayName })
-            }
-            disabled={!canSubmit}
-          >
-            {mode === "signin" ? "Einloggen" : "Account erstellen"}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function SupabaseFoundationCard({ config, status, statsStatus, onChange, onTest, compact = false, defaultOpen = false }) {
-  const enabled = Boolean(config?.enabled);
-  const configured = isSupabaseConfigured(config);
-  const title = compact ? "Technische Verbindung" : "System & Supabase";
-
-  return (
-    <Card>
-      <details open={defaultOpen} style={{ display: "grid" }}>
-        <summary
-          style={{
-            cursor: "pointer",
-            listStyle: "none",
-            padding: compact ? 12 : 14,
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 12,
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <div>
-            <Badge variant={configured ? "default" : "secondary"}>{configured ? "Supabase aktiv" : "Einrichtung"}</Badge>
-            <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5, fontSize: compact ? 18 : 22 }}>{title}</h2>
-            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-              {configured
-                ? "Verbindung ist automatisch gefüllt. Nur öffnen, wenn etwas nicht funktioniert."
-                : "Supabase ist noch nicht vollständig konfiguriert."}
-            </p>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <Badge variant={enabled ? "default" : "secondary"}>{enabled ? "aktiv" : "aus"}</Badge>
-            <Badge variant="secondary">Details</Badge>
-          </div>
-        </summary>
-
-        <CardContent style={{ display: "grid", gap: compact ? 10 : 14, paddingTop: 0 }}>
-          <div style={{ display: "grid", gridTemplateColumns: compact ? "1fr" : "1fr 1fr", gap: 10 }}>
-            <div style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg }}>
-              <span style={{ display: "block", color: colors.muted, fontSize: 12 }}>Verbindung</span>
-              <strong style={{ display: "block", marginTop: 4, fontSize: 13 }}>{status || "Nicht verbunden."}</strong>
-            </div>
-
-            <div style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg }}>
-              <span style={{ display: "block", color: colors.muted, fontSize: 12 }}>Statistiken</span>
-              <strong style={{ display: "block", marginTop: 4, fontSize: 13 }}>{statsStatus || "Noch keine Statistik gespeichert."}</strong>
-            </div>
-          </div>
-
-          <label style={{ display: "flex", gap: 8, alignItems: "center", color: colors.muted, fontSize: 13 }}>
-            <input
-              type="checkbox"
-              checked={enabled}
-              onChange={(event) => onChange?.({ enabled: event.target.checked })}
-            />
-            Supabase aktivieren
-          </label>
-
-          <div style={{ display: "grid", gridTemplateColumns: compact ? "1fr" : "minmax(0, 1fr) minmax(0, 1fr)", gap: 10 }}>
-            <label style={{ display: "grid", gap: 8 }}>
-              <span style={{ color: colors.muted, fontSize: 13 }}>Project URL</span>
-              <Input
-                value={config?.url || ""}
-                onChange={(event) => onChange?.({ url: event.target.value })}
-                placeholder="https://xxxxx.supabase.co"
-              />
-            </label>
-
-            <label style={{ display: "grid", gap: 8 }}>
-              <span style={{ color: colors.muted, fontSize: 13 }}>anon public key</span>
-              <Input
-                value={config?.anonKey || ""}
-                onChange={(event) => onChange?.({ anonKey: event.target.value })}
-                placeholder="eyJhbGciOi..."
-                type="password"
-              />
-            </label>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <Button variant="secondary" onClick={onTest}>
-              Verbindung testen
-            </Button>
-            <span style={{ color: colors.muted, fontSize: 12 }}>
-              Normalerweise musst du hier nichts ändern. Die Werte kommen über Vercel Environment Variables oder aus dem Einladungslink.
-            </span>
-          </div>
-        </CardContent>
-      </details>
-    </Card>
-  );
-}
-
-
-function StartScreen({ initialRoomCode, initialName, socketUrl, syncStatus, supabaseConfig, supabaseStatus, supabaseStatsStatus, authSession, authStatus, onAuthSignUp, onAuthSignIn, onAuthLogout, onSupabaseConfigChange, onTestSupabase, onOpenStatsPage, onEnter }) {
-  const [name, setName] = useState(initialName || "");
-  const [joinCode, setJoinCode] = useState(String(initialRoomCode || "").toUpperCase());
-  const [createdCode, setCreatedCode] = useState(() => createRoomCode());
-
-  const profileRoomName = getAuthDisplayName(authSession);
-  const visibleRoomName = profileRoomName || name;
-
-  function normalizeCode(value) {
-    return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
-  }
-
-  function getPreferredRoomName() {
-    return profileRoomName || name;
-  }
-
-  function createRoom() {
-    const nextCode = normalizeCode(createdCode) || createRoomCode();
-
-    onEnter({
-      mode: "create",
-      name: getPreferredRoomName(),
-      roomCode: nextCode,
-    });
-  }
-
-  function joinRoom() {
-    const nextCode = normalizeCode(joinCode);
-
-    if (!nextCode) {
-      window.alert("Bitte gib einen Raumcode ein.");
-      return;
-    }
-
-    onEnter({
-      mode: "join",
-      name: getPreferredRoomName(),
-      roomCode: nextCode,
-    });
-  }
-
-  function regenerateCode() {
-    setCreatedCode(createRoomCode());
-  }
-
-  useEffect(() => {
-    if (profileRoomName && name !== profileRoomName) {
-      setName(profileRoomName);
-    }
-  }, [profileRoomName, name]);
-
-  const canContinue = String(visibleRoomName || "").trim().length > 0;
-
-  return (
-    <div style={{ minHeight: "100vh", background: colors.bg, color: colors.text, fontFamily: "Inter, system-ui, sans-serif", padding: 18, display: "grid", placeItems: "center" }}>
-      <div style={{ width: "min(1040px, 100%)", display: "grid", gap: 18 }}>
-        <header style={{ display: "grid", gap: 8, textAlign: "center" }}>
-          <Badge variant="secondary">Trackline</Badge>
-          <h1 style={{ margin: 0, fontSize: 46, letterSpacing: -1.4 }}>Trackline starten</h1>
-          <p style={{ margin: "0 auto", color: colors.muted, maxWidth: 720, lineHeight: 1.5 }}>
-            Erstelle einen privaten Raum oder tritt einem bestehenden Raum bei. Spotify bleibt unverändert optional – der Host kann weiterhin manuell, per Discord Stream oder Spotify Jam abspielen.
-          </p>
-
-          <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
-            <Button variant="secondary" onClick={onOpenStatsPage}>
-              Profil & Statistiken ansehen
-            </Button>
-          </div>
-        </header>
-
-        <AuthPanel
-          session={authSession}
-          status={authStatus}
-          defaultName={visibleRoomName}
-          onSignUp={onAuthSignUp}
-          onSignIn={onAuthSignIn}
-          onLogout={onAuthLogout}
-        />
-
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 16 }}>
-          <Card>
-            <CardContent style={{ display: "grid", gap: 14 }}>
-              <div>
-                <Badge>Neuer Raum</Badge>
-                <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5 }}>Raum erstellen</h2>
-                <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-                  Du wirst Host und kannst danach Spieler, Teams und Regeln vorbereiten.
-                </p>
-              </div>
-
-              <label style={{ display: "grid", gap: 8 }}>
-                <span style={{ color: colors.muted, fontSize: 13 }}>Dein Name</span>
-                <Input
-                  value={visibleRoomName}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="z. B. Christoph"
-                  readOnly={Boolean(authSession)}
-                  title={authSession ? "Bei Login wird der Profilname verwendet." : ""}
-                />
-              </label>
-
-              <label style={{ display: "grid", gap: 8 }}>
-                <span style={{ color: colors.muted, fontSize: 13 }}>Raumcode</span>
-                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 8 }}>
-                  <Input value={createdCode} onChange={(event) => setCreatedCode(normalizeCode(event.target.value))} />
-                  <Button variant="secondary" onClick={regenerateCode}>
-                    Neu
-                  </Button>
-                </div>
-              </label>
-
-              <Button onClick={createRoom} disabled={!canContinue} style={{ padding: "14px 18px" }}>
-                Raum erstellen
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent style={{ display: "grid", gap: 14 }}>
-              <div>
-                <Badge variant="secondary">Beitreten</Badge>
-                <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5 }}>Raum beitreten</h2>
-                <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-                  Gib den Raumcode ein. Falls die Lobby noch vorbereitet wird, kann der Host dich wie bisher als Spieler hinzufügen.
-                </p>
-              </div>
-
-              <label style={{ display: "grid", gap: 8 }}>
-                <span style={{ color: colors.muted, fontSize: 13 }}>Dein Name</span>
-                <Input
-                  value={visibleRoomName}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="z. B. Alex"
-                  readOnly={Boolean(authSession)}
-                  title={authSession ? "Bei Login wird der Profilname verwendet." : ""}
-                />
-              </label>
-
-              <label style={{ display: "grid", gap: 8 }}>
-                <span style={{ color: colors.muted, fontSize: 13 }}>Raumcode</span>
-                <Input
-                  value={joinCode}
-                  onChange={(event) => setJoinCode(normalizeCode(event.target.value))}
-                  onKeyDown={(event) => event.key === "Enter" && canContinue && joinRoom()}
-                  placeholder="ABC123"
-                />
-              </label>
-
-              <Button onClick={joinRoom} disabled={!canContinue || !normalizeCode(joinCode)} style={{ padding: "14px 18px" }}>
-                Raum beitreten
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardContent style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
-            <InfoTile label="Online" value="bereit" />
-            <InfoTile label="Spielstand" value="Supabase" />
-            <InfoTile label="Spotify" value="optional" />
-          </CardContent>
-        </Card>
-
-        <SupabaseFoundationCard
-          compact
-          config={supabaseConfig}
-          status={supabaseStatus}
-          statsStatus={supabaseStatsStatus}
-          onChange={onSupabaseConfigChange}
-          onTest={onTestSupabase}
-        />
-      </div>
-    </div>
-  );
-}
-
-function Header({ onReset, onOpenStatsPage, authSession, authStatus, onAuthLogout, isInGame }) {
+function Header({ onReset, isInGame }) {
   return (
     <header style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
       <div>
@@ -6254,31 +4012,15 @@ function Header({ onReset, onOpenStatsPage, authSession, authStatus, onAuthLogou
         <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>Privates Musik-Timeline-Quiz als Web-Spiel</p>
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        {authSession && (
-          <Badge variant="secondary">{getAuthDisplayName(authSession) || getAuthEmail(authSession)}</Badge>
-        )}
-        {authSession && onAuthLogout && (
-          <Button variant="secondary" onClick={onAuthLogout}>
-            Logout
-          </Button>
-        )}
-        {onOpenStatsPage && (
-          <Button variant="secondary" onClick={onOpenStatsPage}>
-            Statistiken
-          </Button>
-        )}
-
-        <Button variant="secondary" onClick={onReset}>
-          {isInGame ? "Spiel beenden" : "Neustart"}
-        </Button>
-      </div>
+      <Button variant="secondary" onClick={onReset}>
+        {isInGame ? "Spiel beenden" : "Neustart"}
+      </Button>
     </header>
   );
 }
 
 
-function HostControlArea({ children, onReset, onOpenStatsPage, authSession, authStatus, onAuthLogout, isInGame }) {
+function HostControlArea({ children, onReset, isInGame }) {
   return (
     <details
       open={!isInGame}
@@ -6303,7 +4045,7 @@ function HostControlArea({ children, onReset, onOpenStatsPage, authSession, auth
         <div>
           <strong style={{ fontSize: 18 }}>Host-Bereich</strong>
           <p style={{ margin: "3px 0 0", color: colors.muted, fontSize: 12 }}>
-            Link, Spieler, Einstellungen und Spotify. Technisches ist eingeklappt.
+            Link, Spotify, Sync und Admin. Im Spiel einklappen und darunter normal spielen.
           </p>
         </div>
 
@@ -6320,7 +4062,7 @@ function HostControlArea({ children, onReset, onOpenStatsPage, authSession, auth
       </summary>
 
       <div style={{ display: "grid", gap: 12, padding: "0 12px 12px" }}>
-        <Header onReset={onReset} onOpenStatsPage={onOpenStatsPage} authSession={authSession} authStatus={authStatus} onAuthLogout={onAuthLogout} isInGame={isInGame} />
+        <Header onReset={onReset} isInGame={isInGame} />
         {children}
       </div>
     </details>
@@ -6328,17 +4070,14 @@ function HostControlArea({ children, onReset, onOpenStatsPage, authSession, auth
 }
 
 
-function WebsiteShareCard({ room, roomCode, playerNames, socketUrl, syncClientCount = 1, supabaseConfig }) {
+function WebsiteShareCard({ room, roomCode, playerNames, socketUrl, syncClientCount = 1 }) {
   const activeRoomCode = room?.code || roomCode;
   const hostName = room?.hostName || playerNames[0] || "Host";
   const [copied, setCopied] = useState(false);
   const normalizedSocketUrl = String(socketUrl || "").trim().replace(/\/+$/, "");
-  const supabaseParams = isSupabaseConfigured(supabaseConfig)
-    ? `&supabaseUrl=${encodeURIComponent(normalizeSupabaseUrl(supabaseConfig.url))}&supabaseKey=${encodeURIComponent(supabaseConfig.anonKey)}`
-    : "";
   const joinUrl =
     typeof window !== "undefined"
-      ? `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(activeRoomCode)}&role=player&server=${encodeURIComponent(normalizedSocketUrl)}${supabaseParams}`
+      ? `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(activeRoomCode)}&role=player&server=${encodeURIComponent(normalizedSocketUrl)}`
       : "";
 
   async function copyJoinUrl() {
@@ -6367,8 +4106,8 @@ function WebsiteShareCard({ room, roomCode, playerNames, socketUrl, syncClientCo
           }}
         >
           <div>
-            <Badge variant="secondary">Host</Badge>
-            <h2 style={{ margin: "10px 0 6px", letterSpacing: -0.6 }}>Freunde einladen</h2>
+            <Badge variant="secondary">Host-Dashboard</Badge>
+            <h2 style={{ margin: "10px 0 6px", letterSpacing: -0.6 }}>Runde bereitstellen</h2>
             <p style={{ margin: 0, color: colors.muted }}>
               {syncClientCount} verbunden · Host: {hostName} · Raum {activeRoomCode}
             </p>
@@ -6388,11 +4127,6 @@ function WebsiteShareCard({ room, roomCode, playerNames, socketUrl, syncClientCo
         <details style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 14, background: colors.bg }}>
           <summary style={{ cursor: "pointer", fontWeight: 900 }}>Einladungslink anzeigen</summary>
           <p style={{ margin: "10px 0 0", color: colors.muted, wordBreak: "break-all", fontSize: 13 }}>{joinUrl}</p>
-          {isSupabaseConfigured(supabaseConfig) && (
-            <p style={{ margin: "8px 0 0", color: colors.muted, fontSize: 12 }}>
-              Der Link enthält alles Nötige, damit Freunde automatisch in dieser Lobby landen.
-            </p>
-          )}
         </details>
       </CardContent>
     </Card>
@@ -6402,56 +4136,55 @@ function WebsiteShareCard({ room, roomCode, playerNames, socketUrl, syncClientCo
 function MultiplayerSyncCard({ roomCode, socketUrl, setSocketUrl, syncEnabled, setSyncEnabled, syncStatus, syncClientCount }) {
   return (
     <Card>
-      <CardContent style={{ display: "grid", gap: 12 }}>
+      <CardContent style={{ display: "grid", gap: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
           <div>
-            <Badge variant={syncEnabled ? "default" : "secondary"}>Online bereit</Badge>
-            <h2 style={{ margin: "8px 0 4px" }}>Raumstatus</h2>
-            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-              Spielstand, Lobby und Statistiken laufen über Supabase. Render wird nicht mehr benötigt.
+            <Badge variant="secondary">Multiplayer Sync</Badge>
+            <h2 style={{ margin: "10px 0 6px" }}>Room-State synchronisieren</h2>
+            <p style={{ margin: 0, color: colors.muted }}>
+              Verbindet alle Browser mit gleichem Raumcode. Clients senden nur Aktionen; der Server berechnet den GameState.
             </p>
           </div>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Badge variant={syncEnabled ? "default" : "secondary"}>{syncEnabled ? "Sync aktiv" : "Sync aus"}</Badge>
-            <Badge variant="secondary">{syncClientCount} Spieler/Client(s)</Badge>
+            <Badge variant="secondary">{syncClientCount} Client(s)</Badge>
           </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, alignItems: "end" }}>
+          <label style={{ display: "grid", gap: 8 }}>
+            <span style={{ color: colors.muted, fontSize: 14 }}>Socket Server URL</span>
+            <Input
+              value={socketUrl}
+              onChange={(event) => setSocketUrl(event.target.value)}
+              placeholder="http://127.0.0.1:3001"
+            />
+          </label>
+
+          <Button variant={syncEnabled ? "danger" : "primary"} onClick={() => setSyncEnabled(!syncEnabled)}>
+            {syncEnabled ? "Sync trennen" : "Sync verbinden"}
+          </Button>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
-          <InfoTile label="Raum" value={roomCode} />
+          <InfoTile label="Sync-Raum" value={roomCode} />
           <InfoTile label="Status" value={syncStatus} />
         </div>
 
-        <details style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg }}>
-          <summary style={{ cursor: "pointer", fontWeight: 900, listStyle: "none" }}>Technik / Fallback anzeigen</summary>
-
-          <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-              Für Spotify/Jam kann hier die alte Render-/Legacy-URL eingetragen werden. Sobald hier eine echte https-URL steht, nutzt Spotify wieder den alten Helper; Supabase bleibt trotzdem für Lobby, GameSync und Stats aktiv.
-            </p>
-
-            <label style={{ display: "grid", gap: 8 }}>
-              <span style={{ color: colors.muted, fontSize: 13 }}>Legacy/Render Spotify Helper URL</span>
-              <Input
-                value={socketUrl}
-                onChange={(event) => setSocketUrl(event.target.value)}
-                placeholder="https://dein-render-server.onrender.com"
-              />
-            </label>
-
-            <Button variant={syncEnabled ? "danger" : "primary"} onClick={() => setSyncEnabled(!syncEnabled)} style={{ justifySelf: "start" }}>
-              {syncEnabled ? "Sync deaktivieren" : "Sync aktivieren"}
-            </Button>
-          </div>
-        </details>
+        <div style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 14, background: colors.bg }}>
+          <p style={{ margin: "0 0 6px", fontWeight: 800 }}>Testablauf</p>
+          <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+            Oeffne denselben Raum in zwei Browserfenstern oder bei zwei Freunden, stelle denselben Raumcode ein und aktiviere Sync.
+            Aktionen wie Spielstart, Song ziehen, Platzierung und Reveal werden an den Server gesendet und dann an alle Clients verteilt.
+          </p>
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-
-function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify, roomCode, spotifyAuthServerUrl, spotifyHelperBackendLabel = "Spotify Helper", roundPlayLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS, jamMode = false, setJamMode = () => {}, onPlaybackRequested }) {
+function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify, roomCode, spotifyAuthServerUrl, roundPlayLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS, onPlaybackRequested }) {
   const [clientId] = useState(() => {
     const storedClientId = localStorage.getItem(SPOTIFY_CLIENT_ID_STORAGE_KEY);
     return storedClientId?.trim() || DEFAULT_SPOTIFY_CLIENT_ID;
@@ -6472,21 +4205,24 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
   const [spotifyDetailsOpen, setSpotifyDetailsOpen] = useState(false);
 
   const countdownIntervalRef = useRef(null);
-  const autoPauseTimeoutRef = useRef(null);
 
   function getSpotifyAuthServerBaseUrl() {
     return String(spotifyAuthServerUrl || "").trim().replace(/\/+$/, "");
   }
 
   function getSpotifyServerRedirectUri() {
-    return SPOTIFY_CANONICAL_REDIRECT_URI;
+    const baseUrl = getSpotifyAuthServerBaseUrl();
+
+    if (!baseUrl) return "Socket Server URL fehlt";
+
+    return `${baseUrl}/spotify/callback`;
   }
 
   function getRoomSpotifyUrl(path = "") {
     const baseUrl = getSpotifyAuthServerBaseUrl();
 
     if (!baseUrl) {
-      throw new Error("Spotify Helper fehlt. Trage bei Technik / Fallback die alte Render-URL ein oder prüfe Supabase.");
+      throw new Error("Socket Server URL fehlt.");
     }
 
     return `${baseUrl}/room/${encodeURIComponent(roomCode)}/spotify${path}`;
@@ -6498,45 +4234,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
       countdownIntervalRef.current = null;
     }
 
-    if (autoPauseTimeoutRef.current) {
-      window.clearTimeout(autoPauseTimeoutRef.current);
-      autoPauseTimeoutRef.current = null;
-    }
-
     setRemainingSeconds(0);
-  }
-
-  function scheduleSpotifyAutoPause(seconds) {
-    const limitedSeconds = Math.max(1, Math.min(120, Math.round(Number(seconds) || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS)));
-
-    if (autoPauseTimeoutRef.current) {
-      window.clearTimeout(autoPauseTimeoutRef.current);
-      autoPauseTimeoutRef.current = null;
-    }
-
-    autoPauseTimeoutRef.current = window.setTimeout(async () => {
-      try {
-        const response = await fetch(getRoomSpotifyUrl("/pause"), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            jamMode: false,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(await response.text());
-        }
-
-        setStatus(`Spotify nach ${limitedSeconds} Sekunden automatisch pausiert.`);
-      } catch (error) {
-        setStatus(error.message || "Automatische Spotify-Pause fehlgeschlagen.");
-      } finally {
-        autoPauseTimeoutRef.current = null;
-      }
-    }, limitedSeconds * 1000 + 250);
   }
 
   function startLocalCountdown(seconds) {
@@ -6554,11 +4252,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
       setRemainingSeconds(next);
 
       if (next <= 0) {
-        if (countdownIntervalRef.current) {
-          window.clearInterval(countdownIntervalRef.current);
-          countdownIntervalRef.current = null;
-        }
-        setRemainingSeconds(0);
+        clearCountdown();
       }
     }, 250);
   }
@@ -6573,7 +4267,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
     return () => {
       window.removeEventListener(SPOTIFY_PLAY_EVENT_NAME, handleExternalPlayRequest);
     };
-  }, [currentTrack, phase, canPlayTrack, isBusy, roomCode, spotifyAuthServerUrl, playLimitSeconds, selectedSpotifyDeviceId, jamMode]);
+  }, [currentTrack, phase, canPlayTrack, isBusy, roomCode, spotifyAuthServerUrl, playLimitSeconds, selectedSpotifyDeviceId]);
 
   useEffect(() => {
     setPlayLimitSeconds(Math.max(1, Math.min(120, Number(roundPlayLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS))));
@@ -6696,7 +4390,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
     const baseUrl = getSpotifyAuthServerBaseUrl();
 
     if (!baseUrl) {
-      throw new Error("Bitte zuerst eine Legacy Spotify/Auth Server eintragen.");
+      throw new Error("Bitte zuerst eine Socket Server URL eintragen.");
     }
 
     const response = await fetch(`${baseUrl}/spotify/create-login`, {
@@ -6839,7 +4533,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
 
     try {
       setIsBusy(true);
-      setStatus("Spotify-Helfer startet den aktuellen Supabase-Song auf dem gespeicherten Host-Geraet...");
+      setStatus("Server startet den verdeckten Song auf dem gespeicherten Spotify-Geraet...");
 
       const response = await fetch(getRoomSpotifyUrl("/play"), {
         method: "POST",
@@ -6848,9 +4542,6 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
         },
         body: JSON.stringify({
           playLimitSeconds,
-          track: currentTrack,
-          jamMode: false,
-          useActiveContext: false,
         }),
       });
 
@@ -6860,12 +4551,9 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
 
       const data = await response.json();
       setSpotifyConnected(true);
-      if (!jamMode) {
-        setSavedDeviceId(data.deviceId || savedDeviceId);
-        setSavedDeviceName(data.deviceName || savedDeviceName);
-      }
+      setSavedDeviceId(data.deviceId || savedDeviceId);
+      setSavedDeviceName(data.deviceName || savedDeviceName);
       startLocalCountdown(playLimitSeconds);
-      scheduleSpotifyAutoPause(playLimitSeconds);
       setStatus(`Verdeckter Song laeuft auf ${data.deviceName || "Spotify"}. TimeLimit: ${playLimitSeconds} Sekunden.`);
       onPlaybackRequested?.();
     } catch (error) {
@@ -6882,12 +4570,6 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
 
       const response = await fetch(getRoomSpotifyUrl("/pause"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          jamMode,
-        }),
       });
 
       if (!response.ok) {
@@ -6904,9 +4586,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
 
   const canStartSpotify = Boolean(currentTrack && phase === "placing" && canPlayTrack && !isBusy);
   const selectedDevice = spotifyDevices.find((device) => device.id === selectedSpotifyDeviceId);
-  const hasPlayableSpotifyTarget = Boolean(savedDeviceName);
-  const spotifyTargetLabel = savedDeviceName;
-  const showSpotifyDetails = !spotifyConnected || !hasPlayableSpotifyTarget || spotifyDetailsOpen || Boolean(externalLoginUrl);
+  const showSpotifyDetails = !spotifyConnected || !savedDeviceName || spotifyDetailsOpen || Boolean(externalLoginUrl);
 
   return (
     <Card>
@@ -6916,13 +4596,12 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
             <Badge variant="secondary">Spotify</Badge>
             <h2 style={{ margin: "10px 0 6px" }}>Ein Host-Account fuer den Raum</h2>
             <p style={{ margin: 0, color: colors.muted }}>
-              Der Host verbindet Spotify in der Lobby oder im Spiel. Wenn eine Legacy/Render-URL hinterlegt ist, nutzt Spotify wieder den alten Helper. Supabase bleibt für Spielstand und Statistiken aktiv.
+              Der Host verbindet Spotify in der Lobby oder im Spiel und speichert ein Zielgeraet. Der Spotify-Bereich ist nur fuer den Host sichtbar.
             </p>
           </div>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Badge variant={spotifyConnected ? "default" : "secondary"}>{spotifyConnected ? "Host Spotify verbunden" : "Nicht verbunden"}</Badge>
-            <Badge variant="secondary">{spotifyHelperBackendLabel}</Badge>
             <Badge variant={savedDeviceName ? "default" : "secondary"}>{savedDeviceName || "Kein Zielgeraet"}</Badge>
           </div>
         </div>
@@ -7095,39 +4774,6 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
           </div>
         )}
 
-        <div
-          style={{
-            border: `1px solid ${jamMode ? colors.primary : colors.border}`,
-            borderRadius: 18,
-            padding: 14,
-            background: jamMode ? "rgba(34,197,94,0.10)" : colors.bg,
-            display: "grid",
-            gap: 10,
-          }}
-        >
-          <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={jamMode}
-              onChange={(event) => setJamMode(Boolean(event.target.checked))}
-              style={{ marginTop: 3 }}
-            />
-            <span>
-              <strong>Spotify Jam ist aktiv / Hinweis anzeigen</strong>
-              <span style={{ display: "block", color: colors.muted, fontSize: 13, marginTop: 4 }}>
-                Für Spotify Jam: Jam vorher in Spotify starten, Mitspieler joinen lassen und kurz prüfen, dass ein manuell gestarteter Song bei allen läuft.
-                Trackline nutzt weiterhin das gespeicherte Host-Zielgerät, so wie in der alten funktionierenden Struktur. Der Jam muss in Spotify bereits aktiv sein.
-              </span>
-            </span>
-          </label>
-
-          {jamMode && (
-            <p style={{ margin: 0, color: "#bbf7d0", fontSize: 13 }}>
-              Hinweis: Wenn Spotify meldet, dass kein aktives Gerät vorhanden ist, starte in Spotify einmal manuell irgendeinen Song im Jam und drücke danach erneut „Song starten“.
-            </p>
-          )}
-        </div>
-
         <div style={{ display: "grid", gridTemplateColumns: "180px minmax(0, 1fr)", gap: 10, alignItems: "end" }}>
           <label style={{ display: "grid", gap: 8 }}>
             <span style={{ color: colors.muted, fontSize: 14 }}>TimeLimit in Sekunden</span>
@@ -7155,7 +4801,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
             <p style={{ margin: "0 0 8px", color: colors.text, fontWeight: 800 }}>Status</p>
             <p style={{ margin: 0, color: colors.muted }}>{status}</p>
             <p style={{ margin: "6px 0 0", color: colors.muted, fontSize: 12 }}>
-              Raum: {roomCode} | Helper: {spotifyHelperBackendLabel} | Spotify-Ziel: {spotifyTargetLabel || selectedDevice?.name || "-"}
+              Raum: {roomCode} | Zielgeraet: {savedDeviceName || selectedDevice?.name || "-"}
             </p>
             <p style={{ margin: "6px 0 0", color: colors.muted, fontSize: 12 }}>
               Redirect URI fuer Spotify Dashboard: {getSpotifyServerRedirectUri()}
@@ -7163,7 +4809,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
           </div>
 
           <Button onClick={playCurrentTrack} disabled={!canStartSpotify}>
-            {isBusy ? "Startet..." : jamMode ? `Song ${playLimitSeconds}s starten` : `Song ${playLimitSeconds}s starten`}
+            {isBusy ? "Startet..." : `Song ${playLimitSeconds}s starten`}
           </Button>
 
           <Button variant="secondary" onClick={pauseSpotify} disabled={isBusy || !spotifyConnected}>
@@ -7188,13 +4834,9 @@ function LobbyCard({
   playerName,
   setPlayerName,
   playerNames,
-  supabaseRoomPlayers = [],
-  supabaseEnabled = false,
   addPlayer,
   removePlayer,
   startGame,
-  backToStartScreen,
-  onOpenStatsPage,
   availableDeck,
   fullDeck,
   selectedPreset,
@@ -7248,17 +4890,7 @@ function LobbyCard({
             gap: 8,
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <Badge variant="secondary">Lobby</Badge>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Button variant="secondary" onClick={onOpenStatsPage} style={{ padding: "7px 10px", borderRadius: 12 }}>
-                Statistiken
-              </Button>
-              <Button variant="secondary" onClick={backToStartScreen} style={{ padding: "7px 10px", borderRadius: 12 }}>
-                Zur Startseite
-              </Button>
-            </div>
-          </div>
+          <Badge variant="secondary">Lobby</Badge>
           <h2 style={{ fontSize: 30, margin: "4px 0 0", letterSpacing: -0.8 }}>Runde vorbereiten</h2>
           <p style={{ color: colors.muted, margin: 0 }}>
             Spieler hinzufügen, Ziel festlegen und dann die erste verdeckte Karte ziehen.
@@ -7303,49 +4935,6 @@ function LobbyCard({
             ))}
           </div>
         </div>
-
-        {supabaseEnabled && (
-          <div
-            style={{
-              border: `1px solid ${colors.border}`,
-              borderRadius: 16,
-              padding: 12,
-              background: "rgba(126,87,255,0.10)",
-              display: "grid",
-              gap: 8,
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <strong>Auto-Join über Supabase</strong>
-              <Badge variant="secondary">{supabaseRoomPlayers.length} verbunden</Badge>
-            </div>
-
-            <p style={{ margin: 0, color: colors.muted, fontSize: 12 }}>
-              Spieler, die auf der Startseite diesem Raum beitreten, werden automatisch in diese Lobby-Liste übernommen.
-            </p>
-
-            {supabaseRoomPlayers.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {supabaseRoomPlayers.map((player) => (
-                  <span
-                    key={`${player.guestId}-${player.displayName}`}
-                    style={{
-                      border: `1px solid ${player.isHost ? colors.primary : colors.border}`,
-                      borderRadius: 999,
-                      padding: "6px 9px",
-                      background: player.isHost ? "rgba(126,87,255,0.18)" : colors.bg,
-                      fontSize: 12,
-                      fontWeight: 850,
-                    }}
-                  >
-                    {player.isHost ? "Host · " : ""}
-                    {player.displayName}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
         <label style={{ display: "grid", gap: 8 }}>
           <span style={{ color: colors.muted, fontSize: 14 }}>Startspieler</span>
