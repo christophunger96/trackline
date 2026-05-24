@@ -5,6 +5,7 @@ import { dirname } from "node:path";
 import { Server } from "socket.io";
 
 const PORT = Number(process.env.PORT || 3001);
+const PUBLIC_SERVER_URL = String(process.env.PUBLIC_SERVER_URL || "").trim().replace(/\/+$/, "");
 const rooms = new Map();
 const spotifyLogins = new Map();
 const DEFAULT_PLAY_LIMIT_SECONDS = 20;
@@ -1502,9 +1503,13 @@ function createCodeChallenge(codeVerifier) {
 }
 
 function createServerBaseUrl(req) {
+  if (PUBLIC_SERVER_URL) return PUBLIC_SERVER_URL;
+
   const forwardedProto = String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim();
-  const proto = forwardedProto || "http";
-  return `${proto}://${req.headers.host}`;
+  const proto = forwardedProto || "https";
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
+
+  return `${proto}://${host}`.replace(/\/+$/, "");
 }
 
 function sendJson(res, statusCode, payload) {
