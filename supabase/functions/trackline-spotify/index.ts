@@ -564,43 +564,19 @@ async function play(req: Request, roomCode: string) {
   const body = await readJsonBody(req);
   const room = await getRoomSpotify(admin, roomCode);
   const track = body.track || await getCurrentTrackFromSupabase(admin, roomCode);
-  const requestedJamMode = Boolean(body.jamMode || body.playbackMode === "jam" || body.useActiveContext);
-  const useActiveSpotifyContext = requestedJamMode || !room.device_id;
   const playLimitSeconds = Math.max(1, Math.min(120, Math.round(Number(body.playLimitSeconds || DEFAULT_PLAY_LIMIT_SECONDS))));
 
   if (!track) throw new Error("Kein aktueller Song im Raum.");
 
-  const spotifyUri = await searchSpotifyUri(admin, room, track);
-
-  if (useActiveSpotifyContext) {
-    // Active-context mode:
-    // - Jam mode explicitly uses this path.
-    // - If no device is saved, we also use this path instead of failing.
-    // This prevents player browsers from getting "Kein Spotify-Zielgeraet gespeichert"
-    // while the host already has an active Spotify/Jam session.
-    await spotifyFetch(admin, room, `${SPOTIFY_API_BASE}/me/player/play`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        uris: [spotifyUri],
-      }),
-    });
-
-    return json({
-      roomCode,
-      ok: true,
-      jamMode: requestedJamMode,
-      activeContext: true,
-      trackId: track.id,
-      hiddenLabel: "Verdeckter Song",
-      deviceId: "",
-      deviceName: requestedJamMode ? "Aktiver Spotify/Jam-Kontext" : "Aktiver Spotify-Kontext",
-      playLimitSeconds,
-    });
+  if (!room.device_id) {
+    throw new Error("Kein Spotify-Zielgeraet gespeichert. Host muss Spotify verbinden, Geraete laden und das Host-Zielgeraet speichern.");
   }
 
+  const spotifyUri = await searchSpotifyUri(admin, room, track);
+
+  // Classic host-device mode, matching the old working Render structure:
+  // 1) transfer playback to the stored host device
+  // 2) start the hidden track on that stored host device
   await spotifyFetch(admin, room, `${SPOTIFY_API_BASE}/me/player`, {
     method: "PUT",
     headers: {
@@ -627,8 +603,7 @@ async function play(req: Request, roomCode: string) {
   return json({
     roomCode,
     ok: true,
-    jamMode: false,
-    activeContext: false,
+    mode: "classic-host-device",
     trackId: track.id,
     hiddenLabel: "Verdeckter Song",
     deviceId: room.device_id,
@@ -639,22 +614,10 @@ async function play(req: Request, roomCode: string) {
 
 async function pause(req: Request, roomCode: string) {
   const admin = getSupabaseAdmin();
-  const body = await readJsonBody(req);
   const room = await getRoomSpotify(admin, roomCode);
-  const requestedJamMode = Boolean(body.jamMode || body.playbackMode === "jam" || body.useActiveContext);
-  const useActiveSpotifyContext = requestedJamMode || !room.device_id;
 
-  if (useActiveSpotifyContext) {
-    await spotifyFetch(admin, room, `${SPOTIFY_API_BASE}/me/player/pause`, {
-      method: "PUT",
-    });
-
-    return json({
-      roomCode,
-      ok: true,
-      jamMode: requestedJamMode,
-      activeContext: true,
-    });
+  if (!room.device_id) {
+    throw new Error("Kein Spotify-Zielgeraet gespeichert. Host muss Spotify verbinden, Geraete laden und das Host-Zielgeraet speichern.");
   }
 
   await spotifyFetch(admin, room, `${SPOTIFY_API_BASE}/me/player/pause?device_id=${encodeURIComponent(room.device_id)}`, {
@@ -664,8 +627,7 @@ async function pause(req: Request, roomCode: string) {
   return json({
     roomCode,
     ok: true,
-    jamMode: false,
-    activeContext: false,
+    mode: "classic-host-device",
   });
 }
 
