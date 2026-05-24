@@ -3341,10 +3341,29 @@ function mergePresenceNamesIntoPlayers(currentPlayers = [], namesToAdd = [], pre
   return result;
 }
 
+function getLatestPresenceNames(roomClients = []) {
+  const byClient = new Map();
+
+  (roomClients || []).forEach((client, index) => {
+    const clientKey = String(client?.clientInstanceId || client?.socketId || `client-${index}`);
+    const safeName = normalizePlayerName(client?.playerName);
+
+    if (!safeName) return;
+    if (safeName.toLowerCase() === "spieler") return;
+    if (safeName.toLowerCase() === "gast") return;
+
+    // Same browser/client may send multiple name updates while typing.
+    // The newest visible name should replace the previous one.
+    byClient.set(clientKey, safeName);
+  });
+
+  return [...byClient.values()];
+}
+
 function buildLobbyDisplayPlayers({ players = [], playerNames = [], roomClients = [], currentDisplayName = "", includeLocal = false }) {
   const namesFromPlayers = Array.isArray(players) ? players.map((player) => player?.name) : [];
   const namesFromPlayerNames = Array.isArray(playerNames) ? playerNames : [];
-  const namesFromClients = Array.isArray(roomClients) ? roomClients.map((client) => client?.playerName) : [];
+  const namesFromClients = getLatestPresenceNames(roomClients);
   const localName = includeLocal ? [currentDisplayName] : [];
 
   return dedupeNames([
@@ -3657,18 +3676,15 @@ export default function App() {
   }, [guestName]);
 
   useEffect(() => {
-    if (gameState.phase !== "lobby") return;
+    if (gameState.phase !== "lobby" || !showLobbyHostView || !localDisplayName) return;
 
-    const joinedNames = (roomClients || [])
-      .map((client) => normalizePlayerName(client.playerName))
-      .filter(Boolean);
-
+    // Only keep the host's own name in the editable start list.
+    // Joined players are shown via live presence and merged once when the host starts the game.
     setPlayerNames((previous) => {
-      const preferredName = showLobbyHostView ? localDisplayName : "";
-      const next = mergePresenceNamesIntoPlayers(previous, joinedNames, preferredName);
+      const next = mergePreferredNameIntoPlayers(previous, localDisplayName);
       return JSON.stringify(next) === JSON.stringify(previous) ? previous : next;
     });
-  }, [localDisplayName, roomClients, gameState.phase, showLobbyHostView]);
+  }, [localDisplayName, gameState.phase, showLobbyHostView]);
 
   useEffect(() => {
     if (!syncEnabled) {
@@ -4199,10 +4215,18 @@ export default function App() {
     downloadTextFile("trackline-custom-deck.json", exportTracksAsJson(customTracks));
   }
 
+  function getStartPlayerNames() {
+    return dedupeNames([
+      ...playerNames,
+      ...getLatestPresenceNames(roomClients),
+      socketDisplayName,
+    ]).filter((name) => name && name.toLowerCase() !== "gast" && name.toLowerCase() !== "spieler");
+  }
+
   function startGame(settings) {
     sendGameAction({
       type: "START_GAME",
-      playerNames: playerNames.length ? playerNames : [socketDisplayName],
+      playerNames: getStartPlayerNames().length ? getStartPlayerNames() : [socketDisplayName],
       deck: availableDeck,
       roomCode,
       targetScore: settings.targetScore,
@@ -5811,7 +5835,7 @@ function LobbyCard({
         <div style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 12, background: colors.bg, display: "grid", gap: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <strong>Aktuell sichtbare Namen</strong>
-            <Badge variant="secondary">{Math.max(playerNames.length, roomClients.length, currentDisplayName ? 1 : 0)}</Badge>
+            <Badge variant="secondary">{buildLobbyDisplayPlayers({ playerNames, roomClients, currentDisplayName, includeLocal: true }).length}</Badge>
           </div>
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -5837,7 +5861,7 @@ function LobbyCard({
           </div>
 
           <p style={{ margin: 0, color: colors.muted, fontSize: 12 }}>
-            Diese Anzeige ist nur die Live-Präsenz. Für den Spielstart zählt die Startliste darunter.
+            Änderungen am Gastnamen ersetzen den alten Namen dieses Browsers. Beim Spielstart werden diese sichtbaren Namen einmal übernommen.
           </p>
         </div>
 
@@ -5860,7 +5884,7 @@ function LobbyCard({
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {playerNames.length === 0 && (
               <span style={{ color: colors.muted, fontSize: 13 }}>
-                Noch keine Spieler in der Startliste. Verbundene Gast-/Login-Namen erscheinen oben; du kannst sie bei Bedarf manuell ergänzen.
+                Noch keine manuell ergänzten Spieler. Die sichtbaren Login-/Gastnamen oben werden beim Spielstart automatisch übernommen.
               </span>
             )}
 
