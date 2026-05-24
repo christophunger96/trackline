@@ -43,18 +43,9 @@ const SYNC_SOCKET_URL_STORAGE_KEY = "trackline.sync.socketUrl";
 const SYNC_ENABLED_STORAGE_KEY = "trackline.sync.enabled";
 const CLIENT_INSTANCE_ID_STORAGE_KEY = "trackline.clientInstanceId.v1";
 const VIEWER_PLAYER_STORAGE_PREFIX = "trackline.viewerPlayer.v1.";
-const GUEST_NAME_STORAGE_KEY = "trackline.guestName.v1";
-const SUPABASE_URL_STORAGE_KEY = "trackline.supabase.url";
-const SUPABASE_ANON_KEY_STORAGE_KEY = "trackline.supabase.anonKey";
-const SUPABASE_ENABLED_STORAGE_KEY = "trackline.supabase.enabled";
-const SUPABASE_AUTH_SESSION_STORAGE_KEY = "trackline.supabase.authSession.v1";
-const DEFAULT_SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || "";
-const DEFAULT_SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || "";
-// Render rollback: VITE_SOCKET_URL must point to the Render server that also handles Spotify.
 const DEFAULT_SYNC_SOCKET_URL = import.meta.env?.VITE_SOCKET_URL || "http://127.0.0.1:3001";
 
 const SPOTIFY_CLIENT_ID_STORAGE_KEY = "trackline.spotify.clientId";
-const SPOTIFY_JAM_SAFE_STORAGE_KEY = "trackline.spotifyJamSafePlayback.v1";
 const DEFAULT_SPOTIFY_CLIENT_ID = "eb70ba4d164248d8810e52caae6b40cb";
 const SPOTIFY_CODE_VERIFIER_STORAGE_KEY = "trackline.spotify.codeVerifier";
 const SPOTIFY_TOKEN_STORAGE_KEY = "trackline.spotify.token";
@@ -377,7 +368,7 @@ const BASE_TRACK_DECK = [
   { id: "t260", title: "1000 und 1 Nacht", artist: "Klaus Lage", year: 1984, genre: "Pop Rock" },
   { id: "t261", title: "Männer", artist: "Herbert Grönemeyer", year: 1984, genre: "Pop Rock" },
   { id: "t262", title: "Verdammt, ich lieb' dich", artist: "Matthias Reim", year: 1990, genre: "Schlager" },
-  { id: "t263", title: "Tage wie diese", artist: "Die Toten Hosen", year: 2012, genre: "Rock", spotifyUri: "spotify:track:2lYsCjTvXIHOqT8xSbK2jq" },
+  { id: "t263", title: "An Tagen wie diesen", artist: "Die Toten Hosen", year: 2012, genre: "Rock" },
   { id: "t264", title: "Tage wie diese", artist: "Die Toten Hosen", year: 2012, genre: "Rock" },
   { id: "t265", title: "Schrei nach Liebe", artist: "Die Ärzte", year: 1993, genre: "Punk Rock" },
   { id: "t266", title: "Ein Kompliment", artist: "Sportfreunde Stiller", year: 2002, genre: "Indie Rock" },
@@ -921,198 +912,6 @@ const ERA_BALANCE_EXPANSION_TRACKS = [
   { id: "b788", title: "Houdini", artist: "Dua Lipa", year: 2023, genre: "Dance Pop" },
   { id: "b789", title: "Beautiful Things", artist: "Benson Boone", year: 2024, genre: "Pop Rock" },
   { id: "b790", title: "Texas Hold 'Em", artist: "Beyoncé", year: 2024, genre: "Country Pop" },
-];
-
-const SONGPOOL_800_EXPANSION_TRACKS = [
-  { id: "e8001", title: "Only You", artist: "The Platters", year: 1955, genre: "Doo-wop" },
-  { id: "e8002", title: "Mr. Sandman", artist: "The Chordettes", year: 1954, genre: "Vocal Pop" },
-  { id: "e8003", title: "Sh-Boom", artist: "The Chords", year: 1954, genre: "Doo-wop" },
-  { id: "e8004", title: "Earth Angel", artist: "The Penguins", year: 1954, genre: "Doo-wop" },
-  { id: "e8005", title: "Sixteen Tons", artist: "Tennessee Ernie Ford", year: 1955, genre: "Country" },
-  { id: "e8006", title: "Come Go with Me", artist: "The Del-Vikings", year: 1957, genre: "Doo-wop" },
-  { id: "e8007", title: "Poetry in Motion", artist: "Johnny Tillotson", year: 1960, genre: "Pop" },
-  { id: "e8008", title: "Telstar", artist: "The Tornados", year: 1962, genre: "Instrumental" },
-  { id: "e8009", title: "Rhythm of the Rain", artist: "The Cascades", year: 1962, genre: "Pop" },
-  { id: "e8010", title: "Walk Like a Man", artist: "The Four Seasons", year: 1963, genre: "Pop" },
-  { id: "e8011", title: "Da Doo Ron Ron", artist: "The Crystals", year: 1963, genre: "Girl Group" },
-  { id: "e8012", title: "Wipe Out", artist: "The Surfaris", year: 1963, genre: "Surf Rock" },
-  { id: "e8013", title: "Surfin' Bird", artist: "The Trashmen", year: 1963, genre: "Surf Rock" },
-  { id: "e8014", title: "California Sun", artist: "The Rivieras", year: 1964, genre: "Surf Rock" },
-  { id: "e8015", title: "Baby Love", artist: "The Supremes", year: 1964, genre: "Motown" },
-  { id: "e8016", title: "The Girl from Ipanema", artist: "Stan Getz & João Gilberto", year: 1964, genre: "Bossa Nova" },
-  { id: "e8017", title: "You Really Got Me", artist: "The Kinks", year: 1964, genre: "Rock" },
-  { id: "e8018", title: "Needles and Pins", artist: "The Searchers", year: 1964, genre: "Beat" },
-  { id: "e8019", title: "She's Not There", artist: "The Zombies", year: 1964, genre: "Rock" },
-  { id: "e8020", title: "Downtown", artist: "Petula Clark", year: 1964, genre: "Pop" },
-  { id: "e8021", title: "Stop! In the Name of Love", artist: "The Supremes", year: 1965, genre: "Motown" },
-  { id: "e8022", title: "The Tracks of My Tears", artist: "Smokey Robinson & The Miracles", year: 1965, genre: "Motown" },
-  { id: "e8023", title: "I Got You Babe", artist: "Sonny & Cher", year: 1965, genre: "Pop" },
-  { id: "e8024", title: "Do You Believe in Magic", artist: "The Lovin' Spoonful", year: 1965, genre: "Folk Rock" },
-  { id: "e8025", title: "All Right Now", artist: "Free", year: 1970, genre: "Rock" },
-  { id: "e8026", title: "ABC", artist: "The Jackson 5", year: 1970, genre: "Motown" },
-  { id: "e8027", title: "O-o-h Child", artist: "Five Stairsteps", year: 1970, genre: "Soul" },
-  { id: "e8028", title: "Love Grows", artist: "Edison Lighthouse", year: 1970, genre: "Pop" },
-  { id: "e8029", title: "Black Magic Woman", artist: "Santana", year: 1970, genre: "Latin Rock" },
-  { id: "e8030", title: "Mr. Bojangles", artist: "Nitty Gritty Dirt Band", year: 1970, genre: "Country Rock" },
-  { id: "e8031", title: "Knock Three Times", artist: "Tony Orlando & Dawn", year: 1970, genre: "Pop" },
-  { id: "e8032", title: "Joy to the World", artist: "Three Dog Night", year: 1971, genre: "Rock" },
-  { id: "e8033", title: "Have You Ever Seen the Rain", artist: "Creedence Clearwater Revival", year: 1971, genre: "Rock" },
-  { id: "e8034", title: "Riders on the Storm", artist: "The Doors", year: 1971, genre: "Rock" },
-  { id: "e8035", title: "I Am... I Said", artist: "Neil Diamond", year: 1971, genre: "Pop" },
-  { id: "e8036", title: "What's Going On", artist: "Marvin Gaye", year: 1971, genre: "Soul" },
-  { id: "e8037", title: "Brand New Key", artist: "Melanie", year: 1971, genre: "Folk Pop" },
-  { id: "e8038", title: "Family Affair", artist: "Sly & The Family Stone", year: 1971, genre: "Funk" },
-  { id: "e8039", title: "Long Cool Woman", artist: "The Hollies", year: 1972, genre: "Rock" },
-  { id: "e8040", title: "I Can See Clearly Now", artist: "Johnny Nash", year: 1972, genre: "Reggae Pop" },
-  { id: "e8041", title: "Papa Was a Rollin' Stone", artist: "The Temptations", year: 1972, genre: "Soul" },
-  { id: "e8042", title: "You're So Vain", artist: "Carly Simon", year: 1972, genre: "Pop Rock" },
-  { id: "e8043", title: "Could It Be I'm Falling in Love", artist: "The Spinners", year: 1972, genre: "Soul" },
-  { id: "e8044", title: "Angie", artist: "The Rolling Stones", year: 1973, genre: "Rock" },
-  { id: "e8045", title: "Free Bird", artist: "Lynyrd Skynyrd", year: 1973, genre: "Southern Rock" },
-  { id: "e8046", title: "Midnight Train to Georgia", artist: "Gladys Knight & The Pips", year: 1973, genre: "Soul" },
-  { id: "e8047", title: "Brother Louie", artist: "Stories", year: 1973, genre: "Pop" },
-  { id: "e8048", title: "Love Train", artist: "The O'Jays", year: 1973, genre: "Soul" },
-  { id: "e8049", title: "Goodbye Yellow Brick Road", artist: "Elton John", year: 1973, genre: "Pop Rock" },
-  { id: "e8050", title: "Love Is a Battlefield", artist: "Pat Benatar", year: 1983, genre: "Rock" },
-  { id: "e8051", title: "Atomic", artist: "Blondie", year: 1980, genre: "New Wave" },
-  { id: "e8052", title: "Funkytown", artist: "Lipps Inc.", year: 1980, genre: "Disco" },
-  { id: "e8053", title: "Whip It", artist: "Devo", year: 1980, genre: "New Wave" },
-  { id: "e8054", title: "You Shook Me All Night Long", artist: "AC/DC", year: 1980, genre: "Rock" },
-  { id: "e8055", title: "Babooshka", artist: "Kate Bush", year: 1980, genre: "Art Pop" },
-  { id: "e8056", title: "Don't Stand So Close to Me", artist: "The Police", year: 1980, genre: "New Wave" },
-  { id: "e8057", title: "Vienna", artist: "Ultravox", year: 1980, genre: "Synthpop" },
-  { id: "e8058", title: "In the Air Tonight", artist: "Phil Collins", year: 1981, genre: "Pop Rock" },
-  { id: "e8059", title: "Bette Davis Eyes", artist: "Kim Carnes", year: 1981, genre: "Pop" },
-  { id: "e8060", title: "Our Lips Are Sealed", artist: "The Go-Go's", year: 1981, genre: "New Wave" },
-  { id: "e8061", title: "I Love Rock 'n' Roll", artist: "Joan Jett & The Blackhearts", year: 1981, genre: "Rock" },
-  { id: "e8062", title: "Under Pressure", artist: "Queen & David Bowie", year: 1981, genre: "Rock" },
-  { id: "e8063", title: "Do You Really Want to Hurt Me", artist: "Culture Club", year: 1982, genre: "New Wave" },
-  { id: "e8064", title: "1999", artist: "Prince", year: 1982, genre: "Funk" },
-  { id: "e8065", title: "I Ran", artist: "A Flock of Seagulls", year: 1982, genre: "New Wave" },
-  { id: "e8066", title: "Jack & Diane", artist: "John Mellencamp", year: 1982, genre: "Rock" },
-  { id: "e8067", title: "Gloria", artist: "Laura Branigan", year: 1982, genre: "Pop" },
-  { id: "e8068", title: "Electric Avenue", artist: "Eddy Grant", year: 1982, genre: "Reggae Pop" },
-  { id: "e8069", title: "Relax", artist: "Frankie Goes to Hollywood", year: 1983, genre: "Synthpop" },
-  { id: "e8070", title: "Let's Dance", artist: "David Bowie", year: 1983, genre: "Pop Rock" },
-  { id: "e8071", title: "Owner of a Lonely Heart", artist: "Yes", year: 1983, genre: "Rock" },
-  { id: "e8072", title: "When Doves Cry", artist: "Prince", year: 1984, genre: "Funk" },
-  { id: "e8073", title: "Like a Virgin", artist: "Madonna", year: 1984, genre: "Pop" },
-  { id: "e8074", title: "The Reflex", artist: "Duran Duran", year: 1984, genre: "New Wave" },
-  { id: "e8075", title: "Shout", artist: "Tears for Fears", year: 1984, genre: "Synthpop" },
-  { id: "e8076", title: "Dancing in the Dark", artist: "Bruce Springsteen", year: 1984, genre: "Rock" },
-  { id: "e8077", title: "Self Control", artist: "Laura Branigan", year: 1984, genre: "Pop" },
-  { id: "e8078", title: "You're the Inspiration", artist: "Chicago", year: 1984, genre: "Rock Ballad" },
-  { id: "e8079", title: "Sweet Dreams", artist: "La Bouche", year: 1995, genre: "Eurodance" },
-  { id: "e8080", title: "Nothing Compares 2 U", artist: "Sinéad O'Connor", year: 1990, genre: "Pop Ballad" },
-  { id: "e8081", title: "The Power", artist: "Snap!", year: 1990, genre: "Eurodance" },
-  { id: "e8082", title: "It Must Have Been Love", artist: "Roxette", year: 1990, genre: "Pop Ballad" },
-  { id: "e8083", title: "Unbelievable", artist: "EMF", year: 1990, genre: "Alternative" },
-  { id: "e8084", title: "More Than Words", artist: "Extreme", year: 1991, genre: "Acoustic Rock" },
-  { id: "e8085", title: "Set Adrift on Memory Bliss", artist: "P.M. Dawn", year: 1991, genre: "Hip-Hop" },
-  { id: "e8086", title: "One", artist: "U2", year: 1991, genre: "Rock" },
-  { id: "e8087", title: "Would I Lie to You?", artist: "Charles & Eddie", year: 1992, genre: "Soul" },
-  { id: "e8088", title: "Connected", artist: "Stereo MC's", year: 1992, genre: "Hip-Hop" },
-  { id: "e8089", title: "Friday I'm in Love", artist: "The Cure", year: 1992, genre: "Alternative" },
-  { id: "e8090", title: "Ordinary World", artist: "Duran Duran", year: 1992, genre: "Pop Rock" },
-  { id: "e8091", title: "No Rain", artist: "Blind Melon", year: 1992, genre: "Alternative" },
-  { id: "e8092", title: "Dreams", artist: "Gabrielle", year: 1993, genre: "Pop" },
-  { id: "e8093", title: "Two Princes", artist: "Spin Doctors", year: 1993, genre: "Rock" },
-  { id: "e8094", title: "Informer", artist: "Snow", year: 1993, genre: "Reggae Pop" },
-  { id: "e8095", title: "Regulate", artist: "Warren G", year: 1994, genre: "Hip-Hop" },
-  { id: "e8096", title: "Return to Innocence", artist: "Enigma", year: 1994, genre: "New Age Pop" },
-  { id: "e8097", title: "Always", artist: "Bon Jovi", year: 1994, genre: "Rock Ballad" },
-  { id: "e8098", title: "Common People", artist: "Pulp", year: 1995, genre: "Britpop" },
-  { id: "e8099", title: "Missing", artist: "Everything But The Girl", year: 1995, genre: "Dance" },
-  { id: "e8100", title: "Bitter Sweet Symphony", artist: "The Verve", year: 1997, genre: "Britpop" },
-  { id: "e8101", title: "Blue", artist: "Eiffel 65", year: 1998, genre: "Eurodance" },
-  { id: "e8102", title: "Flat Beat", artist: "Mr. Oizo", year: 1999, genre: "Electronic" },
-  { id: "e8103", title: "Stan", artist: "Eminem", year: 2000, genre: "Hip-Hop" },
-  { id: "e8104", title: "The Real Slim Shady", artist: "Eminem", year: 2000, genre: "Hip-Hop" },
-  { id: "e8105", title: "Music", artist: "Madonna", year: 2000, genre: "Pop" },
-  { id: "e8106", title: "Teenage Dirtbag", artist: "Wheatus", year: 2000, genre: "Pop Rock" },
-  { id: "e8107", title: "It Wasn't Me", artist: "Shaggy", year: 2000, genre: "Reggae Pop" },
-  { id: "e8108", title: "Get the Party Started", artist: "Pink", year: 2001, genre: "Pop" },
-  { id: "e8109", title: "A Thousand Miles", artist: "Vanessa Carlton", year: 2002, genre: "Pop" },
-  { id: "e8110", title: "Dilemma", artist: "Nelly feat. Kelly Rowland", year: 2002, genre: "R&B" },
-  { id: "e8111", title: "Crazy in Love", artist: "Beyoncé feat. Jay-Z", year: 2003, genre: "R&B" },
-  { id: "e8112", title: "Don't Cha", artist: "The Pussycat Dolls", year: 2005, genre: "Pop" },
-  { id: "e8113", title: "I Bet You Look Good on the Dancefloor", artist: "Arctic Monkeys", year: 2005, genre: "Indie Rock" },
-  { id: "e8114", title: "Maneater", artist: "Nelly Furtado", year: 2006, genre: "Pop" },
-  { id: "e8115", title: "1973", artist: "James Blunt", year: 2007, genre: "Pop" },
-  { id: "e8116", title: "Sweet Disposition", artist: "The Temper Trap", year: 2008, genre: "Indie" },
-  { id: "e8117", title: "You've Got the Love", artist: "Florence + The Machine", year: 2009, genre: "Indie" },
-  { id: "e8118", title: "We No Speak Americano", artist: "Yolanda Be Cool & DCUP", year: 2010, genre: "Dance" },
-  { id: "e8119", title: "Just the Way You Are", artist: "Bruno Mars", year: 2010, genre: "Pop" },
-  { id: "e8120", title: "Only Girl", artist: "Rihanna", year: 2010, genre: "Dance Pop" },
-  { id: "e8121", title: "Wonderful Life", artist: "Hurts", year: 2010, genre: "Synthpop" },
-  { id: "e8122", title: "Moves Like Jagger", artist: "Maroon 5 feat. Christina Aguilera", year: 2011, genre: "Pop" },
-  { id: "e8123", title: "Video Games", artist: "Lana Del Rey", year: 2011, genre: "Indie Pop" },
-  { id: "e8124", title: "Little Talks", artist: "Of Monsters and Men", year: 2011, genre: "Indie" },
-  { id: "e8125", title: "Titanium", artist: "David Guetta feat. Sia", year: 2011, genre: "Dance" },
-  { id: "e8126", title: "Feel This Moment", artist: "Pitbull feat. Christina Aguilera", year: 2012, genre: "Pop" },
-  { id: "e8127", title: "I Love It", artist: "Icona Pop", year: 2012, genre: "Dance Pop" },
-  { id: "e8128", title: "Blurred Lines", artist: "Robin Thicke feat. T.I. & Pharrell", year: 2013, genre: "Pop" },
-  { id: "e8129", title: "Pompeii", artist: "Bastille", year: 2013, genre: "Indie Pop" },
-  { id: "e8130", title: "Lean On", artist: "Major Lazer & DJ Snake feat. MØ", year: 2015, genre: "Dance" },
-  { id: "e8131", title: "Faded", artist: "Alan Walker", year: 2015, genre: "EDM" },
-  { id: "e8132", title: "This Is What You Came For", artist: "Calvin Harris feat. Rihanna", year: 2016, genre: "Dance" },
-  { id: "e8133", title: "Castle on the Hill", artist: "Ed Sheeran", year: 2017, genre: "Pop" },
-  { id: "e8134", title: "Feel It Still", artist: "Portugal. The Man", year: 2017, genre: "Indie Pop" },
-  { id: "e8135", title: "One Kiss", artist: "Calvin Harris & Dua Lipa", year: 2018, genre: "Dance" },
-  { id: "e8136", title: "No Tears Left to Cry", artist: "Ariana Grande", year: 2018, genre: "Pop" },
-  { id: "e8137", title: "Sweet but Psycho", artist: "Ava Max", year: 2018, genre: "Pop" },
-  { id: "e8138", title: "Señorita", artist: "Shawn Mendes & Camila Cabello", year: 2019, genre: "Pop" },
-  { id: "e8139", title: "Physical", artist: "Dua Lipa", year: 2020, genre: "Dance Pop" },
-  { id: "e8140", title: "Beggin'", artist: "Måneskin", year: 2021, genre: "Rock" },
-  { id: "e8141", title: "I'm Good", artist: "David Guetta & Bebe Rexha", year: 2022, genre: "Dance" },
-  { id: "e8142", title: "Made You Look", artist: "Meghan Trainor", year: 2022, genre: "Pop" },
-  { id: "e8143", title: "What Was I Made For?", artist: "Billie Eilish", year: 2023, genre: "Soundtrack" },
-  { id: "e8144", title: "Cruel Summer", artist: "Taylor Swift", year: 2019, genre: "Pop" },
-  { id: "e8145", title: "Training Season", artist: "Dua Lipa", year: 2024, genre: "Dance Pop" },
-  { id: "e8146", title: "Too Sweet", artist: "Hozier", year: 2024, genre: "Soul" },
-  { id: "e8147", title: "Birds of a Feather", artist: "Billie Eilish", year: 2024, genre: "Pop" },
-  { id: "e8148", title: "A Bar Song", artist: "Shaboozey", year: 2024, genre: "Country Pop" },
-  { id: "e8149", title: "Stargazing", artist: "Myles Smith", year: 2024, genre: "Folk Pop" },
-  { id: "e8150", title: "The Door", artist: "Teddy Swims", year: 2024, genre: "Soul Pop" },
-  { id: "e8151", title: "I Had Some Help", artist: "Post Malone feat. Morgan Wallen", year: 2024, genre: "Country Pop" },
-  { id: "e8152", title: "360", artist: "Charli XCX", year: 2024, genre: "Electropop" },
-  { id: "e8153", title: "Apple", artist: "Charli XCX", year: 2024, genre: "Electropop" },
-  { id: "e8154", title: "Houdini", artist: "Eminem", year: 2024, genre: "Hip-Hop" },
-  { id: "e8155", title: "Beautiful Day", artist: "U2", year: 2000, genre: "Rock" },
-  { id: "e8156", title: "Kryptonite", artist: "3 Doors Down", year: 2000, genre: "Rock" },
-  { id: "e8157", title: "Hanging by a Moment", artist: "Lifehouse", year: 2000, genre: "Rock" },
-  { id: "e8158", title: "Survivor", artist: "Destiny's Child", year: 2001, genre: "R&B" },
-  { id: "e8159", title: "Smooth Criminal", artist: "Alien Ant Farm", year: 2001, genre: "Rock" },
-  { id: "e8160", title: "Island in the Sun", artist: "Weezer", year: 2001, genre: "Alternative" },
-  { id: "e8161", title: "Hash Pipe", artist: "Weezer", year: 2001, genre: "Alternative" },
-  { id: "e8162", title: "Because I Got High", artist: "Afroman", year: 2001, genre: "Hip-Hop" },
-  { id: "e8163", title: "Family Affair", artist: "Mary J. Blige", year: 2001, genre: "R&B" },
-  { id: "e8164", title: "A Woman's Worth", artist: "Alicia Keys", year: 2001, genre: "R&B" },
-  { id: "e8165", title: "Fell in Love with a Girl", artist: "The White Stripes", year: 2001, genre: "Garage Rock" },
-  { id: "e8166", title: "Just Like a Pill", artist: "Pink", year: 2001, genre: "Pop Rock" },
-  { id: "e8167", title: "Here to Stay", artist: "Korn", year: 2002, genre: "Nu Metal" },
-  { id: "e8168", title: "Can't Stop", artist: "Red Hot Chili Peppers", year: 2002, genre: "Alternative" },
-  { id: "e8169", title: "Sweet Nothing", artist: "Calvin Harris feat. Florence Welch", year: 2012, genre: "Dance" },
-  { id: "e8170", title: "Breezeblocks", artist: "alt-J", year: 2012, genre: "Indie" },
-  { id: "e8171", title: "Tessellate", artist: "alt-J", year: 2012, genre: "Indie" },
-  { id: "e8172", title: "Riptide", artist: "Vance Joy", year: 2013, genre: "Folk Pop" },
-  { id: "e8173", title: "Home", artist: "Edward Sharpe & The Magnetic Zeros", year: 2010, genre: "Indie Folk" },
-  { id: "e8174", title: "Midnight City", artist: "M83", year: 2011, genre: "Synthpop" },
-  { id: "e8175", title: "Pursuit of Happiness", artist: "Kid Cudi", year: 2010, genre: "Hip-Hop" },
-  { id: "e8176", title: "No Hands", artist: "Waka Flocka Flame", year: 2010, genre: "Hip-Hop" },
-  { id: "e8177", title: "Bottoms Up", artist: "Trey Songz feat. Nicki Minaj", year: 2010, genre: "R&B" },
-  { id: "e8178", title: "Super Bass", artist: "Nicki Minaj", year: 2011, genre: "Pop Rap" },
-  { id: "e8179", title: "Starships", artist: "Nicki Minaj", year: 2012, genre: "Pop Rap" },
-  { id: "e8180", title: "Turn Me On", artist: "David Guetta feat. Nicki Minaj", year: 2011, genre: "Dance" },
-  { id: "e8181", title: "Domino", artist: "Jessie J", year: 2011, genre: "Pop" },
-  { id: "e8182", title: "Price Tag", artist: "Jessie J feat. B.o.B", year: 2011, genre: "Pop" },
-  { id: "e8183", title: "Glad You Came", artist: "The Wanted", year: 2011, genre: "Pop" },
-  { id: "e8184", title: "What Makes You Beautiful", artist: "One Direction", year: 2011, genre: "Pop" },
-  { id: "e8185", title: "Live While We're Young", artist: "One Direction", year: 2012, genre: "Pop" },
-  { id: "e8186", title: "Little Things", artist: "One Direction", year: 2012, genre: "Pop" },
-  { id: "e8187", title: "Hallucinate", artist: "Dua Lipa", year: 2020, genre: "Dance Pop" },
-  { id: "e8188", title: "Break My Heart", artist: "Dua Lipa", year: 2020, genre: "Dance Pop" },
-  { id: "e8189", title: "Fever", artist: "Dua Lipa & Angèle", year: 2020, genre: "Dance Pop" },
 ];
 
 
@@ -3371,17 +3170,6 @@ function getInitialViewerPlayerId() {
   return "auto-host";
 }
 
-function getInitialPlayerAccessLocked() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    const roleFromUrl = params.get("role");
-
-    return roleFromUrl === "player";
-  } catch {
-    return false;
-  }
-}
-
 function getClientInstanceId() {
   try {
     const existingId = localStorage.getItem(CLIENT_INSTANCE_ID_STORAGE_KEY);
@@ -3416,298 +3204,6 @@ function storeViewerPlayerId(roomCode, playerId) {
 }
 
 
-function getInitialSupabaseConfig() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    const urlFromLink = params.get("supabaseUrl") ? decodeURIComponent(params.get("supabaseUrl")) : "";
-    const keyFromLink = params.get("supabaseKey") ? decodeURIComponent(params.get("supabaseKey")) : "";
-    const storedUrl = localStorage.getItem(SUPABASE_URL_STORAGE_KEY) || "";
-    const storedKey = localStorage.getItem(SUPABASE_ANON_KEY_STORAGE_KEY) || "";
-    const url = urlFromLink || storedUrl || DEFAULT_SUPABASE_URL;
-    const anonKey = keyFromLink || storedKey || DEFAULT_SUPABASE_ANON_KEY;
-    const enabledFromLink = Boolean(urlFromLink && keyFromLink);
-
-    return {
-      url,
-      anonKey,
-      enabled: enabledFromLink || localStorage.getItem(SUPABASE_ENABLED_STORAGE_KEY) === "true" || Boolean(DEFAULT_SUPABASE_URL && DEFAULT_SUPABASE_ANON_KEY),
-    };
-  } catch {
-    return {
-      url: DEFAULT_SUPABASE_URL,
-      anonKey: DEFAULT_SUPABASE_ANON_KEY,
-      enabled: Boolean(DEFAULT_SUPABASE_URL && DEFAULT_SUPABASE_ANON_KEY),
-    };
-  }
-}
-
-function normalizeSupabaseUrl(url = "") {
-  return String(url || "").trim().replace(/\/+$/, "");
-}
-
-function isSupabaseConfigured(config) {
-  return Boolean(config?.enabled && normalizeSupabaseUrl(config.url) && String(config.anonKey || "").trim());
-}
-
-function getInitialSupabaseAuthSession() {
-  try {
-    const raw = localStorage.getItem(SUPABASE_AUTH_SESSION_STORAGE_KEY);
-
-    if (!raw) return null;
-
-    const session = JSON.parse(raw);
-    const expiresAt = Number(session?.expires_at || 0) * 1000;
-
-    if (!session?.access_token || !session?.user) return null;
-    if (expiresAt && expiresAt < Date.now() - 60_000) return null;
-
-    return session;
-  } catch {
-    return null;
-  }
-}
-
-function getAuthDisplayName(session) {
-  return (
-    String(session?.user?.user_metadata?.display_name || "").trim() ||
-    String(session?.user?.email || "").split("@")[0] ||
-    ""
-  );
-}
-
-function getAuthEmail(session) {
-  return String(session?.user?.email || "").trim();
-}
-
-function getAuthGuestId(session, fallbackGuestId) {
-  const userId = session?.user?.id;
-
-  return userId ? `auth-${userId}` : String(fallbackGuestId || "");
-}
-
-function normalizePlayerName(value = "") {
-  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 32);
-}
-
-function getInitialGuestName() {
-  try {
-    return normalizePlayerName(localStorage.getItem(GUEST_NAME_STORAGE_KEY) || "");
-  } catch {
-    return "";
-  }
-}
-
-function getLocalDisplayName(authName = "", guestName = "", fallback = "") {
-  return normalizePlayerName(authName) || normalizePlayerName(guestName) || normalizePlayerName(fallback);
-}
-
-function dedupeNames(names = []) {
-  const seen = new Set();
-  const result = [];
-
-  names.forEach((name) => {
-    const safeName = normalizePlayerName(name);
-    const key = safeName.toLowerCase();
-
-    if (!safeName || seen.has(key)) return;
-
-    seen.add(key);
-    result.push(safeName);
-  });
-
-  return result;
-}
-
-function mergePreferredNameIntoPlayers(currentPlayers = [], preferredName = "") {
-  const safeName = normalizePlayerName(preferredName);
-
-  if (!safeName) return dedupeNames(currentPlayers);
-
-  const rest = dedupeNames(currentPlayers).filter((name) => name.toLowerCase() !== safeName.toLowerCase());
-  return [safeName, ...rest];
-}
-
-function mergePresenceNamesIntoPlayers(currentPlayers = [], namesToAdd = [], preferredName = "") {
-  const preferred = normalizePlayerName(preferredName);
-  const existing = dedupeNames(currentPlayers);
-  const result = preferred ? mergePreferredNameIntoPlayers(existing, preferred) : existing;
-
-  namesToAdd.forEach((name) => {
-    const safeName = normalizePlayerName(name);
-    if (!safeName) return;
-    if (safeName.toLowerCase() === "spieler") return;
-    if (safeName.toLowerCase() === "gast") return;
-    if (result.some((existingName) => existingName.toLowerCase() === safeName.toLowerCase())) return;
-
-    result.push(safeName);
-  });
-
-  return result;
-}
-
-function getLatestPresenceNames(roomClients = []) {
-  const byClient = new Map();
-
-  (roomClients || []).forEach((client, index) => {
-    const clientKey = String(client?.clientInstanceId || client?.socketId || `client-${index}`);
-    const safeName = normalizePlayerName(client?.playerName);
-
-    if (!safeName) return;
-    if (safeName.toLowerCase() === "spieler") return;
-    if (safeName.toLowerCase() === "gast") return;
-
-    // Same browser/client may send multiple name updates while typing.
-    // The newest visible name should replace the previous one.
-    byClient.set(clientKey, safeName);
-  });
-
-  return [...byClient.values()];
-}
-
-function buildLobbyDisplayPlayers({ players = [], playerNames = [], roomClients = [], currentDisplayName = "", includeLocal = false }) {
-  const namesFromPlayers = Array.isArray(players) ? players.map((player) => player?.name) : [];
-  const namesFromPlayerNames = Array.isArray(playerNames) ? playerNames : [];
-  const namesFromClients = getLatestPresenceNames(roomClients);
-  const localName = includeLocal ? [currentDisplayName] : [];
-
-  return dedupeNames([
-    ...namesFromPlayers,
-    ...namesFromPlayerNames,
-    ...namesFromClients,
-    ...localName,
-  ])
-    .filter((name) => name.toLowerCase() !== "spieler")
-    .filter((name) => name.toLowerCase() !== "gast")
-    .map((name, index) => ({
-      id: `display-${index}-${name.toLowerCase().replace(/[^a-z0-9]+/gi, "-")}`,
-      name,
-      score: 0,
-      timeline: [],
-      isDisplayOnly: true,
-    }));
-}
-
-async function supabaseAuthRequest(config, path, options = {}, accessToken = "") {
-  const baseUrl = normalizeSupabaseUrl(config?.url);
-  const anonKey = String(config?.anonKey || "").trim();
-
-  if (!baseUrl || !anonKey) {
-    throw new Error("Supabase URL oder anon public key fehlt.");
-  }
-
-  const response = await fetch(`${baseUrl}/auth/v1${path}`, {
-    ...options,
-    headers: {
-      apikey: anonKey,
-      Authorization: `Bearer ${accessToken || anonKey}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  });
-
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
-
-  if (!response.ok) {
-    throw new Error(data?.msg || data?.message || data?.error_description || text || `Supabase Auth Fehler ${response.status}`);
-  }
-
-  return data;
-}
-
-async function supabaseRestRequest(config, path, options = {}, accessToken = "") {
-  const baseUrl = normalizeSupabaseUrl(config?.url);
-  const anonKey = String(config?.anonKey || "").trim();
-
-  if (!baseUrl || !anonKey) {
-    throw new Error("Supabase URL oder anon public key fehlt.");
-  }
-
-  const response = await fetch(`${baseUrl}/rest/v1${path}`, {
-    ...options,
-    headers: {
-      apikey: anonKey,
-      Authorization: `Bearer ${accessToken || anonKey}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `Supabase Fehler ${response.status}`);
-  }
-
-  if (response.status === 204) return null;
-
-  const text = await response.text();
-  return text ? JSON.parse(text) : null;
-}
-
-async function signUpWithSupabase(config, { email, password, displayName }) {
-  return supabaseAuthRequest(config, "/signup", {
-    method: "POST",
-    body: JSON.stringify({
-      email: String(email || "").trim(),
-      password,
-      data: {
-        display_name: String(displayName || "").trim(),
-      },
-    }),
-  });
-}
-
-async function signInWithSupabase(config, { email, password }) {
-  return supabaseAuthRequest(config, "/token?grant_type=password", {
-    method: "POST",
-    body: JSON.stringify({
-      email: String(email || "").trim(),
-      password,
-    }),
-  });
-}
-
-async function signOutWithSupabase(config, session) {
-  if (!session?.access_token) return null;
-
-  return supabaseAuthRequest(
-    config,
-    "/logout",
-    {
-      method: "POST",
-      body: JSON.stringify({}),
-    },
-    session.access_token
-  );
-}
-
-async function createOrUpdateAuthProfile(config, session, displayName, fallbackGuestId) {
-  if (!isSupabaseConfigured(config) || !session?.user?.id) return null;
-
-  const safeDisplayName = String(displayName || getAuthDisplayName(session) || "Spieler").trim() || "Spieler";
-  const stableGuestId = getAuthGuestId(session, fallbackGuestId);
-
-  await supabaseRestRequest(config, "/profiles?on_conflict=guest_id", {
-    method: "POST",
-    headers: {
-      Prefer: "resolution=merge-duplicates,return=representation",
-    },
-    body: JSON.stringify({
-      guest_id: stableGuestId,
-      auth_user_id: session.user.id,
-      display_name: safeDisplayName,
-      updated_at: new Date().toISOString(),
-    }),
-  });
-
-  return true;
-}
-
-function mergeAuthNameIntoPlayers(currentPlayers = [], displayName = "") {
-  return mergePreferredNameIntoPlayers(currentPlayers, displayName);
-}
-
-
 function getInitialSocketUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -3726,24 +3222,11 @@ function getInitialSocketUrl() {
   }
 }
 
-function getInitialSyncEnabled() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-
-    if (params.get("room")) return true;
-  } catch {
-    // ignore
-  }
-
-  return localStorage.getItem(SYNC_ENABLED_STORAGE_KEY) === "true";
-}
-
 export default function App() {
   const [gameState, dispatch] = useReducer(gameReducer, initialGameState, loadStoredGameState);
 
   const [playerName, setPlayerName] = useState("");
-  const [playerNames, setPlayerNames] = useState([]);
-  const [guestName, setGuestName] = useState(() => getInitialGuestName());
+  const [playerNames, setPlayerNames] = useState(["Christoph", "Alex"]);
   const [customTracks, setCustomTracks] = useState(() => loadStoredCustomTracks());
   const [selectedPreset, setSelectedPreset] = useState("all");
   const [selectedDifficulty, setSelectedDifficulty] = useState("normal");
@@ -3754,21 +3237,11 @@ export default function App() {
     isDiscordLikeEnvironment() ? "Web-App erkannt." : "Browsermodus."
   );
   const [viewerPlayerId, setViewerPlayerId] = useState(() => getInitialViewerPlayerId());
-  const [playerAccessLocked, setPlayerAccessLocked] = useState(() => getInitialPlayerAccessLocked());
   const [socketUrl, setSocketUrl] = useState(() => getInitialSocketUrl());
-  const [syncEnabled, setSyncEnabled] = useState(() => getInitialSyncEnabled());
+  const [syncEnabled, setSyncEnabled] = useState(() => localStorage.getItem(SYNC_ENABLED_STORAGE_KEY) === "true");
   const [syncStatus, setSyncStatus] = useState("Sync nicht verbunden.");
   const [syncClientCount, setSyncClientCount] = useState(1);
   const [roomClients, setRoomClients] = useState([]);
-  const [supabaseConfig, setSupabaseConfig] = useState(() => getInitialSupabaseConfig());
-  const [authSession, setAuthSession] = useState(() => getInitialSupabaseAuthSession());
-  const [authStatus, setAuthStatus] = useState(() =>
-    getInitialSupabaseAuthSession()
-      ? "Angemeldet."
-      : isSupabaseConfigured(getInitialSupabaseConfig())
-        ? "Gastmodus aktiv."
-        : "Supabase Login nicht konfiguriert."
-  );
   const [clientInstanceId] = useState(() => getClientInstanceId());
   const [roomPlaybackTimer, setRoomPlaybackTimer] = useState({
     requestId: null,
@@ -3784,7 +3257,7 @@ export default function App() {
   const lastRemoteStateRef = useRef("");
   const lastEmittedStateRef = useRef("");
 
-  const fullDeck = useMemo(() => dedupeTrackDeck([...BASE_TRACK_DECK, ...THEME_TRACK_DECK, ...CATEGORY_EXPANSION_TRACKS, ...VINTAGE_EXPANSION_TRACKS, ...ERA_BALANCE_EXPANSION_TRACKS, ...SONGPOOL_800_EXPANSION_TRACKS, ...customTracks]), [customTracks]);
+  const fullDeck = useMemo(() => dedupeTrackDeck([...BASE_TRACK_DECK, ...THEME_TRACK_DECK, ...CATEGORY_EXPANSION_TRACKS, ...VINTAGE_EXPANSION_TRACKS, ...ERA_BALANCE_EXPANSION_TRACKS, ...customTracks]), [customTracks]);
   const presetDeck = useMemo(() => dedupeTrackDeck(filterDeckByPreset(fullDeck, selectedPreset)), [fullDeck, selectedPreset]);
   const availableDeck = useMemo(() => dedupeTrackDeck(filterDeckByDifficulty(presetDeck, selectedDifficulty)), [presetDeck, selectedDifficulty]);
 
@@ -3792,19 +3265,15 @@ export default function App() {
   const activeTimeline = activePlayer ? sortTimeline(activePlayer.timeline) : [];
   const winner = getFinalWinner(gameState.players, gameState.targetScore);
   const activeRoomCode = gameState.room?.code || roomCode;
-  const authDisplayName = getAuthDisplayName(authSession);
-  const guestDisplayName = normalizePlayerName(guestName);
-  const localDisplayName = getLocalDisplayName(authDisplayName, guestDisplayName);
-  const socketDisplayName = localDisplayName || "Gast";
 
   const resolvedViewerPlayerId = (() => {
-    const hostPlayerId = gameState.room?.hostPlayerId || null;
+    if (viewerPlayerId === "auto-host") return gameState.room?.hostPlayerId || "spectator";
 
-    const getAutoPlayerId = () => {
+    if (viewerPlayerId === "auto-player") {
       const storedPlayerId = getStoredViewerPlayerId(activeRoomCode);
       const storedPlayer = gameState.players.find((player) => player.id === storedPlayerId);
 
-      if (storedPlayer && storedPlayer.id !== hostPlayerId) return storedPlayer.id;
+      if (storedPlayer && storedPlayer.id !== gameState.room?.hostPlayerId) return storedPlayer.id;
 
       const claimedByOther = new Set(
         roomClients
@@ -3813,46 +3282,19 @@ export default function App() {
           .filter(Boolean)
       );
 
-      const matchingLocalPlayer = localDisplayName
-        ? gameState.players.find(
-            (player) =>
-              player.id !== hostPlayerId &&
-              player.name?.toLowerCase() === localDisplayName.toLowerCase() &&
-              !claimedByOther.has(player.id)
-          )
-        : null;
-
-      if (matchingLocalPlayer) return matchingLocalPlayer.id;
-
       return (
-        gameState.players.find((player) => player.id !== hostPlayerId && !claimedByOther.has(player.id))?.id ||
-        gameState.players.find((player) => player.id !== hostPlayerId)?.id ||
+        gameState.players.find((player) => player.id !== gameState.room?.hostPlayerId && !claimedByOther.has(player.id))?.id ||
+        gameState.players.find((player) => player.id !== gameState.room?.hostPlayerId)?.id ||
         "spectator"
       );
-    };
-
-    if (playerAccessLocked) {
-      const selectedPlayer = gameState.players.find((player) => player.id === viewerPlayerId);
-
-      if (selectedPlayer && selectedPlayer.id !== hostPlayerId) return selectedPlayer.id;
-
-      return getAutoPlayerId();
     }
-
-    if (viewerPlayerId === "auto-host") return hostPlayerId || "spectator";
-
-    if (viewerPlayerId === "auto-player") return getAutoPlayerId();
 
     return viewerPlayerId;
   })();
   const viewerRole = getViewerRoleFromPlayer(resolvedViewerPlayerId, gameState);
   const viewerPermissions = getViewerPermissions(viewerRole);
-  const isPlayerJoinView = playerAccessLocked || viewerPlayerId === "auto-player";
-  const isHostSetupView = !playerAccessLocked && !isPlayerJoinView && (viewerPlayerId === "auto-host" || viewerRole === "host");
-  const showAdminPanels = gameState.phase === "lobby" ? isHostSetupView : viewerRole === "host";
+  const showAdminPanels = gameState.phase === "lobby" || viewerRole === "host";
   const showSpotifyPanel = showAdminPanels;
-  const showLobbyHostView = gameState.phase === "lobby" && isHostSetupView;
-  const showLobbyPlayerView = gameState.phase === "lobby" && !isHostSetupView;
 
   const leaderboard = useMemo(() => {
     return [...gameState.players].sort((a, b) => b.score - a.score || a.wrong - b.wrong);
@@ -3873,35 +3315,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(SYNC_ENABLED_STORAGE_KEY, String(syncEnabled));
   }, [syncEnabled]);
-
-  useEffect(() => {
-    localStorage.setItem(SUPABASE_URL_STORAGE_KEY, supabaseConfig.url || "");
-    localStorage.setItem(SUPABASE_ANON_KEY_STORAGE_KEY, supabaseConfig.anonKey || "");
-    localStorage.setItem(SUPABASE_ENABLED_STORAGE_KEY, String(Boolean(supabaseConfig.enabled)));
-  }, [supabaseConfig]);
-
-  useEffect(() => {
-    if (authSession) {
-      localStorage.setItem(SUPABASE_AUTH_SESSION_STORAGE_KEY, JSON.stringify(authSession));
-    } else {
-      localStorage.removeItem(SUPABASE_AUTH_SESSION_STORAGE_KEY);
-    }
-  }, [authSession]);
-
-  useEffect(() => {
-    localStorage.setItem(GUEST_NAME_STORAGE_KEY, guestName || "");
-  }, [guestName]);
-
-  useEffect(() => {
-    if (gameState.phase !== "lobby" || !showLobbyHostView || !localDisplayName) return;
-
-    // Only keep the host's own name in the editable start list.
-    // Joined players are shown via live presence and merged once when the host starts the game.
-    setPlayerNames((previous) => {
-      const next = mergePreferredNameIntoPlayers(previous, localDisplayName);
-      return JSON.stringify(next) === JSON.stringify(previous) ? previous : next;
-    });
-  }, [localDisplayName, gameState.phase, showLobbyHostView]);
 
   useEffect(() => {
     if (!syncEnabled) {
@@ -3927,7 +3340,7 @@ export default function App() {
       setSyncStatus(`Sync verbunden: ${socket.id}`);
       socket.emit("room:join", {
         roomCode: activeRoomCode,
-        playerName: socketDisplayName,
+        playerName: playerNames[0] || "Spieler",
         clientInstanceId,
       });
     });
@@ -3992,18 +3405,7 @@ export default function App() {
         socketRef.current = null;
       }
     };
-  }, [syncEnabled, socketUrl, roomCode, gameState.room?.code, socketDisplayName, clientInstanceId]);
-
-  useEffect(() => {
-    const socket = socketRef.current;
-    if (!syncEnabled || !socket?.connected) return;
-
-    socket.emit("room:join", {
-      roomCode: activeRoomCode,
-      playerName: socketDisplayName,
-      clientInstanceId,
-    });
-  }, [syncEnabled, activeRoomCode, socketDisplayName, clientInstanceId]);
+  }, [syncEnabled, socketUrl, roomCode, gameState.room?.code, playerNames[0], clientInstanceId]);
 
   useEffect(() => {
     const socket = socketRef.current;
@@ -4017,10 +3419,10 @@ export default function App() {
     socket.emit("room:claimPlayer", {
       roomCode: activeRoomCode,
       playerId: resolvedViewerPlayerId,
-      playerName: claimedPlayer?.name || socketDisplayName,
+      playerName: claimedPlayer?.name || playerNames[0] || "Spieler",
       clientInstanceId,
     });
-  }, [syncEnabled, viewerPlayerId, resolvedViewerPlayerId, gameState.room?.code, roomCode, gameState.players, socketDisplayName, clientInstanceId]);
+  }, [syncEnabled, viewerPlayerId, resolvedViewerPlayerId, gameState.room?.code, roomCode, gameState.players, playerNames, clientInstanceId]);
 
   useEffect(() => {
     if (!resolvedViewerPlayerId || resolvedViewerPlayerId === "spectator" || resolvedViewerPlayerId.startsWith("auto-")) return;
@@ -4174,136 +3576,6 @@ export default function App() {
     sendGameAction({ type: "NEXT_PLAYER" });
   }
 
-  async function handleAuthSignUp({ email, password, displayName }) {
-    if (!isSupabaseConfigured(supabaseConfig)) {
-      setAuthStatus("Supabase ist nicht aktiv oder nicht konfiguriert.");
-      return;
-    }
-
-    setAuthStatus("Account wird erstellt...");
-
-    try {
-      const session = await signUpWithSupabase(supabaseConfig, { email, password, displayName });
-
-      if (session?.access_token) {
-        const safeName = getAuthDisplayName(session) || displayName || email;
-
-        setAuthSession(session);
-        setPlayerNames((previous) => mergeAuthNameIntoPlayers(previous, safeName));
-        setAuthStatus(`Account erstellt und angemeldet als ${safeName}.`);
-
-        try {
-          await createOrUpdateAuthProfile(supabaseConfig, session, safeName, clientInstanceId);
-        } catch {
-          // Login soll nicht scheitern, nur weil das optionale Profil-Upsert blockiert.
-        }
-      } else {
-        setAuthStatus("Account erstellt. Bitte bestätige ggf. deine E-Mail und melde dich danach an.");
-      }
-    } catch (error) {
-      setAuthStatus(`Registrierung fehlgeschlagen: ${error.message || "Fehler"}`);
-    }
-  }
-
-  async function handleAuthSignIn({ email, password }) {
-    if (!isSupabaseConfigured(supabaseConfig)) {
-      setAuthStatus("Supabase ist nicht aktiv oder nicht konfiguriert.");
-      return;
-    }
-
-    setAuthStatus("Login läuft...");
-
-    try {
-      const session = await signInWithSupabase(supabaseConfig, { email, password });
-      const safeName = getAuthDisplayName(session) || email;
-
-      setAuthSession(session);
-      setPlayerNames((previous) => mergeAuthNameIntoPlayers(previous, safeName));
-      setAuthStatus(`Angemeldet als ${safeName}.`);
-
-      try {
-        await createOrUpdateAuthProfile(supabaseConfig, session, safeName, clientInstanceId);
-      } catch {
-        // Login soll nicht scheitern, nur weil das optionale Profil-Upsert blockiert.
-      }
-    } catch (error) {
-      setAuthStatus(`Login fehlgeschlagen: ${error.message || "Fehler"}`);
-    }
-  }
-
-  async function handleAuthLogout() {
-    try {
-      if (authSession) {
-        await signOutWithSupabase(supabaseConfig, authSession);
-      }
-    } catch {
-      // Lokaler Logout soll trotzdem passieren.
-    }
-
-    setAuthSession(null);
-    setAuthStatus("Abgemeldet. Gastmodus aktiv.");
-  }
-
-  function handleSupabaseConfigChange(patch) {
-    setSupabaseConfig((current) => ({
-      ...current,
-      ...patch,
-    }));
-  }
-
-  function updateBrowserRoomUrl(nextCode, nextRole = "player") {
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.set("room", nextCode);
-
-      if (nextRole) {
-        url.searchParams.set("role", nextRole);
-      } else {
-        url.searchParams.delete("role");
-      }
-
-      if (socketUrl) {
-        url.searchParams.set("server", socketUrl);
-      }
-
-      window.history.replaceState({}, "", url.toString());
-    } catch {
-      // URL update is optional.
-    }
-  }
-
-  function joinRoomAsPlayer(nextCode) {
-    const safeCode = String(nextCode || "").trim().toUpperCase().slice(0, 8);
-
-    if (!safeCode) {
-      window.alert("Bitte Raumcode eingeben.");
-      return;
-    }
-
-    setRoomCode(safeCode);
-    setViewerPlayerId("auto-player");
-    setPlayerAccessLocked(true);
-    storeViewerPlayerId(safeCode, "auto-player");
-    setSyncEnabled(true);
-    setSyncStatus(`Du trittst Raum ${safeCode} als ${socketDisplayName || "Gast"} bei...`);
-    updateBrowserRoomUrl(safeCode, "player");
-
-    window.setTimeout(() => {
-      setSyncStatus((current) =>
-        String(current || "").includes(`Raum ${safeCode}`) || String(current || "").includes(`trittst Raum ${safeCode}`)
-          ? `Raum ${safeCode} verbunden. Du bist als ${socketDisplayName || "Gast"} sichtbar.`
-          : current
-      );
-    }, 1200);
-  }
-
-  function switchToHostView() {
-    setPlayerAccessLocked(false);
-    setViewerPlayerId("auto-host");
-    setSyncEnabled(true);
-    updateBrowserRoomUrl(roomCode, "");
-  }
-
   async function requestRoomSpotifyPlayback(playLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS) {
     const activeRoomCode = gameState.room?.code || roomCode;
     const serverBaseUrl = String(socketUrl || "").trim().replace(/\/+$/, "");
@@ -4326,8 +3598,6 @@ export default function App() {
         },
         body: JSON.stringify({
           playLimitSeconds,
-          track: gameState.currentTrack,
-          jamSafe: localStorage.getItem(SPOTIFY_JAM_SAFE_STORAGE_KEY) === "true",
         }),
       });
 
@@ -4349,7 +3619,7 @@ export default function App() {
     const actionWithActor = {
       ...action,
       actorPlayerId,
-      actorName: actorPlayer?.name || socketDisplayName,
+      actorName: actorPlayer?.name || playerNames[0] || "Spieler",
     };
 
 
@@ -4365,15 +3635,17 @@ export default function App() {
   }
 
   function addPlayer() {
-    const name = normalizePlayerName(playerName);
+    const name = playerName.trim();
 
-    if (!name || playerNames.some((existingName) => existingName.toLowerCase() === name.toLowerCase())) return;
+    if (!name || playerNames.includes(name)) return;
 
     setPlayerNames([...playerNames, name]);
     setPlayerName("");
   }
 
   function removePlayer(name) {
+    if (playerNames.length <= 1) return;
+
     setPlayerNames(playerNames.filter((player) => player !== name));
   }
 
@@ -4435,18 +3707,10 @@ export default function App() {
     downloadTextFile("trackline-custom-deck.json", exportTracksAsJson(customTracks));
   }
 
-  function getStartPlayerNames() {
-    return dedupeNames([
-      ...playerNames,
-      ...getLatestPresenceNames(roomClients),
-      socketDisplayName,
-    ]).filter((name) => name && name.toLowerCase() !== "gast" && name.toLowerCase() !== "spieler");
-  }
-
   function startGame(settings) {
     sendGameAction({
       type: "START_GAME",
-      playerNames: getStartPlayerNames().length ? getStartPlayerNames() : [socketDisplayName],
+      playerNames,
       deck: availableDeck,
       roomCode,
       targetScore: settings.targetScore,
@@ -4487,36 +3751,6 @@ export default function App() {
   return (
     <div style={{ minHeight: "100vh", background: colors.bg, color: colors.text, padding: gameState.phase === "lobby" ? 12 : 8, fontFamily: "Inter, system-ui, sans-serif", overflowX: "hidden" }}>
       <div style={{ maxWidth: gameState.phase === "lobby" ? 1320 : "100%", margin: "0 auto", display: "grid", gap: gameState.phase === "lobby" ? 14 : 8 }}>
-        {gameState.phase === "lobby" && (
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.15fr) minmax(280px, 0.85fr)", gap: 12, alignItems: "start" }}>
-            <AuthPanel
-              session={authSession}
-              status={authStatus}
-              defaultName={authDisplayName || guestDisplayName || playerNames[0] || ""}
-              guestName={guestName}
-              currentDisplayName={socketDisplayName}
-              onGuestNameChange={setGuestName}
-              config={supabaseConfig}
-              onConfigChange={handleSupabaseConfigChange}
-              onSignUp={handleAuthSignUp}
-              onSignIn={handleAuthSignIn}
-              onLogout={handleAuthLogout}
-            />
-
-            <JoinRoomModeCard
-              roomCode={roomCode}
-              setRoomCode={setRoomCode}
-              isPlayerJoinView={isPlayerJoinView}
-              isHostSetupView={isHostSetupView}
-              syncStatus={syncStatus}
-              syncEnabled={syncEnabled}
-              socketUrl={socketUrl}
-              currentDisplayName={socketDisplayName}
-              onJoinRoom={joinRoomAsPlayer}
-            />
-          </div>
-        )}
-
         {showAdminPanels ? (
           <HostControlArea onReset={resetGame} isInGame={gameState.phase !== "lobby"}>
             <WebsiteShareCard
@@ -4578,15 +3812,13 @@ export default function App() {
           gameState.phase === "lobby" && <Header onReset={resetGame} isInGame={false} />
         )}
 
-        {showLobbyHostView && (
+        {gameState.phase === "lobby" && (
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.35fr) minmax(280px, 0.65fr)", gap: 24 }}>
             <main style={{ display: "grid", gap: 16, minWidth: 0 }}>
               <LobbyCard
                 playerName={playerName}
                 setPlayerName={setPlayerName}
                 playerNames={playerNames}
-                roomClients={roomClients}
-                currentDisplayName={socketDisplayName}
                 addPlayer={addPlayer}
                 removePlayer={removePlayer}
                 startGame={startGame}
@@ -4610,24 +3842,6 @@ export default function App() {
               <RulesCard />
             </aside>
           </div>
-        )}
-
-        {showLobbyPlayerView && (
-          <PlayerLobbyWaitingCard
-            roomCode={activeRoomCode}
-            syncStatus={syncStatus}
-            syncEnabled={syncEnabled}
-            syncClientCount={syncClientCount}
-            players={gameState.players}
-            playerNames={playerNames}
-            roomClients={roomClients}
-            viewerPlayerId={viewerPlayerId}
-            setViewerPlayerId={setViewerPlayerId}
-            viewerRole={viewerRole}
-            clientInstanceId={clientInstanceId}
-            currentDisplayName={socketDisplayName}
-            onSwitchToHost={switchToHostView}
-          />
         )}
 
         {gameState.phase !== "lobby" && gameState.players.length > 0 && (
@@ -4738,7 +3952,6 @@ export default function App() {
                       })
                     }
                     canPlace={viewerPermissions.canPlace}
-                    viewerRole={viewerRole}
                   />
 
                   {gameState.lastResult && (
@@ -4778,8 +3991,6 @@ export default function App() {
                 roomClients={roomClients}
                 clientInstanceId={clientInstanceId}
                 roomCode={activeRoomCode}
-                playerAccessLocked={playerAccessLocked}
-                hostPlayerId={gameState.room?.hostPlayerId}
               />
 
               <Leaderboard players={leaderboard} />
@@ -4792,369 +4003,7 @@ export default function App() {
   );
 }
 
-
-function JoinRoomModeCard({ roomCode, setRoomCode, isPlayerJoinView, isHostSetupView, syncStatus, syncEnabled, socketUrl, currentDisplayName = "Gast", onJoinRoom }) {
-  const [joinCode, setJoinCode] = useState(roomCode || "");
-
-  useEffect(() => {
-    if (roomCode && !joinCode.trim()) setJoinCode(roomCode);
-  }, [roomCode, joinCode]);
-
-  const safeJoinCode = String(joinCode || "").trim().toUpperCase().slice(0, 8);
-
-  return (
-    <Card>
-      <CardContent style={{ display: "grid", gap: 12 }}>
-        <div>
-          <Badge variant={isPlayerJoinView ? "secondary" : "default"}>
-            {isPlayerJoinView ? "Spieler-Ansicht" : "Host-Ansicht"}
-          </Badge>
-          <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5 }}>Raum betreten oder hosten</h2>
-          <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-            Host sieht Setup, Spotify und Start. Spieler sehen nur die reduzierte Ansicht mit ihrem Zug und dem Spielstand.
-          </p>
-        </div>
-
-        <div style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg, display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ color: colors.muted, fontSize: 13 }}>Du trittst bei als</span>
-          <strong>{currentDisplayName || "Gast"}</strong>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 8, alignItems: "end" }}>
-          <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: colors.muted, fontSize: 13 }}>Raumcode</span>
-            <Input
-              value={joinCode}
-              onChange={(event) => {
-                const next = event.target.value.toUpperCase().slice(0, 8);
-                setJoinCode(next);
-                if (isHostSetupView) setRoomCode?.(next);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") onJoinRoom?.(safeJoinCode);
-              }}
-              placeholder="ABC123"
-            />
-          </label>
-
-          <Button onClick={() => onJoinRoom?.(safeJoinCode)} disabled={!safeJoinCode}>
-            Beitreten
-          </Button>
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ color: colors.muted, fontSize: 12 }}>
-            {isPlayerJoinView && syncEnabled
-              ? `Verbunden als ${currentDisplayName || "Gast"}.`
-              : syncEnabled
-                ? syncStatus
-                : "Sync ist noch aus. Beim Beitreten wird er aktiviert."}
-          </div>
-
-          {!isHostSetupView && (
-            <Badge variant="secondary">Spielerzugang</Badge>
-          )}
-        </div>
-
-        <details style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg }}>
-          <summary style={{ cursor: "pointer", fontWeight: 900 }}>Technische Verbindung</summary>
-          <p style={{ margin: "8px 0 0", color: colors.muted, fontSize: 12, wordBreak: "break-all" }}>
-            Render/Socket: {socketUrl || "-"}
-          </p>
-        </details>
-      </CardContent>
-    </Card>
-  );
-}
-
-function PlayerLobbyWaitingCard({ roomCode, syncStatus, syncEnabled, syncClientCount, players, playerNames = [], roomClients, viewerPlayerId, setViewerPlayerId, viewerRole, clientInstanceId, currentDisplayName = "Gast" }) {
-  const visiblePlayers = buildLobbyDisplayPlayers({
-    players,
-    playerNames,
-    roomClients,
-    currentDisplayName,
-    includeLocal: true,
-  });
-
-  const claimedNames = new Set(
-    (roomClients || [])
-      .filter((client) => client.clientInstanceId && client.clientInstanceId !== clientInstanceId)
-      .map((client) => client.playerName)
-      .filter(Boolean)
-  );
-
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(280px, 0.8fr)", gap: 18, alignItems: "start" }}>
-      <main style={{ minWidth: 0 }}>
-        <Card>
-          <CardContent style={{ display: "grid", gap: 16 }}>
-            <div
-              style={{
-                borderRadius: 24,
-                padding: 18,
-                background: cardTheme.table,
-                border: `1px solid ${colors.border}`,
-                display: "grid",
-                gap: 8,
-              }}
-            >
-              <Badge variant="secondary">Spieler-Lobby</Badge>
-              <h2 style={{ margin: "4px 0 0", fontSize: 30, letterSpacing: -0.8 }}>Du bist im Raum {roomCode}</h2>
-              <p style={{ margin: 0, color: colors.muted }}>
-                Warte, bis der Host die Runde startet. Du bist als <strong>{currentDisplayName || "Gast"}</strong> im Raum sichtbar.
-              </p>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
-              <InfoTile label="Raum" value={roomCode || "-"} />
-              <InfoTile label="Verbindung" value={syncEnabled ? "aktiv" : "aus"} />
-              <InfoTile label="Clients" value={`${syncClientCount || 1}`} />
-            </div>
-
-            <div style={{ border: `1px solid ${colors.border}`, borderRadius: 18, padding: 14, background: colors.bg }}>
-              <strong>Status</strong>
-              <p style={{ margin: "6px 0 0", color: colors.muted }}>
-                {syncEnabled ? `Verbunden als ${currentDisplayName || "Gast"}. Warte auf den Host.` : syncStatus}
-              </p>
-            </div>
-
-            <div style={{ display: "grid", gap: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                <strong>Spieler im Raum</strong>
-                <Badge variant="secondary">{visiblePlayers.length}</Badge>
-              </div>
-
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {visiblePlayers.length === 0 && (
-                  <span
-                    style={{
-                      border: `1px solid ${colors.border}`,
-                      borderRadius: 999,
-                      background: colors.chip,
-                      color: colors.text,
-                      padding: "8px 12px",
-                      fontWeight: 850,
-                    }}
-                  >
-                    {currentDisplayName || "Du"}
-                  </span>
-                )}
-
-                {visiblePlayers.map((player, index) => (
-                  <span
-                    key={player.id || player.name}
-                    style={{
-                      border: `1px solid ${index === 0 ? colors.primary : colors.border}`,
-                      borderRadius: 999,
-                      background: index === 0 ? "rgba(126,87,255,0.18)" : colors.chip,
-                      color: colors.text,
-                      padding: "8px 12px",
-                      fontWeight: 850,
-                    }}
-                  >
-                    {index === 0 ? "Host · " : ""}
-                    {player.name}
-                    {claimedNames.has(player.name) ? " · verbunden" : ""}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </main>
-
-      <aside style={{ display: "grid", gap: 12, minWidth: 0 }}>
-        <Card>
-          <CardContent style={{ display: "grid", gap: 10 }}>
-            <Badge variant="secondary">Automatische Zuordnung</Badge>
-            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-              Nach dem Spielstart wirst du automatisch deinem Login- oder Gastnamen zugeordnet. Die Host-Ansicht ist für Spieler gesperrt.
-            </p>
-          </CardContent>
-        </Card>
-
-        <RulesCard />
-
-        <Card>
-          <CardContent style={{ display: "grid", gap: 10 }}>
-            <Badge variant="secondary">Spieleransicht</Badge>
-            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-              Du bist als Spieler in diesem Raum. Setup, Spotify und Spielstart bleiben beim Host.
-            </p>
-          </CardContent>
-        </Card>
-      </aside>
-    </div>
-  );
-}
-
-function AuthPanel({ session, status, defaultName, guestName = "", currentDisplayName = "Gast", onGuestNameChange, config, onConfigChange, onSignUp, onSignIn, onLogout }) {
-  const [mode, setMode] = useState("signin");
-  const [displayName, setDisplayName] = useState(defaultName || "");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  const configured = isSupabaseConfigured(config);
-  const loggedInName = getAuthDisplayName(session);
-  const canSubmit = configured && email.trim() && password.length >= 6 && (mode === "signin" || displayName.trim());
-
-  useEffect(() => {
-    if (defaultName && !displayName.trim()) {
-      setDisplayName(defaultName);
-    }
-  }, [defaultName, displayName]);
-
-  if (session) {
-    return (
-      <Card>
-        <CardContent style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <div>
-            <Badge>Login aktiv</Badge>
-            <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5 }}>Angemeldet als {loggedInName || getAuthEmail(session)}</h2>
-            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-              Render-Spielstruktur bleibt aktiv. Der Login liefert nur Profilname und Account-Zuordnung.
-            </p>
-          </div>
-
-          <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
-            <Badge variant="secondary">Spielname: {currentDisplayName}</Badge>
-            <Button variant="secondary" onClick={onLogout}>
-              Logout
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardContent style={{ display: "grid", gap: 12 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
-          <div>
-            <Badge variant={configured ? "secondary" : "warning"}>{configured ? "Login optional" : "Login nicht konfiguriert"}</Badge>
-            <h2 style={{ margin: "8px 0 4px", letterSpacing: -0.5 }}>Profil speichern</h2>
-            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-              Supabase wird hier nur für Login/Profil genutzt. Spotify, Jam, Raum und Socket bleiben auf Render.
-            </p>
-          </div>
-
-          <div style={{ display: "flex", gap: 8 }}>
-            <Button variant={mode === "signin" ? "primary" : "secondary"} onClick={() => setMode("signin")}>
-              Einloggen
-            </Button>
-            <Button variant={mode === "signup" ? "primary" : "secondary"} onClick={() => setMode("signup")}>
-              Registrieren
-            </Button>
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: mode === "signup" ? "minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)" : "minmax(0, 1fr) minmax(0, 1fr)", gap: 10 }}>
-          {mode === "signup" && (
-            <label style={{ display: "grid", gap: 8 }}>
-              <span style={{ color: colors.muted, fontSize: 13 }}>Anzeigename</span>
-              <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="z. B. Mia" />
-            </label>
-          )}
-
-          <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: colors.muted, fontSize: 13 }}>E-Mail</span>
-            <Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" type="email" />
-          </label>
-
-          <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: colors.muted, fontSize: 13 }}>Passwort</span>
-            <Input
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="mind. 6 Zeichen"
-              type="password"
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && canSubmit) {
-                  mode === "signin"
-                    ? onSignIn?.({ email, password })
-                    : onSignUp?.({ email, password, displayName });
-                }
-              }}
-            />
-          </label>
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ color: colors.muted, fontSize: 12 }}>{status || "Gastmodus aktiv."}</span>
-          <Button
-            onClick={() =>
-              mode === "signin"
-                ? onSignIn?.({ email, password })
-                : onSignUp?.({ email, password, displayName })
-            }
-            disabled={!canSubmit}
-          >
-            {mode === "signin" ? "Einloggen" : "Account erstellen"}
-          </Button>
-        </div>
-
-        <div style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 12, background: colors.bg, display: "grid", gap: 10 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <div>
-              <strong>Ohne Login als Gast spielen</strong>
-              <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 12 }}>
-                Dieser Name wird für Lobby, Raumbeitritt und Spielerzuordnung verwendet.
-              </p>
-            </div>
-            <Badge variant="secondary">Aktuell: {currentDisplayName}</Badge>
-          </div>
-
-          <Input
-            value={guestName}
-            onChange={(event) => onGuestNameChange?.(normalizePlayerName(event.target.value))}
-            placeholder="Gastname eingeben"
-          />
-        </div>
-
-        {!configured && (
-          <details style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg }}>
-            <summary style={{ cursor: "pointer", fontWeight: 900 }}>Supabase Login-Verbindung eintragen</summary>
-            <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-              <label style={{ display: "grid", gap: 8 }}>
-                <span style={{ color: colors.muted, fontSize: 13 }}>Project URL</span>
-                <Input
-                  value={config?.url || ""}
-                  onChange={(event) => onConfigChange?.({ url: event.target.value })}
-                  placeholder="https://xxxxx.supabase.co"
-                />
-              </label>
-
-              <label style={{ display: "grid", gap: 8 }}>
-                <span style={{ color: colors.muted, fontSize: 13 }}>anon public key</span>
-                <Input
-                  value={config?.anonKey || ""}
-                  onChange={(event) => onConfigChange?.({ anonKey: event.target.value })}
-                  placeholder="eyJhbGciOi..."
-                  type="password"
-                />
-              </label>
-
-              <label style={{ display: "flex", gap: 8, alignItems: "center", color: colors.muted, fontSize: 13 }}>
-                <input
-                  type="checkbox"
-                  checked={Boolean(config?.enabled)}
-                  onChange={(event) => onConfigChange?.({ enabled: event.target.checked })}
-                />
-                Supabase Login aktivieren
-              </label>
-            </div>
-          </details>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-
 function Header({ onReset, isInGame }) {
-  const session = getInitialSupabaseAuthSession();
-
   return (
     <header style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
       <div>
@@ -5162,12 +4011,9 @@ function Header({ onReset, isInGame }) {
         <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>Privates Musik-Timeline-Quiz als Web-Spiel</p>
       </div>
 
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        {session && <Badge variant="secondary">{getAuthDisplayName(session) || getAuthEmail(session)}</Badge>}
-        <Button variant="secondary" onClick={onReset}>
-          {isInGame ? "Spiel beenden" : "Neustart"}
-        </Button>
-      </div>
+      <Button variant="secondary" onClick={onReset}>
+        {isInGame ? "Spiel beenden" : "Neustart"}
+      </Button>
     </header>
   );
 }
@@ -5355,7 +4201,6 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
   const [selectedSpotifyDeviceId, setSelectedSpotifyDeviceId] = useState("");
   const [savedDeviceId, setSavedDeviceId] = useState("");
   const [savedDeviceName, setSavedDeviceName] = useState("");
-  const [jamSafePlayback, setJamSafePlayback] = useState(() => localStorage.getItem(SPOTIFY_JAM_SAFE_STORAGE_KEY) === "true");
   const [spotifyDetailsOpen, setSpotifyDetailsOpen] = useState(false);
 
   const countdownIntervalRef = useRef(null);
@@ -5426,10 +4271,6 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
   useEffect(() => {
     setPlayLimitSeconds(Math.max(1, Math.min(120, Number(roundPlayLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS))));
   }, [roundPlayLimitSeconds]);
-
-  useEffect(() => {
-    localStorage.setItem(SPOTIFY_JAM_SAFE_STORAGE_KEY, jamSafePlayback ? "true" : "false");
-  }, [jamSafePlayback]);
 
   useEffect(() => {
     return () => {
@@ -5691,7 +4532,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
 
     try {
       setIsBusy(true);
-      setStatus(jamSafePlayback ? "Server startet den Song jam-sicher auf dem aktuell aktiven Spotify-Kontext..." : "Server startet den verdeckten Song auf dem gespeicherten Spotify-Geraet...");
+      setStatus("Server startet den verdeckten Song auf dem gespeicherten Spotify-Geraet...");
 
       const response = await fetch(getRoomSpotifyUrl("/play"), {
         method: "POST",
@@ -5700,8 +4541,6 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
         },
         body: JSON.stringify({
           playLimitSeconds,
-          track: currentTrack,
-          jamSafe: jamSafePlayback,
         }),
       });
 
@@ -5714,7 +4553,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
       setSavedDeviceId(data.deviceId || savedDeviceId);
       setSavedDeviceName(data.deviceName || savedDeviceName);
       startLocalCountdown(playLimitSeconds);
-      setStatus(`${data.jamSafe ? "Jam-sicherer Start" : "Verdeckter Song"} laeuft auf ${data.deviceName || "Spotify"}. TimeLimit: ${playLimitSeconds} Sekunden.`);
+      setStatus(`Verdeckter Song laeuft auf ${data.deviceName || "Spotify"}. TimeLimit: ${playLimitSeconds} Sekunden.`);
       onPlaybackRequested?.();
     } catch (error) {
       setStatus(error.message || "Spotify Wiedergabe fehlgeschlagen.");
@@ -5765,34 +4604,6 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
             <Badge variant={savedDeviceName ? "default" : "secondary"}>{savedDeviceName || "Kein Zielgeraet"}</Badge>
           </div>
         </div>
-
-        {canManageSpotify && spotifyConnected && (
-          <div
-            style={{
-              border: jamSafePlayback ? "1px solid #22c55e" : `1px solid ${colors.border}`,
-              borderRadius: 18,
-              padding: 14,
-              background: jamSafePlayback ? "rgba(34,197,94,0.10)" : colors.bg,
-              display: "grid",
-              gap: 10,
-            }}
-          >
-            <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={jamSafePlayback}
-                onChange={(event) => setJamSafePlayback(event.target.checked)}
-                style={{ marginTop: 3 }}
-              />
-              <span>
-                <strong>Jam-sicher starten</strong>
-                <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>
-                  Für Spotify Jam: kein Gerätewechsel und kein device_id. Host muss den Jam vorher manuell starten und Spotify muss bereits aktiv laufen.
-                </p>
-              </span>
-            </label>
-          </div>
-        )}
 
         {canManageSpotify && spotifyConnected && savedDeviceName && (
           <div
@@ -6022,8 +4833,6 @@ function LobbyCard({
   playerName,
   setPlayerName,
   playerNames,
-  roomClients = [],
-  currentDisplayName = "",
   addPlayer,
   removePlayer,
   startGame,
@@ -6083,40 +4892,7 @@ function LobbyCard({
           <Badge variant="secondary">Lobby</Badge>
           <h2 style={{ fontSize: 30, margin: "4px 0 0", letterSpacing: -0.8 }}>Runde vorbereiten</h2>
           <p style={{ color: colors.muted, margin: 0 }}>
-            Spieler melden sich mit Profil- oder Gastnamen an. Der Host kann zusätzlich manuell Namen ergänzen.
-          </p>
-        </div>
-
-        <div style={{ border: `1px solid ${colors.border}`, borderRadius: 16, padding: 12, background: colors.bg, display: "grid", gap: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <strong>Aktuell sichtbare Namen</strong>
-            <Badge variant="secondary">{buildLobbyDisplayPlayers({ playerNames, roomClients, currentDisplayName, includeLocal: true }).length}</Badge>
-          </div>
-
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {buildLobbyDisplayPlayers({
-              playerNames,
-              roomClients,
-              currentDisplayName,
-              includeLocal: true,
-            }).map((player) => (
-              <span
-                key={player.id}
-                style={{
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: 999,
-                  background: colors.chip,
-                  padding: "7px 10px",
-                  fontWeight: 850,
-                }}
-              >
-                {player.name}
-              </span>
-            ))}
-          </div>
-
-          <p style={{ margin: 0, color: colors.muted, fontSize: 12 }}>
-            Änderungen am Gastnamen ersetzen den alten Namen dieses Browsers. Beim Spielstart werden diese sichtbaren Namen einmal übernommen.
+            Spieler hinzufügen, Ziel festlegen und dann die erste verdeckte Karte ziehen.
           </p>
         </div>
 
@@ -6137,12 +4913,6 @@ function LobbyCard({
           </div>
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {playerNames.length === 0 && (
-              <span style={{ color: colors.muted, fontSize: 13 }}>
-                Noch keine manuell ergänzten Spieler. Die sichtbaren Login-/Gastnamen oben werden beim Spielstart automatisch übernommen.
-              </span>
-            )}
-
             {playerNames.map((name, index) => (
               <button
                 key={name}
@@ -7240,7 +6010,7 @@ function JokerChallengePanel({ gameState, activePlayer, viewerPlayerId, canRevea
 }
 
 
-function TimelineChooser({ playerName, timeline, phase, selectedInsertIndex, setSelectedInsertIndex, canPlace, viewerRole = "spectator" }) {
+function TimelineChooser({ playerName, timeline, phase, selectedInsertIndex, setSelectedInsertIndex, canPlace }) {
   const orderedTimeline = sortTimeline(timeline);
   const disabled = phase !== "placing" || !canPlace;
   const isSlotDisabled = (insertIndex) => disabled || !isInsertSlotAllowed(orderedTimeline, insertIndex);
@@ -7254,12 +6024,6 @@ function TimelineChooser({ playerName, timeline, phase, selectedInsertIndex, set
 
         <Badge variant="secondary">{orderedTimeline.length} Karten</Badge>
       </div>
-
-      {phase === "placing" && !canPlace && (
-        <div style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10, background: colors.bg, color: colors.muted, fontSize: 13 }}>
-          Du bist aktuell nicht als aktiver Spieler zugeordnet. Prüfe rechts „Deine Ansicht“ und wähle deinen Spielernamen.
-        </div>
-      )}
 
       <div
         style={{
@@ -8050,21 +6814,7 @@ function PlayerFocusedCard({ viewerRole, activePlayer, permissions }) {
   );
 }
 
-function LocalRoleCard({
-  viewerPlayerId,
-  setViewerPlayerId,
-  viewerRole,
-  permissions,
-  players,
-  roomClients = [],
-  clientInstanceId,
-  roomCode,
-  playerAccessLocked = false,
-  hostPlayerId = "",
-}) {
-  const safeHostPlayerId = hostPlayerId || players.find((player) => player.role === "host")?.id || "";
-  const selectablePlayers = players.filter((player) => !player.isDisplayOnly);
-  const selectablePlayerIds = new Set(selectablePlayers.map((player) => player.id));
+function LocalRoleCard({ viewerPlayerId, setViewerPlayerId, viewerRole, permissions, players, roomClients = [], clientInstanceId, roomCode }) {
   const claimedByOther = new Set(
     roomClients
       .filter((client) => client.clientInstanceId && client.clientInstanceId !== clientInstanceId)
@@ -8072,22 +6822,8 @@ function LocalRoleCard({
       .filter(Boolean)
   );
 
-  const safeSelectValue =
-    playerAccessLocked &&
-    (
-      viewerPlayerId === "auto-host" ||
-      viewerPlayerId === "spectator" ||
-      (viewerPlayerId !== "auto-player" && !selectablePlayerIds.has(viewerPlayerId))
-    )
-      ? "auto-player"
-      : viewerPlayerId || "auto-player";
-
   function handleViewerChange(event) {
     const nextPlayerId = event.target.value;
-
-    if (playerAccessLocked && (nextPlayerId === "auto-host" || nextPlayerId === safeHostPlayerId)) {
-      return;
-    }
 
     setViewerPlayerId(nextPlayerId);
     storeViewerPlayerId(roomCode, nextPlayerId);
@@ -8098,41 +6834,25 @@ function LocalRoleCard({
       <CardContent style={{ display: "grid", gap: 8 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
           <h3 style={{ margin: 0, fontSize: 16 }}>Deine Ansicht</h3>
-          <Badge variant="secondary">{playerAccessLocked ? "Spieler gesperrt" : players.some(isTeamPlayer) ? "Team" : "Name"}</Badge>
+          <Badge variant="secondary">{players.some(isTeamPlayer) ? "Team" : "Name"}</Badge>
         </div>
 
-        <Select value={safeSelectValue} onChange={handleViewerChange}>
-          {!playerAccessLocked && <option value="auto-host">Host automatisch</option>}
-          <option value="auto-player">Automatisch deinem Namen zuordnen</option>
+        <Select value={viewerPlayerId} onChange={handleViewerChange}>
+          <option value="auto-host">Host automatisch</option>
+          <option value="auto-player">Automatisch per Einladungslink</option>
 
-          {selectablePlayers.map((player) => {
-            const isHostPlayer = player.id === safeHostPlayerId || player.role === "host";
+          {players.map((player) => {
             const isClaimedByOther = claimedByOther.has(player.id);
-            const isDisabled = isClaimedByOther || (playerAccessLocked && isHostPlayer);
-
-            if (playerAccessLocked && isHostPlayer) {
-              return (
-                <option key={player.id} value={player.id} disabled>
-                  {player.name} (Host belegt)
-                </option>
-              );
-            }
 
             return (
-              <option key={player.id} value={player.id} disabled={isDisabled}>
+              <option key={player.id} value={player.id} disabled={isClaimedByOther}>
                 {player.name}{isClaimedByOther ? " (belegt)" : ""}
               </option>
             );
           })}
 
-          {!playerAccessLocked && <option value="spectator">Zuschauer</option>}
+          <option value="spectator">Zuschauer</option>
         </Select>
-
-        {playerAccessLocked && (
-          <p style={{ margin: 0, color: colors.muted, fontSize: 12 }}>
-            Spieler können nicht zur Host-Ansicht wechseln. Wähle hier nur deinen eigenen Spielernamen, falls die automatische Zuordnung nicht passt.
-          </p>
-        )}
       </CardContent>
     </Card>
   );

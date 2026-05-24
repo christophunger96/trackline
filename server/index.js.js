@@ -5,7 +5,6 @@ import { dirname } from "node:path";
 import { Server } from "socket.io";
 
 const PORT = Number(process.env.PORT || 3001);
-const PUBLIC_SERVER_URL = String(process.env.PUBLIC_SERVER_URL || "").trim().replace(/\/+$/, "");
 const rooms = new Map();
 const spotifyLogins = new Map();
 const DEFAULT_PLAY_LIMIT_SECONDS = 20;
@@ -1503,13 +1502,9 @@ function createCodeChallenge(codeVerifier) {
 }
 
 function createServerBaseUrl(req) {
-  if (PUBLIC_SERVER_URL) return PUBLIC_SERVER_URL;
-
   const forwardedProto = String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim();
-  const proto = forwardedProto || "https";
-  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
-
-  return `${proto}://${host}`.replace(/\/+$/, "");
+  const proto = forwardedProto || "http";
+  return `${proto}://${req.headers.host}`;
 }
 
 function sendJson(res, statusCode, payload) {
@@ -1645,14 +1640,10 @@ async function handleSpotifyCallback(req, res) {
     if (!response.ok) {
       const details = await response.text();
       login.error = details || `Spotify Token Fehler ${response.status}`;
-      const isInvalidGrant = details.includes("invalid_grant");
-      const hint = isInvalidGrant
-        ? "<p><strong>Hinweis:</strong> Dieser Spotify-Code ist abgelaufen, wurde bereits benutzt oder die Redirect URI stimmt nicht exakt. Starte den Login bitte neu aus Trackline heraus und prüfe PUBLIC_SERVER_URL sowie die Spotify Dashboard Redirect URI.</p>"
-        : "";
       sendHtml(
         res,
         500,
-        `<h1>Trackline Spotify Login</h1><p>Token-Austausch fehlgeschlagen.</p>${hint}<pre>${details}</pre>`
+        `<h1>Trackline Spotify Login</h1><p>Token-Austausch fehlgeschlagen.</p><pre>${details}</pre>`
       );
       return;
     }
@@ -2139,7 +2130,6 @@ async function handleRoomSpotifyPlay(req, res) {
     const { roomCode, room } = getRoomFromSpotifyPath(req);
     const state = room.gameState;
     const track = state?.currentTrack || body.track;
-    const jamSafe = Boolean(body.jamSafe || body.jamMode || body.jam);
     const playLimitSeconds = Math.max(1, Math.min(120, Math.round(Number(body.playLimitSeconds || state?.playLimitSeconds || DEFAULT_PLAY_LIMIT_SECONDS))));
 
     if (!track) {
@@ -2147,50 +2137,35 @@ async function handleRoomSpotifyPlay(req, res) {
       return;
     }
 
-    if (!jamSafe && !room.spotify.deviceId) {
+    if (!room.spotify.deviceId) {
       sendJson(res, 400, { error: "Kein Spotify-Zielgeraet gespeichert. Host muss Geraete laden und Zielgeraet speichern." });
       return;
     }
 
     const spotifyUri = await searchSpotifyUriForRoom(room, track);
 
-    if (jamSafe) {
-      // Jam-safe mode:
-      // Do not transfer playback and do not target a concrete device_id.
-      // This keeps Spotify's currently active playback context intact.
-      await spotifyFetch(room, "https://api.spotify.com/v1/me/player/play", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          uris: [spotifyUri],
-        }),
-      });
-    } else {
-      await spotifyFetch(room, "https://api.spotify.com/v1/me/player", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          device_ids: [room.spotify.deviceId],
-          play: false,
-        }),
-      });
+    await spotifyFetch(room, "https://api.spotify.com/v1/me/player", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        device_ids: [room.spotify.deviceId],
+        play: false,
+      }),
+    });
 
-      await wait(700);
+    await wait(700);
 
-      await spotifyFetch(room, `https://api.spotify.com/v1/me/player/play?device_id=${encodeURIComponent(room.spotify.deviceId)}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          uris: [spotifyUri],
-        }),
-      });
-    }
+    await spotifyFetch(room, `https://api.spotify.com/v1/me/player/play?device_id=${encodeURIComponent(room.spotify.deviceId)}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        uris: [spotifyUri],
+      }),
+    });
 
     if (room.spotify.playbackTimeout) {
       clearTimeout(room.spotify.playbackTimeout);
@@ -2198,11 +2173,7 @@ async function handleRoomSpotifyPlay(req, res) {
 
     room.spotify.playbackTimeout = setTimeout(async () => {
       try {
-        const pauseUrl = jamSafe
-          ? "https://api.spotify.com/v1/me/player/pause"
-          : `https://api.spotify.com/v1/me/player/pause?device_id=${encodeURIComponent(room.spotify.deviceId)}`;
-
-        await spotifyFetch(room, pauseUrl, {
+        await spotifyFetch(room, `https://api.spotify.com/v1/me/player/pause?device_id=${encodeURIComponent(room.spotify.deviceId)}`, {
           method: "PUT",
         });
       } catch (error) {
@@ -2215,11 +2186,9 @@ async function handleRoomSpotifyPlay(req, res) {
       ok: true,
       trackId: track.id,
       hiddenLabel: "Verdeckter Song",
-      deviceId: jamSafe ? "" : room.spotify.deviceId,
-      deviceName: jamSafe ? "aktiver Spotify/Jam-Kontext" : room.spotify.deviceName || "Spotify-Geraet",
-      spotifyUri,
+      deviceId: room.spotify.deviceId,
+      deviceName: room.spotify.deviceName || "Spotify-Geraet",
       playLimitSeconds,
-      jamSafe,
     });
   } catch (error) {
     sendJson(res, 400, { error: error.message || "Spotify Wiedergabe fehlgeschlagen." });
@@ -2256,23 +2225,8 @@ const httpServer = createServer(async (req, res) => {
     return;
   }
 
-  if (req.url === "/") {
-    sendHtml(
-      res,
-      200,
-      `<h1>Trackline Render Spotify Server</h1><p>Server läuft.</p><p>Public URL: ${createServerBaseUrl(req)}</p><p>Spotify Callback: ${createServerBaseUrl(req)}/spotify/callback</p><p><a href="/health">Health prüfen</a></p>`
-    );
-    return;
-  }
-
   if (req.url === "/health") {
-    sendJson(res, 200, {
-      ok: true,
-      rooms: rooms.size,
-      spotifyLogins: spotifyLogins.size,
-      publicServerUrl: createServerBaseUrl(req),
-      spotifyCallback: `${createServerBaseUrl(req)}/spotify/callback`,
-    });
+    sendJson(res, 200, { ok: true, rooms: rooms.size, spotifyLogins: spotifyLogins.size });
     return;
   }
 
