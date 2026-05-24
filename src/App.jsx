@@ -54,6 +54,7 @@ const DEFAULT_SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || "";
 const DEFAULT_SYNC_SOCKET_URL = import.meta.env?.VITE_SOCKET_URL || "http://127.0.0.1:3001";
 
 const SPOTIFY_CLIENT_ID_STORAGE_KEY = "trackline.spotify.clientId";
+const SPOTIFY_JAM_SAFE_STORAGE_KEY = "trackline.spotifyJamSafePlayback.v1";
 const DEFAULT_SPOTIFY_CLIENT_ID = "eb70ba4d164248d8810e52caae6b40cb";
 const SPOTIFY_CODE_VERIFIER_STORAGE_KEY = "trackline.spotify.codeVerifier";
 const SPOTIFY_TOKEN_STORAGE_KEY = "trackline.spotify.token";
@@ -4326,6 +4327,7 @@ export default function App() {
         body: JSON.stringify({
           playLimitSeconds,
           track: gameState.currentTrack,
+          jamSafe: localStorage.getItem(SPOTIFY_JAM_SAFE_STORAGE_KEY) === "true",
         }),
       });
 
@@ -5353,6 +5355,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
   const [selectedSpotifyDeviceId, setSelectedSpotifyDeviceId] = useState("");
   const [savedDeviceId, setSavedDeviceId] = useState("");
   const [savedDeviceName, setSavedDeviceName] = useState("");
+  const [jamSafePlayback, setJamSafePlayback] = useState(() => localStorage.getItem(SPOTIFY_JAM_SAFE_STORAGE_KEY) === "true");
   const [spotifyDetailsOpen, setSpotifyDetailsOpen] = useState(false);
 
   const countdownIntervalRef = useRef(null);
@@ -5423,6 +5426,10 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
   useEffect(() => {
     setPlayLimitSeconds(Math.max(1, Math.min(120, Number(roundPlayLimitSeconds || DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS))));
   }, [roundPlayLimitSeconds]);
+
+  useEffect(() => {
+    localStorage.setItem(SPOTIFY_JAM_SAFE_STORAGE_KEY, jamSafePlayback ? "true" : "false");
+  }, [jamSafePlayback]);
 
   useEffect(() => {
     return () => {
@@ -5684,7 +5691,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
 
     try {
       setIsBusy(true);
-      setStatus("Server startet den verdeckten Song auf dem gespeicherten Spotify-Geraet...");
+      setStatus(jamSafePlayback ? "Server startet den Song jam-sicher auf dem aktuell aktiven Spotify-Kontext..." : "Server startet den verdeckten Song auf dem gespeicherten Spotify-Geraet...");
 
       const response = await fetch(getRoomSpotifyUrl("/play"), {
         method: "POST",
@@ -5694,6 +5701,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
         body: JSON.stringify({
           playLimitSeconds,
           track: currentTrack,
+          jamSafe: jamSafePlayback,
         }),
       });
 
@@ -5706,7 +5714,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
       setSavedDeviceId(data.deviceId || savedDeviceId);
       setSavedDeviceName(data.deviceName || savedDeviceName);
       startLocalCountdown(playLimitSeconds);
-      setStatus(`Verdeckter Song laeuft auf ${data.deviceName || "Spotify"}. TimeLimit: ${playLimitSeconds} Sekunden.`);
+      setStatus(`${data.jamSafe ? "Jam-sicherer Start" : "Verdeckter Song"} laeuft auf ${data.deviceName || "Spotify"}. TimeLimit: ${playLimitSeconds} Sekunden.`);
       onPlaybackRequested?.();
     } catch (error) {
       setStatus(error.message || "Spotify Wiedergabe fehlgeschlagen.");
@@ -5757,6 +5765,34 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
             <Badge variant={savedDeviceName ? "default" : "secondary"}>{savedDeviceName || "Kein Zielgeraet"}</Badge>
           </div>
         </div>
+
+        {canManageSpotify && spotifyConnected && (
+          <div
+            style={{
+              border: jamSafePlayback ? "1px solid #22c55e" : `1px solid ${colors.border}`,
+              borderRadius: 18,
+              padding: 14,
+              background: jamSafePlayback ? "rgba(34,197,94,0.10)" : colors.bg,
+              display: "grid",
+              gap: 10,
+            }}
+          >
+            <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={jamSafePlayback}
+                onChange={(event) => setJamSafePlayback(event.target.checked)}
+                style={{ marginTop: 3 }}
+              />
+              <span>
+                <strong>Jam-sicher starten</strong>
+                <p style={{ margin: "4px 0 0", color: colors.muted, fontSize: 13 }}>
+                  Für Spotify Jam: kein Gerätewechsel und kein device_id. Host muss den Jam vorher manuell starten und Spotify muss bereits aktiv laufen.
+                </p>
+              </span>
+            </label>
+          </div>
+        )}
 
         {canManageSpotify && spotifyConnected && savedDeviceName && (
           <div
