@@ -3480,6 +3480,34 @@ function getSupabaseSpotifyFunctionUrl(config) {
   }
 }
 
+function normalizeLegacySpotifyHelperUrl(url = "") {
+  const value = String(url || "").trim().replace(/\/+$/, "");
+
+  if (!/^https?:\/\//i.test(value)) return "";
+  if (value.includes("nicht mehr nötig")) return "";
+
+  return value;
+}
+
+function getSpotifyHelperUrl(config, legacyUrl = "") {
+  const legacySpotifyUrl = normalizeLegacySpotifyHelperUrl(legacyUrl);
+
+  // Important: If a Legacy/Render helper is configured, prefer it for Spotify.
+  // This restores the old working Spotify/Jam structure while Supabase still
+  // handles lobby, game sync and stats.
+  if (legacySpotifyUrl) return legacySpotifyUrl;
+
+  return getSupabaseSpotifyFunctionUrl(config);
+}
+
+function getSpotifyHelperBackendLabel(config, legacyUrl = "") {
+  return normalizeLegacySpotifyHelperUrl(legacyUrl)
+    ? "Legacy/Render Spotify Helper"
+    : getSupabaseSpotifyFunctionUrl(config)
+      ? "Supabase Edge Spotify Helper"
+      : "Kein Spotify Helper";
+}
+
 function isSupabaseConfigured(config) {
   return Boolean(config?.enabled && normalizeSupabaseUrl(config.url) && String(config.anonKey || "").trim());
 }
@@ -4374,7 +4402,8 @@ export default function App() {
   const activeTimeline = activePlayer ? sortTimeline(activePlayer.timeline) : [];
   const winner = getFinalWinner(gameState.players, gameState.targetScore);
   const activeRoomCode = gameState.room?.code || roomCode;
-  const spotifyHelperUrl = getSupabaseSpotifyFunctionUrl(supabaseConfig) || socketUrl;
+  const spotifyHelperUrl = getSpotifyHelperUrl(supabaseConfig, socketUrl);
+  const spotifyHelperBackendLabel = getSpotifyHelperBackendLabel(supabaseConfig, socketUrl);
   const syncedSpotifyJamMode = Boolean(gameState.spotifyJamMode || spotifyJamMode);
 
   const resolvedViewerPlayerId = (() => {
@@ -5300,6 +5329,7 @@ export default function App() {
                 canManageSpotify={showAdminPanels}
                 roomCode={gameState.room?.code || roomCode}
                 spotifyAuthServerUrl={spotifyHelperUrl}
+                spotifyHelperBackendLabel={spotifyHelperBackendLabel}
                 roundPlayLimitSeconds={gameState.playLimitSeconds}
                 jamMode={syncedSpotifyJamMode}
                 setJamMode={handleSpotifyJamModeChange}
@@ -6398,15 +6428,15 @@ function MultiplayerSyncCard({ roomCode, socketUrl, setSocketUrl, syncEnabled, s
 
           <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
             <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
-              Nur relevant, wenn du einen alten Render-/Legacy-Fallback testen möchtest. Für den normalen Betrieb ist dieses Feld nicht nötig.
+              Für Spotify/Jam kann hier die alte Render-/Legacy-URL eingetragen werden. Sobald hier eine echte https-URL steht, nutzt Spotify wieder den alten Helper; Supabase bleibt trotzdem für Lobby, GameSync und Stats aktiv.
             </p>
 
             <label style={{ display: "grid", gap: 8 }}>
-              <span style={{ color: colors.muted, fontSize: 13 }}>Legacy Server URL</span>
+              <span style={{ color: colors.muted, fontSize: 13 }}>Legacy/Render Spotify Helper URL</span>
               <Input
                 value={socketUrl}
                 onChange={(event) => setSocketUrl(event.target.value)}
-                placeholder="nicht nötig"
+                placeholder="https://dein-render-server.onrender.com"
               />
             </label>
 
@@ -6421,7 +6451,7 @@ function MultiplayerSyncCard({ roomCode, socketUrl, setSocketUrl, syncEnabled, s
 }
 
 
-function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify, roomCode, spotifyAuthServerUrl, roundPlayLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS, jamMode = false, setJamMode = () => {}, onPlaybackRequested }) {
+function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify, roomCode, spotifyAuthServerUrl, spotifyHelperBackendLabel = "Spotify Helper", roundPlayLimitSeconds = DEFAULT_SPOTIFY_PLAY_LIMIT_SECONDS, jamMode = false, setJamMode = () => {}, onPlaybackRequested }) {
   const [clientId] = useState(() => {
     const storedClientId = localStorage.getItem(SPOTIFY_CLIENT_ID_STORAGE_KEY);
     return storedClientId?.trim() || DEFAULT_SPOTIFY_CLIENT_ID;
@@ -6456,7 +6486,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
     const baseUrl = getSpotifyAuthServerBaseUrl();
 
     if (!baseUrl) {
-      throw new Error("Legacy Spotify/Auth Server fehlt.");
+      throw new Error("Spotify Helper fehlt. Trage bei Technik / Fallback die alte Render-URL ein oder prüfe Supabase.");
     }
 
     return `${baseUrl}/room/${encodeURIComponent(roomCode)}/spotify${path}`;
@@ -6886,12 +6916,13 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
             <Badge variant="secondary">Spotify</Badge>
             <h2 style={{ margin: "10px 0 6px" }}>Ein Host-Account fuer den Raum</h2>
             <p style={{ margin: 0, color: colors.muted }}>
-              Der Host verbindet Spotify in der Lobby oder im Spiel. Im Normalmodus wird ein Zielgeraet gespeichert; im Jam-Modus nutzt Trackline den aktiven Spotify/Jam-Kontext.
+              Der Host verbindet Spotify in der Lobby oder im Spiel. Wenn eine Legacy/Render-URL hinterlegt ist, nutzt Spotify wieder den alten Helper. Supabase bleibt für Spielstand und Statistiken aktiv.
             </p>
           </div>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Badge variant={spotifyConnected ? "default" : "secondary"}>{spotifyConnected ? "Host Spotify verbunden" : "Nicht verbunden"}</Badge>
+            <Badge variant="secondary">{spotifyHelperBackendLabel}</Badge>
             <Badge variant={savedDeviceName ? "default" : "secondary"}>{savedDeviceName || "Kein Zielgeraet"}</Badge>
           </div>
         </div>
@@ -7124,7 +7155,7 @@ function SpotifyPlayerCard({ currentTrack, phase, canPlayTrack, canManageSpotify
             <p style={{ margin: "0 0 8px", color: colors.text, fontWeight: 800 }}>Status</p>
             <p style={{ margin: 0, color: colors.muted }}>{status}</p>
             <p style={{ margin: "6px 0 0", color: colors.muted, fontSize: 12 }}>
-              Raum: {roomCode} | Spotify-Ziel: {spotifyTargetLabel || selectedDevice?.name || "-"}
+              Raum: {roomCode} | Helper: {spotifyHelperBackendLabel} | Spotify-Ziel: {spotifyTargetLabel || selectedDevice?.name || "-"}
             </p>
             <p style={{ margin: "6px 0 0", color: colors.muted, fontSize: 12 }}>
               Redirect URI fuer Spotify Dashboard: {getSpotifyServerRedirectUri()}
