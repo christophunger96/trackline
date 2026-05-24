@@ -2212,25 +2212,14 @@ async function handleRoomSpotifyPlay(req, res) {
 
     sendJson(res, 200, {
       roomCode,
-      deviceId: jamSafe ? "" : room.spotify.deviceId,
-      deviceName: jamSafe ? "aktiver Spotify/Jam-Kontext" : room.spotify.deviceName || "Spotify",
-      spotifyUri,
-      playLimitSeconds,
-      jamSafe,
-    });
-  } catch (error) {
-        console.log(`[spotify pause timeout] ${roomCode}: ${error.message}`);
-      }
-    }, playLimitSeconds * 1000);
-
-    sendJson(res, 200, {
-      roomCode,
       ok: true,
       trackId: track.id,
       hiddenLabel: "Verdeckter Song",
-      deviceId: room.spotify.deviceId,
-      deviceName: room.spotify.deviceName || "Spotify-Geraet",
+      deviceId: jamSafe ? "" : room.spotify.deviceId,
+      deviceName: jamSafe ? "aktiver Spotify/Jam-Kontext" : room.spotify.deviceName || "Spotify-Geraet",
+      spotifyUri,
       playLimitSeconds,
+      jamSafe,
     });
   } catch (error) {
     sendJson(res, 400, { error: error.message || "Spotify Wiedergabe fehlgeschlagen." });
